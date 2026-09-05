@@ -19,7 +19,7 @@ export function ItemView({ item, feedTitle, actions, articleDark }: Props) {
       ? { bg: '#16181d', fg: '#d8dce3', link: '#7cb2ff', border: '#2a2e37' }
       : { bg: '#fff', fg: '#111', link: '#1a4fb8', border: '#d9dce2' }
     return `<!doctype html><html><head><meta charset="utf-8"><style>
-      body { font-family: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif; font-weight: normal; line-height: 1.55; max-width: 46rem; margin: 0 auto; padding: 1rem; color: ${art.fg}; background: ${art.bg}; overflow-wrap: anywhere; word-break: break-word; }
+      body { font-family: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif; font-weight: normal; line-height: 1.55; max-width: 46rem; margin: 0 auto; padding: 0.5rem 1rem; color: ${art.fg}; background: ${art.bg}; overflow-wrap: anywhere; word-break: break-word; }
       img { max-width: 100%; height: auto; }
       a { color: ${art.link}; overflow-wrap: anywhere; word-break: break-word; }
     </style></head><body>${item.body}</body></html>`
