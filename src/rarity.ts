@@ -1,4 +1,5 @@
 import type { NewsItem } from './api/types'
+import { FEED_WINDOW } from './api/sync'
 
 /**
  * Weighted rarity sort — faithful port of dripfeed's
@@ -12,6 +13,11 @@ import type { NewsItem } from './api/types'
  *
  * Rare publishers (large gap) get a small multiplier and float up; chatty
  * ones sink. Feeds with < 2 dated items get the neutral multiplier 1.0.
+ *
+ * STABILITY: the gap sample is the newest FEED_WINDOW (20) items PER FEED by
+ * publish date — the same window the initial sync fetches. Once a feed has
+ * 20 items its gap/mult/rarity are locked; loading older history via
+ * load-more never enters the top-20 set, so the score doesn't drift.
  */
 
 export type RarityInfo = {
@@ -20,7 +26,11 @@ export type RarityInfo = {
   rarity: number // gap/(gap+72), 0..1 — the displayed % is this ×100
 }
 
-/** Per-feed avg inter-article gap in hours (LAG over pub_date, ms → h). */
+/**
+ * Per-feed avg inter-article gap in hours, computed from the NEWEST
+ * FEED_WINDOW dated items per feed (by pubDate). Stable under growth: older
+ * items can't displace the top N.
+ */
 export function feedGaps(items: Iterable<NewsItem>): Map<number, number> {
   const dates = new Map<number, number[]>()
   for (const it of items) {
@@ -34,9 +44,11 @@ export function feedGaps(items: Iterable<NewsItem>): Map<number, number> {
   for (const [feedId, arr] of dates) {
     if (arr.length < 2) continue
     arr.sort((a, b) => a - b)
+    const newest = arr.slice(-FEED_WINDOW) // most recent 20 by pubDate
+    if (newest.length < 2) continue
     let sum = 0
-    for (let i = 1; i < arr.length; i++) sum += (arr[i] - arr[i - 1]) / 3_600_000
-    gaps.set(feedId, sum / (arr.length - 1))
+    for (let i = 1; i < newest.length; i++) sum += (newest[i] - newest[i - 1]) / 3_600_000
+    gaps.set(feedId, sum / (newest.length - 1))
   }
   return gaps
 }
