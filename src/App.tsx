@@ -301,26 +301,28 @@ function filterView(
   let list: NewsItem[]
   switch (view.kind) {
     case 'all':
-      // Global only-unread/all toggle governs this view.
-      list = showAll ? items : items.filter((i) => i.unread)
+      // Dedicated view: ALL items, independent of the global toggle.
+      list = items
       break
     case 'allUnread':
-      // Dedicated unread filter: always unread only.
+      // Dedicated view: unread only, independent of the global toggle.
       list = items.filter((i) => i.unread)
       break
     case 'starred':
-      list = items.filter((i) => i.starred && (showAll || i.unread))
+      // Independent of the global toggle: always show all starred.
+      list = items.filter((i) => i.starred)
       break
     case 'feed':
     case 'folder':
-      // B: browsing a feed (or a folder's combined feed) is about reading
-      // old posts — always show all items, ignore the global toggle.
+      // Feeds/folders RESPECT the global only-unread/all toggle, since
+      // these are the views you read through day-to-day.
       list = items.filter((i) => {
         if (view.kind === 'feed') return i.feedId === view.id
         // folder: item belongs if its feed is a member of the folder
         const memberFeeds = feedOfFolder?.get(view.id)
         return !!memberFeeds && memberFeeds.has(i.feedId)
       })
+      if (!showAll) list = list.filter((i) => i.unread)
       break
   }
   // Feed/folder views stay newest-first (rarity is a cross-feed view).
