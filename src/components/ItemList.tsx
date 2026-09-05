@@ -9,10 +9,11 @@ interface Props {
 }
 
 export function ItemList({ items, selectedId, feedTitle, onSelect, onRead }: Props) {
-  const sorted = [...items].sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
+  // Order is owned by the caller (App applies newest or rarity); never
+  // re-sort here or the toggle silently no-ops.
   return (
     <ul className="item-list">
-      {sorted.map((item) => (
+      {items.map((item) => (
         <li
           key={item.id}
           className={`item ${item.id === selectedId ? 'selected' : ''} ${item.unread ? '' : 'read'}`}
