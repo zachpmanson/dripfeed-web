@@ -195,6 +195,11 @@ body {
   align-items: baseline;
 }
 
+.rarity-line {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
 .feed {
   color: var(--accent);
 }

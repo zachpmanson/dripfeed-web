@@ -6,7 +6,7 @@ import { SettingsForm } from './components/SettingsForm'
 import { Sidebar, type View } from './components/Sidebar'
 import { ItemList } from './components/ItemList'
 import { ItemView } from './components/ItemView'
-import { rarityMultipliers, sortByRarity } from './rarity'
+import { rarityMultipliers, rarityStats, sortByRarity } from './rarity'
 import type { NewsItem } from './api/types'
 
 type SortMode = 'newest' | 'rarity'
@@ -43,6 +43,7 @@ export default function App() {
   const { items, feeds, folders } = newsQuery.data
 
   const visibleItems = filterView(items, view, sortMode)
+  const rarStats = sortMode === 'rarity' ? rarityStats(items.values()) : undefined
 
   const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
   const selected =
@@ -104,6 +105,8 @@ export default function App() {
           onRead={(item: NewsItem) => {
             actions.toggleRead.mutate({ id: item.id, unread: item.unread })
           }}
+          rarityMode={sortMode === 'rarity'}
+          rarityStats={rarStats}
         />
         <ItemView item={selected} feedTitle={feedTitle} actions={actions} />
       </main>

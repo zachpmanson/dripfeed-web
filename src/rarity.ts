@@ -14,12 +14,14 @@ import type { NewsItem } from './api/types'
  * ones sink. Feeds with < 2 dated items get the neutral multiplier 1.0.
  */
 
-export function rarityMultipliers(
-  items: Iterable<NewsItem>,
-  now = Date.now(),
-): Map<number, number> {
-  // Group pub_dates per feed, sorted ascending by date. Avoids allocating
-  // full arrays per feed when we only need the sorted span.
+export type RarityInfo = {
+  gap: number // avg inter-article gap in hours
+  mult: number // weighted multiplier (sort + effective age)
+  rarity: number // gap/(gap+72), 0..1 — the displayed % is this ×100
+}
+
+/** Per-feed avg inter-article gap in hours (LAG over pub_date, ms → h). */
+export function feedGaps(items: Iterable<NewsItem>): Map<number, number> {
   const dates = new Map<number, number[]>()
   for (const it of items) {
     if (!it.pubDate) continue
@@ -28,18 +30,42 @@ export function rarityMultipliers(
     arr.push(it.pubDate)
   }
 
-  const mult = new Map<number, number>()
+  const gaps = new Map<number, number>()
   for (const [feedId, arr] of dates) {
-    if (arr.length < 2) continue // no inter-arrival sample → neutral 1.0
+    if (arr.length < 2) continue
     arr.sort((a, b) => a - b)
     let sum = 0
     for (let i = 1; i < arr.length; i++) sum += (arr[i] - arr[i - 1]) / 3_600_000
-    const avgGap = sum / (arr.length - 1)
+    gaps.set(feedId, sum / (arr.length - 1))
+  }
+  return gaps
+}
+
+export function rarityMultipliers(
+  items: Iterable<NewsItem>,
+  _now = Date.now(),
+): Map<number, number> {
+  const mult = new Map<number, number>()
+  for (const [feedId, avgGap] of feedGaps(items)) {
     const raw = Math.pow(72 / Math.max(0.1, avgGap), 2.5)
     mult.set(feedId, Math.min(100, Math.max(0.0001, raw)))
   }
-  void now
   return mult
+}
+
+/** Per-feed stats for the list display: gap, mult, rarity%. */
+export function rarityStats(items: Iterable<NewsItem>): Map<number, RarityInfo> {
+  const out = new Map<number, RarityInfo>()
+  for (const [feedId, gap] of feedGaps(items)) {
+    const rarity = gap / (gap + 72)
+    const raw = Math.pow(72 / Math.max(0.1, gap), 2.5)
+    out.set(feedId, {
+      gap,
+      rarity,
+      mult: Math.min(100, Math.max(0.0001, raw)),
+    })
+  }
+  return out
 }
 
 export function sortByRarity(
