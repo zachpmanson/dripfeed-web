@@ -121,6 +121,40 @@ body {
   padding: 0.8rem 0.6rem 0.25rem;
 }
 
+.folder-head,
+.folder-head-static {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.35rem 0.6rem;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.folder-head:hover {
+  background: var(--border);
+}
+
+.folder-head .folder-name {
+  padding: 0;
+}
+
+.caret {
+  width: 0;
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.caret.collapsed {
+  transform: rotate(-90deg);
+}
+
 .feed-name {
   overflow: hidden;
   text-overflow: ellipsis;

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { NewsFolder, NewsFeed, NewsItem } from '../api/types'
 import { unreadCount, starredCount } from '../selectors'
 
@@ -14,11 +15,35 @@ interface Props {
   onSelect: (v: View) => void
 }
 
+const COLLAPSE_KEY = 'dripfeed.folders.collapsed'
+
 export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
   const totalUnread = unreadCount(items)
   const totalStarred = starredCount(items)
   const feedEntries = [...feeds.values()].sort((a, b) => a.title.localeCompare(b.title))
+
+  // Sorted by folder NAME, then ungrouped ("Feeds") always last.
+  const sortedFolders = [...folders]
+    .filter((f) => feedEntries.some((fe) => fe.folderId === f.id))
+    .sort((a, b) => a.name.localeCompare(b.name))
   const ungrouped = feedEntries.filter((f) => f.folderId === null)
+
+  const [collapsed, setCollapsed] = useState<Set<number>>(() => {
+    try {
+      const raw = localStorage.getItem(COLLAPSE_KEY)
+      return raw ? new Set(JSON.parse(raw) as number[]) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
+
+  const toggle = (id: number) => {
+    const next = new Set(collapsed)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setCollapsed(next)
+    localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...next]))
+  }
 
   return (
     <nav className="sidebar">
@@ -38,22 +63,32 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
           <span className="count">{totalStarred}</span>
         </button>
 
-        {folders.map((folder) => {
+        {sortedFolders.map((folder) => {
           const inFolder = feedEntries.filter((f) => f.folderId === folder.id)
-          if (inFolder.length === 0) return null
+          const isCollapsed = collapsed.has(folder.id)
           return (
             <div key={folder.id} className="folder">
-              <div className="folder-name">{folder.name}</div>
-              {inFolder.map((f) => (
-                <FeedRow key={f.id} feed={f} items={items} view={view} onSelect={onSelect} />
-              ))}
+              <button
+                className="folder-head"
+                onClick={() => toggle(folder.id)}
+                aria-expanded={!isCollapsed}
+              >
+                <span className={`caret${isCollapsed ? ' collapsed' : ''}`}>▾</span>
+                <span className="folder-name">{folder.name}</span>
+              </button>
+              {!isCollapsed &&
+                inFolder.map((f) => (
+                  <FeedRow key={f.id} feed={f} items={items} view={view} onSelect={onSelect} />
+                ))}
             </div>
           )
         })}
 
         {ungrouped.length > 0 && (
           <div className="folder">
-            <div className="folder-name">Feeds</div>
+            <div className="folder-head-static">
+              <span className="folder-name no-caret">Feeds</span>
+            </div>
             {ungrouped.map((f) => (
               <FeedRow key={f.id} feed={f} items={items} view={view} onSelect={onSelect} />
             ))}
