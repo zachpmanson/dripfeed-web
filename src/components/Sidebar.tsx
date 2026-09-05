@@ -81,7 +81,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, onMet
             }}
             aria-label={allCollapsed ? 'expand all' : 'collapse all'}
           >
-            {allCollapsed ? '❯' : '⌄'}
+            <span className={`caret${allCollapsed ? ' collapsed' : ''}`} />
           </button>
         </div>
       </div>
@@ -128,7 +128,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, onMet
                     onClick={() => toggle(folder.id)}
                     aria-expanded={!isCollapsed}
                   >
-                    <span className={`caret${isCollapsed ? ' collapsed' : ''}`}>⌄</span>
+                    <span className={`caret${isCollapsed ? ' collapsed' : ''}`} />
                   </button>
                 </span>
               </div>

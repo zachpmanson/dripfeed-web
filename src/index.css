@@ -228,13 +228,18 @@ body {
 }
 
 .caret {
-  font-size: 0.7rem;
-  flex-shrink: 0;
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg); /* points down */
   transition: transform 0.15s ease;
+  flex-shrink: 0;
 }
 
 .caret.collapsed {
-  transform: rotate(-90deg);
+  transform: rotate(-45deg); /* points right */
 }
 
 .modal-backdrop,

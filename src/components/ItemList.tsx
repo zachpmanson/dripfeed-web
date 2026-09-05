@@ -7,10 +7,8 @@ import type { RarityInfo } from '../rarity'
  */
 export function titleFor(item: NewsItem): string {
   if (item.title && item.title.trim()) return item.title
-  const text = (item.body || '')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+  const doc = new DOMParser().parseFromString(item.body || '', 'text/html')
+  const text = (doc.body.textContent || '').replace(/\s+/g, ' ').trim()
   if (!text) return '(untitled)'
   const m = text.match(/^[^.?!]*[.?!]/)
   const first = (m ? m[0] : text).trim()
