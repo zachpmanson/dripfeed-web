@@ -33,6 +33,16 @@ export function onStoreChange(l: () => void): () => void {
   return () => listeners.delete(l)
 }
 
+/**
+ * Ping React that the local DB changed WITHOUT a server round-trip.
+ * Optimistic read/star toggles write the DB directly (actions.ts) — they
+ * must hit the listeners too, or the UI only catches up on the next poll
+ * or reload.
+ */
+export function notifyLocalChange(): void {
+  emit()
+}
+
 export function getStatus(): SyncStatus {
   return status
 }
