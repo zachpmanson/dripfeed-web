@@ -157,6 +157,7 @@ body {
 .sidebar button.active {
   background: var(--border);
   box-shadow: inset 2px 0 0 var(--accent);
+  border-radius: 0 6px 6px 0; /* left bar square against the edge */
 }
 
 .caret-btn {
