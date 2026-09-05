@@ -3,7 +3,11 @@ import type { DBSchema, IDBPDatabase } from 'idb'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
 
 const DB_NAME = 'dripfeed'
-const DB_VERSION = 1
+// v2: per-feed initial sync now covers EVERY feed (the old worker returned
+// after one feed, syncing only CONCURRENCY=6 feeds and leaving the rest
+// without cursors — feeds never populated). Bump forces existing stores to
+// wipe and re-sync so the missing feeds get their windows + cursors.
+const DB_VERSION = 2
 
 interface DripfeedDB extends DBSchema {
   items: {
@@ -33,7 +37,17 @@ let dbPromise: Promise<IDBPDatabase<DripfeedDB>> | null = null
 function getDB(): Promise<IDBPDatabase<DripfeedDB>> {
   if (!dbPromise) {
     dbPromise = openDB<DripfeedDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 2) {
+          // v1 -> v2: drop everything; fullSync reruns for all feeds.
+          for (const name of ['items', 'feeds', 'folders', 'meta'] as const) {
+            try {
+              db.deleteObjectStore(name)
+            } catch {
+              /* store may not exist yet */
+            }
+          }
+        }
         const items = db.createObjectStore('items', { keyPath: 'id' })
         items.createIndex('by-feed', 'feedId')
         items.createIndex('by-pubDate', 'pubDate')

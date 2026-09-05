@@ -25,17 +25,17 @@ export async function fetchInitial(
   const feedWindows = new Map<number, number>()
   const map = (arr: NewsFeed[], fn: (f: NewsFeed) => Promise<NewsItem[]>) => {
     let i = 0
-    const workers = Array.from({ length: Math.min(CONCURRENCY, arr.length) }, async () => {
+    const out: NewsItem[][] = Array.from({ length: Math.min(CONCURRENCY, arr.length) }, () => [])
+    const workers = Array.from({ length: Math.min(CONCURRENCY, arr.length) }, async (_w, wi) => {
       while (i < arr.length) {
         const f = arr[i++]
         const items = await fn(f)
         done += items.length
         onProgress?.(done)
-        return items
+        out[wi].push(...items) // collect per worker, return at the END of the loop
       }
-      return []
     })
-    return Promise.all(workers).then((r) => r.flat())
+    return Promise.all(workers).then(() => out.flat())
   }
 
   const [perFeed, starred] = await Promise.all([
