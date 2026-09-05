@@ -3,6 +3,7 @@ import { fetchFeedWindow, fetchInitial, fetchMeta } from './api/sync'
 import { fetchItems } from './api/news'
 import { LIST_TYPES } from './api/types'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
+import { clearSettings } from './settings'
 import type { Settings } from './settings'
 import { FEED_WINDOW } from './api/sync'
 
@@ -150,6 +151,13 @@ export async function resetLocal(): Promise<void> {
   await dbClear()
   dbReady = false
   status = { stage: 'idle', done: 0 }
+  // Logout = purge EVERYTHING: the local DB and the stored credentials.
+  // The old reset only cleared IDB, so a refresh re-read `dripfeed.settings`
+  // from localStorage and "remembered" the account.
+  clearSettings()
+  localStorage.removeItem('dripfeed.sort')
+  localStorage.removeItem('dripfeed.showAll')
+  localStorage.removeItem('dripfeed.folders.collapsed')
 }
 
 export function isDbReady(): boolean {
