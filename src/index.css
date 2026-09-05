@@ -140,6 +140,7 @@ body {
 .folder-head-static {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.4rem;
   width: 100%;
   padding: 0.35rem 0.6rem;
@@ -161,8 +162,8 @@ body {
 }
 
 .caret {
-  width: 0;
-  display: inline-block;
+  font-size: 0.7rem;
+  flex-shrink: 0;
   transition: transform 0.15s ease;
 }
 

@@ -73,8 +73,8 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
                 onClick={() => toggle(folder.id)}
                 aria-expanded={!isCollapsed}
               >
-                <span className={`caret${isCollapsed ? ' collapsed' : ''}`}>▾</span>
                 <span className="folder-name">{folder.name}</span>
+                <span className={`caret${isCollapsed ? ' collapsed' : ''}`}>▾</span>
               </button>
               {!isCollapsed &&
                 inFolder.map((f) => (
