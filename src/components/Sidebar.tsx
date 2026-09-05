@@ -1,5 +1,5 @@
 import type { NewsFolder, NewsFeed, NewsItem } from '../api/types'
-import { unreadCount } from '../store'
+import { unreadCount, starredCount } from '../selectors'
 
 export type View =
   | { kind: 'unread' }
@@ -9,14 +9,14 @@ export type View =
 interface Props {
   feeds: Map<number, NewsFeed>
   folders: NewsFolder[]
-  items: Map<number, NewsItem>
+  items: NewsItem[]
   view: View
   onSelect: (v: View) => void
 }
 
 export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
   const totalUnread = unreadCount(items)
-  const totalStarred = [...items.values()].filter((i) => i.starred).length
+  const totalStarred = starredCount(items)
   const feedEntries = [...feeds.values()].sort((a, b) => a.title.localeCompare(b.title))
   const ungrouped = feedEntries.filter((f) => f.folderId === null)
 
@@ -71,7 +71,7 @@ function FeedRow({
   onSelect,
 }: {
   feed: NewsFeed
-  items: Map<number, NewsItem>
+  items: NewsItem[]
   view: View
   onSelect: (v: View) => void
 }) {

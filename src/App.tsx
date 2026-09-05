@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useNews, useNewsActions } from './hooks'
-import { clearSettings, loadSettings } from './settings'
+import { useStore } from './hooks'
+import { loadSettings } from './settings'
 import type { Settings } from './settings'
 import { SettingsForm } from './components/SettingsForm'
 import { Sidebar, type View } from './components/Sidebar'
@@ -32,8 +32,7 @@ export default function App() {
     localStorage.setItem(SHOW_ALL_KEY, showAll ? '1' : '0')
   }, [showAll])
 
-  const newsQuery = useNews(settings)
-  const actions = useNewsActions(settings)
+  const store = useStore(settings)
 
   if (!settings) {
     return (
@@ -46,14 +45,42 @@ export default function App() {
     )
   }
 
-  const { items, feeds, folders } = newsQuery.data
+  if (!store.ready) {
+    return (
+      <div className="sync-gate">
+        <div className="sync-card">
+          <h1>dripfeed</h1>
+          {store.error ? (
+            <div className="error">{store.error}</div>
+          ) : store.progress ? (
+            <>
+              <p className="muted">
+                syncing… {store.progress.done} items
+              </p>
+              <div className="progress">
+                <div
+                  className="progress-bar"
+                  style={{ width: `${Math.min(100, Math.max(4, (store.progress.done / Math.max(1, store.progress.total)) * 100))}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            <p className="muted">connecting…</p>
+          )}
+          <button onClick={() => store.actions.reset()}>start over</button>
+        </div>
+      </div>
+    )
+  }
+
+  const { items, feeds, folders, count, allLoaded } = store
 
   const visibleItems = filterView(items, view, sortMode, showAll)
-  const rarStats = sortMode === 'rarity' ? rarityStats(items.values()) : undefined
+  const rarStats = sortMode === 'rarity' ? rarityStats(items) : undefined
 
   const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
   const selected =
-    (selectedId !== null && items.get(selectedId)) || visibleItems[0] || null
+    (selectedId !== null && items.find((i) => i.id === selectedId)) || visibleItems[0] || null
 
   return (
     <div className="app">
@@ -61,24 +88,15 @@ export default function App() {
         <h1>dripfeed</h1>
         <div className="header-right">
           <div className="seg" title="items shown: all, or only unread">
-            <button
-              className={!showAll ? 'active' : ''}
-              onClick={() => setShowAll(false)}
-            >
+            <button className={!showAll ? 'active' : ''} onClick={() => setShowAll(false)}>
               only unread
             </button>
-            <button
-              className={showAll ? 'active' : ''}
-              onClick={() => setShowAll(true)}
-            >
+            <button className={showAll ? 'active' : ''} onClick={() => setShowAll(true)}>
               all
             </button>
           </div>
           <div className="seg">
-            <button
-              className={sortMode === 'newest' ? 'active' : ''}
-              onClick={() => setSortMode('newest')}
-            >
+            <button className={sortMode === 'newest' ? 'active' : ''} onClick={() => setSortMode('newest')}>
               newest
             </button>
             <button
@@ -89,54 +107,50 @@ export default function App() {
               rarity
             </button>
           </div>
-          {newsQuery.isFetching && <span className="muted sync">syncing…</span>}
-          <button
-            onClick={() => {
-              void newsQuery.refetch()
-            }}
-          >
-            refresh
-          </button>
-          <button
-            onClick={() => {
-              clearSettings()
-              setSettings(null)
-            }}
-          >
-            settings
-          </button>
+          <span className="muted sync">{count} local</span>
+          <button onClick={() => store.actions.reset()}>settings</button>
         </div>
       </header>
 
       <main className="app-body">
-        {newsQuery.isError && <div className="error">{String(newsQuery.error)}</div>}
-        <Sidebar feeds={feeds} folders={folders} items={items}
+        {store.error && <div className="error">{store.error}</div>}
+        <Sidebar
+          feeds={feeds}
+          folders={folders}
+          items={items}
           view={view}
           onSelect={(v) => {
             setView(v)
             setSelectedId(null)
           }}
         />
-        <ItemList
-          items={visibleItems}
-          selectedId={selected?.id ?? null}
-          feedTitle={feedTitle}
-          onSelect={setSelectedId}
-          onRead={(item: NewsItem) => {
-            actions.toggleRead.mutate({ id: item.id, unread: item.unread })
-          }}
-          rarityMode={sortMode === 'rarity'}
-          rarityStats={rarStats}
-          emptyText={showAll ? 'No items here.' : 'No unread items. Nothing dripping?'}
-        />
-        <ItemView item={selected} feedTitle={feedTitle} actions={actions} />
+        <div className="list-pane">
+          <ItemList
+            items={visibleItems}
+            selectedId={selected?.id ?? null}
+            feedTitle={feedTitle}
+            onSelect={setSelectedId}
+            onRead={(item: NewsItem) => {
+              void store.actions.setRead(item, !item.unread)
+            }}
+            rarityMode={sortMode === 'rarity'}
+            rarityStats={rarStats}
+            emptyText={showAll ? 'No items here.' : 'No unread items. Nothing dripping?'}
+          />
+          {!allLoaded && visibleItems.length > 0 && (
+            <button className="load-more" onClick={() => store.loadMore()}>
+              load more
+            </button>
+          )}
+        </div>
+        <ItemView item={selected} feedTitle={feedTitle} actions={store.actions} />
       </main>
     </div>
   )
 }
 
 function filterView(
-  items: Map<number, NewsItem>,
+  items: NewsItem[],
   view: View,
   sortMode: SortMode,
   showAll: boolean,
@@ -144,22 +158,18 @@ function filterView(
   let list: NewsItem[]
   switch (view.kind) {
     case 'unread':
-      list = showAll
-        ? [...items.values()]
-        : [...items.values()].filter((i) => i.unread)
+      list = showAll ? items : items.filter((i) => i.unread)
       break
     case 'starred':
-      list = [...items.values()].filter((i) => i.starred && (showAll || i.unread))
+      list = items.filter((i) => i.starred && (showAll || i.unread))
       break
     case 'feed':
-      list = [...items.values()].filter((i) => i.feedId === view.id && (showAll || i.unread))
+      list = items.filter((i) => i.feedId === view.id && (showAll || i.unread))
       break
   }
-  // A single feed is always newest-first — rarity is cross-feed by design.
   if (view.kind !== 'feed' && sortMode === 'rarity') {
-    // Multipliers come from the FULL history, not just the visible slice —
-    // same as dripfeed: gaps are computed over the whole item table.
-    const mult = rarityMultipliers(items.values())
+    // Multipliers over the loaded set (DB-backed: full history after sync).
+    const mult = rarityMultipliers(items)
     return sortByRarity(list, mult)
   }
   return list.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))

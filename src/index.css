@@ -217,6 +217,54 @@ body {
   justify-content: center;
 }
 
+/* full-hydration gate */
+.sync-gate {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sync-card {
+  width: 22rem;
+  text-align: center;
+}
+
+.sync-card h1 {
+  font-size: 1.4rem;
+}
+
+.progress {
+  width: 100%;
+  height: 8px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 0.6rem 0;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.list-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.list-pane .item-list {
+  flex: 1;
+}
+
+.load-more {
+  margin: 0.6rem;
+  width: calc(100% - 1.2rem);
+  padding: 0.5rem;
+}
+
 .reader-title {
   margin: 0 0 0.4rem;
   font-size: 1.15rem;

@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
 import type { NewsItem } from '../api/types'
-import type { useNewsActions } from '../hooks'
+import type { useStore } from '../hooks'
 
 interface Props {
   item: NewsItem | null
   feedTitle: (feedId: number) => string
-  actions: ReturnType<typeof useNewsActions>
+  actions: ReturnType<typeof useStore>['actions']
 }
 
 export function ItemView({ item, feedTitle, actions }: Props) {
@@ -37,10 +37,10 @@ export function ItemView({ item, feedTitle, actions }: Props) {
         <span className="muted">{item.pubDate ? new Date(item.pubDate).toLocaleString() : ''}</span>
       </div>
       <div className="reader-actions">
-        <button onClick={() => actions.toggleRead.mutate({ id: item.id, unread: item.unread })}>
+        <button onClick={() => actions.setRead(item, !item.unread)}>
           {item.unread ? 'mark read' : 'mark unread'}
         </button>
-        <button onClick={() => actions.toggleStar.mutate({ id: item.id })}>
+        <button onClick={() => actions.setStar(item, !item.starred)}>
           {item.starred ? 'unstar' : 'star'}
         </button>
       </div>
