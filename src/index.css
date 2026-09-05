@@ -49,6 +49,26 @@ body {
 .header-right {
   display: flex;
   gap: 0.5rem;
+  align-items: center;
+}
+
+.seg {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.seg button {
+  border: none;
+  border-radius: 0;
+  padding: 0.3rem 0.7rem;
+  background: transparent;
+}
+
+.seg button.active {
+  background: var(--border);
+  color: var(--text);
 }
 
 .app-body {
