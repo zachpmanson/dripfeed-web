@@ -26,23 +26,35 @@ export function ItemView({ item, feedTitle, actions }: Props) {
 
   return (
     <article className="reader">
-      <h2 className="reader-title">
-        <a href={item.url} target="_blank" rel="noreferrer">
-          {item.title || '(untitled)'}
-        </a>
-      </h2>
+      <div className="reader-head">
+        <h2 className="reader-title">
+          <a href={item.url} target="_blank" rel="noreferrer">
+            {item.title || '(untitled)'}
+          </a>
+        </h2>
+        <div className="reader-actions">
+          <button
+            className="icon-btn"
+            title={item.unread ? 'mark read' : 'mark unread'}
+            aria-label={item.unread ? 'mark read' : 'mark unread'}
+            onClick={() => actions.setRead(item, !item.unread)}
+          >
+            {item.unread ? '○' : '●'}
+          </button>
+          <button
+            className="icon-btn"
+            title={item.starred ? 'unstar' : 'star'}
+            aria-label={item.starred ? 'unstar' : 'star'}
+            onClick={() => actions.setStar(item, !item.starred)}
+          >
+            {item.starred ? '★' : '☆'}
+          </button>
+        </div>
+      </div>
       <div className="item-meta">
         <span className="feed">{feedTitle(item.feedId)}</span>
         {item.author && <span className="muted">by {item.author}</span>}
         <span className="muted">{item.pubDate ? new Date(item.pubDate).toLocaleString() : ''}</span>
-      </div>
-      <div className="reader-actions">
-        <button onClick={() => actions.setRead(item, !item.unread)}>
-          {item.unread ? 'mark read' : 'mark unread'}
-        </button>
-        <button onClick={() => actions.setStar(item, !item.starred)}>
-          {item.starred ? 'unstar' : 'star'}
-        </button>
       </div>
       <iframe className="reader-frame" sandbox="allow-same-origin" srcDoc={srcdoc} title={item.title} />
     </article>
