@@ -422,6 +422,32 @@ body {
   white-space: nowrap;
 }
 
+.feed-left {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.feed-icon {
+  border-radius: 3px;
+  flex-shrink: 0;
+  object-fit: contain;
+  background: var(--bg);
+}
+
+.feed-icon.fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 3px;
+}
+
 .count {
   font-size: 0.7rem;
   color: var(--muted);
@@ -492,6 +518,11 @@ body {
   display: flex;
   gap: 0.5rem;
   align-items: baseline;
+}
+
+/* List rows: icon + feed + right-aligned date sit centred vertically. */
+.item-list .item-meta {
+  align-items: center;
 }
 
 /* reader pane: whole header (title + date + author) sits above this */

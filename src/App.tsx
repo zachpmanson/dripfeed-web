@@ -157,6 +157,7 @@ export default function App() {
   const visibleItems = filterView(pool, view, sortMode, showAll, rarMult, feedOfFolder)
 
   const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
+  const feedById = (feedId: number) => feeds.get(feedId)
   const selected =
     (selectedId !== null && visibleItems.find((i) => i.id === selectedId)) || visibleItems[0] || null
 
@@ -223,6 +224,7 @@ export default function App() {
             items={visibleItems}
             selectedId={selected?.id ?? null}
             feedTitle={feedTitle}
+            feedById={feedById}
             onSelect={setSelectedId}
             onRead={(item: NewsItem) => {
               void store.actions.setRead(item, !item.unread)

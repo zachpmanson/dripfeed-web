@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
-import type { NewsItem } from '../api/types'
+import type { NewsItem, NewsFeed } from '../api/types'
 import type { RarityInfo } from '../rarity'
 import type { LoadMoreProgress } from '../store'
+import { FeedIcon } from './FeedIcon'
 
 /**
  * Fallback title for untitled items: strip HTML from the body and take the
@@ -21,6 +22,7 @@ interface Props {
   items: NewsItem[]
   selectedId: number | null
   feedTitle: (feedId: number) => string
+  feedById?: (feedId: number) => NewsFeed | undefined
   onSelect: (id: number) => void
   onRead: (item: NewsItem) => void // optimistic removal hook once read
   rarityMode?: boolean
@@ -37,6 +39,7 @@ export function ItemList({
   items,
   selectedId,
   feedTitle,
+  feedById,
   onSelect,
   onRead,
   rarityMode = false,
@@ -90,6 +93,10 @@ export function ItemList({
             {titleFor(item)}
           </div>
           <div className="item-meta">
+            {feedById && (() => {
+              const f = feedById(item.feedId)
+              return f ? <FeedIcon feed={f} size={12} /> : null
+            })()}
             <span className="feed">{feedTitle(item.feedId)}</span>
             {rarityMode ? (
               <span className="rarity-line" title="real age / effective age / rarity">

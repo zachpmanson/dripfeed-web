@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { NewsFolder, NewsFeed, NewsItem } from '../api/types'
 import { unreadCount, starredCount } from '../selectors'
 import { FeedContextMenu } from './FeedContextMenu'
+import { FeedIcon } from './FeedIcon'
 import type { Settings } from '../settings'
 
 export type View =
@@ -189,7 +190,10 @@ function FeedRow({
       onClick={() => onSelect({ kind: 'feed', id: feed.id })}
       onContextMenu={(e) => onCtx(e, feed)}
     >
-      <span className="feed-name">{feed.title}</span>
+      <span className="feed-left">
+        <FeedIcon feed={feed} size={14} />
+        <span className="feed-name">{feed.title}</span>
+      </span>
       {n > 0 && <span className="count">{n}</span>}
     </button>
   )
