@@ -7,7 +7,7 @@ export interface NewsItem {
   url: string
   title: string
   author: string | null
-  pubDate: number | null // ms epoch
+  pubDate: number | null // UNIX seconds from the API (normalized to ms at ingest)
   updatedDate: number | null
   body: string // HTML
   enclosureMime: string | null
@@ -18,7 +18,7 @@ export interface NewsItem {
   unread: boolean
   starred: boolean
   filtered: boolean
-  lastModified: number // ms epoch
+  lastModified: number // UNIX seconds from the API (normalized to ms at ingest)
   rtl: boolean
   intro: string | null
   fingerprint: string | null
