@@ -23,6 +23,7 @@ interface Props {
   selectedId: number | null
   feedTitle: (feedId: number) => string
   feedById?: (feedId: number) => NewsFeed | undefined
+  showFavicons?: boolean
   onSelect: (id: number) => void
   onRead: (item: NewsItem) => void // optimistic removal hook once read
   rarityMode?: boolean
@@ -40,6 +41,7 @@ export function ItemList({
   selectedId,
   feedTitle,
   feedById,
+  showFavicons = true,
   onSelect,
   onRead,
   rarityMode = false,
@@ -93,7 +95,7 @@ export function ItemList({
             {titleFor(item)}
           </div>
           <div className="item-meta">
-            {feedById && (() => {
+            {showFavicons && feedById && (() => {
               const f = feedById(item.feedId)
               return f ? <FeedIcon feed={f} size={12} /> : null
             })()}

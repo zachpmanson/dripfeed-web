@@ -3,8 +3,10 @@ import type { ThemeSetting } from '../theme'
 interface Props {
   uiTheme: ThemeSetting
   articleTheme: ThemeSetting
+  showFavicons: boolean
   onUiTheme: (v: ThemeSetting) => void
   onArticleTheme: (v: ThemeSetting) => void
+  onShowFavicons: (v: boolean) => void
   onLogout: () => void
   onClose: () => void
 }
@@ -35,8 +37,10 @@ function Seg({
 export function SettingsModal({
   uiTheme,
   articleTheme,
+  showFavicons,
   onUiTheme,
   onArticleTheme,
+  onShowFavicons,
   onLogout,
   onClose,
 }: Props) {
@@ -57,6 +61,16 @@ export function SettingsModal({
           <div className="setting-row">
             <span className="setting-label">Article dark mode</span>
             <Seg value={articleTheme} onChange={onArticleTheme} />
+          </div>
+          <div className="setting-row">
+            <label className="setting-label checkbox">
+              <input
+                type="checkbox"
+                checked={showFavicons}
+                onChange={(e) => onShowFavicons(e.target.checked)}
+              />
+              show favicons
+            </label>
           </div>
           <div className="setting-row">
             <button className="danger-btn" onClick={onLogout}>

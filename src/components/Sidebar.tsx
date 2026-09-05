@@ -19,12 +19,13 @@ interface Props {
   view: View
   onSelect: (v: View) => void
   settings: Settings
+  showFavicons: boolean
   onMetaChanged: () => void
 }
 
 const COLLAPSE_KEY = 'dripfeed.folders.collapsed'
 
-export function Sidebar({ feeds, folders, items, view, onSelect, settings, onMetaChanged }: Props) {
+export function Sidebar({ feeds, folders, items, view, onSelect, settings, showFavicons, onMetaChanged }: Props) {
   const totalUnread = unreadCount(items)
   const totalStarred = starredCount(items)
   const feedEntries = [...feeds.values()].sort((a, b) => a.title.localeCompare(b.title))
@@ -135,7 +136,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, onMet
               </div>
               {!isCollapsed &&
                 inFolder.map((f) => (
-                  <FeedRow key={f.id} feed={f} items={items} view={view} onSelect={onSelect} onCtx={onCtx} />
+                  <FeedRow key={f.id} feed={f} items={items} view={view} onSelect={onSelect} onCtx={onCtx} showFavicons={showFavicons} />
                 ))}
             </div>
           )
@@ -147,7 +148,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, onMet
               <span className="folder-name no-caret">Feeds</span>
             </div>
             {ungrouped.map((f) => (
-              <FeedRow key={f.id} feed={f} items={items} view={view} onSelect={onSelect} onCtx={onCtx} />
+              <FeedRow key={f.id} feed={f} items={items} view={view} onSelect={onSelect} onCtx={onCtx} showFavicons={showFavicons} />
             ))}
           </div>
         )}
@@ -174,12 +175,14 @@ function FeedRow({
   view,
   onSelect,
   onCtx,
+  showFavicons,
 }: {
   feed: NewsFeed
   items: NewsItem[]
   view: View
   onSelect: (v: View) => void
   onCtx: (e: React.MouseEvent, feed: NewsFeed) => void
+  showFavicons: boolean
 }) {
   const n = unreadCount(items, feed.id)
   return (
@@ -191,7 +194,7 @@ function FeedRow({
       onContextMenu={(e) => onCtx(e, feed)}
     >
       <span className="feed-left">
-        <FeedIcon feed={feed} size={14} />
+        {showFavicons && <FeedIcon feed={feed} size={14} />}
         <span className="feed-name">{feed.title}</span>
       </span>
       {n > 0 && <span className="count">{n}</span>}

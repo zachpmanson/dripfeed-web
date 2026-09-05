@@ -24,6 +24,24 @@ export function saveThemeSetting(key: string, v: ThemeSetting): void {
 export const uiThemeKey = UI_KEY
 export const articleThemeKey = ARTICLE_KEY
 
+const FAVICONS_KEY = 'dripfeed.showFavicons'
+
+export function loadShowFavicons(): boolean {
+  try {
+    return localStorage.getItem(FAVICONS_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+export function saveShowFavicons(v: boolean): void {
+  try {
+    localStorage.setItem(FAVICONS_KEY, v ? '1' : '0')
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Resolve a light/dark/system setting against the OS preference. */
 export function effectiveTheme(setting: ThemeSetting): 'light' | 'dark' {
   if (setting !== 'system') return setting

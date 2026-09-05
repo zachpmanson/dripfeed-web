@@ -343,6 +343,15 @@ body {
   font-size: 0.85rem;
 }
 
+.setting-label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .setting-row .danger-btn {
   background: rgba(255, 141, 141, 0.12);
   border-color: rgba(255, 141, 141, 0.35);

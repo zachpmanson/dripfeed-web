@@ -12,7 +12,9 @@ import {
   applyUiTheme,
   articleThemeKey,
   effectiveTheme,
+  loadShowFavicons,
   loadThemeSetting,
+  saveShowFavicons,
   saveThemeSetting,
   uiThemeKey,
   type ThemeSetting,
@@ -54,6 +56,7 @@ export default function App() {
   const [articleTheme, setArticleThemeState] = useState<ThemeSetting>(() =>
     loadThemeSetting(articleThemeKey),
   )
+  const [showFavicons, setShowFaviconsState] = useState<boolean>(loadShowFavicons)
 
   useEffect(() => {
     applyUiTheme(uiTheme)
@@ -71,6 +74,10 @@ export default function App() {
   const setArticleTheme = (v: ThemeSetting) => {
     setArticleThemeState(v)
     saveThemeSetting(articleThemeKey, v)
+  }
+  const setShowFavicons = (v: boolean) => {
+    setShowFaviconsState(v)
+    saveShowFavicons(v)
   }
   const articleDark = effectiveTheme(articleTheme) === 'dark'
 
@@ -213,6 +220,7 @@ export default function App() {
           items={pool}
           view={view}
           settings={settings}
+          showFavicons={showFavicons}
           onMetaChanged={() => void store.actions.refreshMeta()}
           onSelect={(v) => {
             setView(v)
@@ -225,6 +233,7 @@ export default function App() {
             selectedId={selected?.id ?? null}
             feedTitle={feedTitle}
             feedById={feedById}
+            showFavicons={showFavicons}
             onSelect={setSelectedId}
             onRead={(item: NewsItem) => {
               void store.actions.setRead(item, !item.unread)
@@ -261,8 +270,10 @@ export default function App() {
         <SettingsModal
           uiTheme={uiTheme}
           articleTheme={articleTheme}
+          showFavicons={showFavicons}
           onUiTheme={setUiTheme}
           onArticleTheme={setArticleTheme}
+          onShowFavicons={setShowFavicons}
           onLogout={() => {
             void store.actions.reset()
             setSettings(null)
