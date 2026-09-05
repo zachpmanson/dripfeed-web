@@ -59,48 +59,24 @@ export function ItemList({
   const onLoadMoreRef = useRef(onLoadMore)
   onLoadMoreRef.current = onLoadMore
   const more = moreServer && !drained
-  const canMoreRef = useRef(more)
-  canMoreRef.current = more
-  const loadingRef = useRef(false)
+  const activeRef = useRef(more && !loadingMore)
+  activeRef.current = more && !loadingMore
 
   useEffect(() => {
     const el = sentinelRef.current
     if (!el || !onLoadMoreRef.current) return
-    const MARGIN = 400
-    let disposed = false
     const io = new IntersectionObserver(
-      async (entries) => {
+      (entries) => {
         // Only auto-page when this view can still pull more and isn't
         // mid-fetch; otherwise (drained/loading) do nothing.
-        if (disposed || !entries[0]?.isIntersecting) return
-        if (loadingRef.current || !canMoreRef.current) return
-        loadingRef.current = true
-        try {
-          // Chain pages while the trailing row stays near the viewport:
-          // after each page lands, re-check its position — once the newly
-          // added items fill the screen the sentinel falls beyond the
-          // margin and we stop, waiting for the next scroll. The page the
-          // user just hit is always auto-loaded into view.
-          while (canMoreRef.current && !disposed) {
-            const fn = onLoadMoreRef.current
-            if (!fn) break
-            await fn()
-            const el2 = sentinelRef.current
-            if (!el2 || disposed) break
-            const rect = el2.getBoundingClientRect()
-            if (rect.top > window.innerHeight + MARGIN) break
-          }
-        } finally {
-          loadingRef.current = false
+        if (entries[0]?.isIntersecting && activeRef.current) {
+          onLoadMoreRef.current?.()
         }
       },
-      { rootMargin: `${MARGIN}px 0px` },
+      { rootMargin: '400px 0px' },
     )
     io.observe(el)
-    return () => {
-      disposed = true
-      io.disconnect()
-    }
+    return () => io.disconnect()
   }, [])
 
   // Order is owned by the caller (App applies newest or rarity); never
