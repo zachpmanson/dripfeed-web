@@ -47,8 +47,19 @@ export interface ItemsResponse {
   newestItemId?: number // present on /items/updated replies
 }
 
+export interface NewsFolder {
+  id: number
+  parentId: number | null
+  name: string
+  opened: boolean
+}
+
 export interface FeedsResponse {
   feeds: NewsFeed[]
+}
+
+export interface FoldersResponse {
+  folders: NewsFolder[]
 }
 
 export type ListType = 0 | 1 | 2 | 3 // FEED | FOLDER | STARRED | ALL_ITEMS

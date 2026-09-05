@@ -1,1 +1,1 @@
-{"root":["./src/App.tsx","./src/main.tsx","./src/settings.ts","./src/api/client.ts","./src/api/news.ts","./src/api/types.ts","./src/components/ItemList.tsx","./src/components/ItemView.tsx","./src/components/SettingsForm.tsx"],"version":"5.9.3"}
+{"root":["./src/App.tsx","./src/hooks.ts","./src/main.tsx","./src/settings.ts","./src/store.ts","./src/api/client.ts","./src/api/news.ts","./src/api/types.ts","./src/components/ItemList.tsx","./src/components/ItemView.tsx","./src/components/SettingsForm.tsx","./src/components/Sidebar.tsx"],"version":"5.9.3"}

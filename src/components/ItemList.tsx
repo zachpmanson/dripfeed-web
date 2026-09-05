@@ -15,11 +15,14 @@ export function ItemList({ items, selectedId, feedTitle, onSelect, onRead }: Pro
       {sorted.map((item) => (
         <li
           key={item.id}
-          className={item.id === selectedId ? 'item selected' : 'item'}
+          className={`item ${item.id === selectedId ? 'selected' : ''} ${item.unread ? '' : 'read'}`}
           onClick={() => onSelect(item.id)}
           onDoubleClick={() => onRead(item)}
         >
-          <div className="item-title">{item.title || '(untitled)'}</div>
+          <div className="item-title">
+            {item.unread && <span className="unread-dot" />}
+            {item.title || '(untitled)'}
+          </div>
           <div className="item-meta">
             <span className="feed">{feedTitle(item.feedId)}</span>
             <span className="muted">{formatDate(item.pubDate)}</span>

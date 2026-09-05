@@ -1,37 +1,20 @@
 import { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNews, useNewsActions } from './hooks'
 import { clearSettings, loadSettings } from './settings'
-import { fetchFeeds, fetchItems, markRead } from './api/news'
-import { LIST_TYPES } from './api/types'
+import type { Settings } from './settings'
 import { SettingsForm } from './components/SettingsForm'
+import { Sidebar, type View } from './components/Sidebar'
 import { ItemList } from './components/ItemList'
 import { ItemView } from './components/ItemView'
 import type { NewsItem } from './api/types'
 
 export default function App() {
-  const [settings, setSettings] = useState(loadSettings)
+  const [settings, setSettings] = useState<Settings | null>(loadSettings)
+  const [view, setView] = useState<View>({ kind: 'unread' })
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const queryClient = useQueryClient()
 
-  const feedsQuery = useQuery({
-    queryKey: ['feeds'],
-    queryFn: () => fetchFeeds(settings!),
-    enabled: !!settings,
-  })
-
-  const itemsQuery = useQuery({
-    queryKey: ['items', 'unread'],
-    // Bootstrap slice: newest unread, bigish batch. The full IndexedDB sync
-    // engine replaces this in milestone 2.
-    queryFn: () =>
-      fetchItems(settings!, {
-        type: LIST_TYPES.ALL,
-        getRead: false,
-        batchSize: 200,
-        oldestFirst: false,
-      }),
-    enabled: !!settings,
-  })
+  const newsQuery = useNews(settings)
+  const actions = useNewsActions(settings)
 
   if (!settings) {
     return (
@@ -44,19 +27,23 @@ export default function App() {
     )
   }
 
-  const items = itemsQuery.data?.items ?? []
-  const feeds = feedsQuery.data?.feeds ?? []
-  const feedTitle = (feedId: number) => feeds.find((f) => f.id === feedId)?.title ?? `feed ${feedId}`
-  const selected = items.find((i) => i.id === selectedId) ?? null
+  const { items, feeds, folders } = newsQuery.data
+
+  const visibleItems = filterView(items, view)
+
+  const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
+  const selected =
+    (selectedId !== null && items.get(selectedId)) || visibleItems[0] || null
 
   return (
     <div className="app">
       <header className="app-header">
         <h1>dripfeed</h1>
         <div className="header-right">
+          {newsQuery.isFetching && <span className="muted sync">syncing…</span>}
           <button
             onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ['items'] })
+              void newsQuery.refetch()
             }}
           >
             refresh
@@ -73,24 +60,42 @@ export default function App() {
       </header>
 
       <main className="app-body">
-        {itemsQuery.isError && (
-          <div className="error">{String(itemsQuery.error)}</div>
-        )}
-        <ItemList
-          items={items}
-          selectedId={selectedId}
-          feedTitle={feedTitle}
-          onSelect={(id) => setSelectedId(id)}
-          onRead={(item: NewsItem) => {
-            // double-click: mark read on the server, drop from the unread list
-            void markRead(settings, item.id)
-            queryClient.setQueryData<{ items: NewsItem[] }>(['items', 'unread'], (old) =>
-              old ? { ...old, items: old.items.filter((i) => i.id !== item.id) } : old,
-            )
+        {newsQuery.isError && <div className="error">{String(newsQuery.error)}</div>}
+        <Sidebar feeds={feeds} folders={folders} items={items}
+          view={view}
+          onSelect={(v) => {
+            setView(v)
+            setSelectedId(null)
           }}
         />
-        <ItemView item={selected} feedTitle={feedTitle} settings={settings} />
+        <ItemList
+          items={visibleItems}
+          selectedId={selected?.id ?? null}
+          feedTitle={feedTitle}
+          onSelect={setSelectedId}
+          onRead={(item: NewsItem) => {
+            actions.toggleRead.mutate({ id: item.id, unread: item.unread })
+          }}
+        />
+        <ItemView item={selected} feedTitle={feedTitle} actions={actions} />
       </main>
     </div>
   )
+}
+
+function filterView(items: Map<number, NewsItem>, view: View): NewsItem[] {
+  let list: NewsItem[]
+  switch (view.kind) {
+    case 'unread':
+      list = [...items.values()].filter((i) => i.unread)
+      break
+    case 'starred':
+      list = [...items.values()].filter((i) => i.starred)
+      break
+    case 'feed':
+      list = [...items.values()].filter((i) => i.feedId === view.id)
+      break
+  }
+  // newest first — rarity sorting replaces this later
+  return list.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
 }

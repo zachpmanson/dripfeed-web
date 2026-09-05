@@ -1,34 +1,14 @@
 import { useMemo } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { NewsItem } from '../api/types'
-import type { Settings } from '../settings'
-import { markRead, markUnread, setStar } from '../api/news'
+import type { useNewsActions } from '../hooks'
 
 interface Props {
   item: NewsItem | null
   feedTitle: (feedId: number) => string
-  settings: Settings
+  actions: ReturnType<typeof useNewsActions>
 }
 
-export function ItemView({ item, feedTitle, settings }: Props) {
-  const queryClient = useQueryClient()
-  const readMutation = useMutation({
-    mutationFn: async (i: NewsItem) => {
-      if (i.unread) await markRead(settings, i.id)
-      else await markUnread(settings, i.id)
-      return i
-    },
-    onSuccess: (i) => {
-      queryClient.setQueryData<{ items: NewsItem[] }>(['items', 'unread'], (old) =>
-        old ? { ...old, items: old.items.map((x) => (x.id === i.id ? { ...x, unread: !x.unread } : x)) } : old,
-      )
-    },
-  })
-  const starMutation = useMutation({
-    mutationFn: (i: NewsItem) => setStar(settings, i.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['items'] }),
-  })
-
+export function ItemView({ item, feedTitle, actions }: Props) {
   const srcdoc = useMemo(() => {
     if (!item) return ''
     // Body comes from the server already rewritten with target=_blank.
@@ -57,10 +37,12 @@ export function ItemView({ item, feedTitle, settings }: Props) {
         <span className="muted">{item.pubDate ? new Date(item.pubDate).toLocaleString() : ''}</span>
       </div>
       <div className="reader-actions">
-        <button onClick={() => readMutation.mutate(item)}>
+        <button onClick={() => actions.toggleRead.mutate({ id: item.id, unread: item.unread })}>
           {item.unread ? 'mark read' : 'mark unread'}
         </button>
-        <button onClick={() => starMutation.mutate(item)}>{item.starred ? 'unstar' : 'star'}</button>
+        <button onClick={() => actions.toggleStar.mutate({ id: item.id })}>
+          {item.starred ? 'unstar' : 'star'}
+        </button>
       </div>
       <iframe className="reader-frame" sandbox="allow-same-origin" srcDoc={srcdoc} title={item.title} />
     </article>

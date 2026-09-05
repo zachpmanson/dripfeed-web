@@ -1,5 +1,5 @@
 import { apiGet, apiPost } from './client'
-import type { FeedsResponse, ItemsResponse, ListType } from './types'
+import type { FeedsResponse, FoldersResponse, ItemsResponse, ListType } from './types'
 import type { Settings } from '../settings'
 
 export interface ItemsParams {
@@ -57,4 +57,8 @@ export function setStar(settings: Settings, itemId: number): Promise<void> {
 
 export function fetchFeeds(settings: Settings): Promise<FeedsResponse> {
   return apiGet<FeedsResponse>(settings, '/feeds')
+}
+
+export function fetchFolders(settings: Settings): Promise<FoldersResponse> {
+  return apiGet<FoldersResponse>(settings, '/folders')
 }
