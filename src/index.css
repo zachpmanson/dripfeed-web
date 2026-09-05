@@ -264,6 +264,10 @@ button:hover {
   font-size: 0.9rem;
 }
 
+.hint {
+  font-size: 0.75rem;
+}
+
 .settings button {
   margin-top: 0.4rem;
   padding: 0.55rem;

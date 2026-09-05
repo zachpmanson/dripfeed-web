@@ -8,7 +8,7 @@ interface Props {
 }
 
 export function SettingsForm({ initial, onSave }: Props) {
-  const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? 'https://nextcloud.zachmanson.com')
+  const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? '')
   const [user, setUser] = useState(initial?.user ?? '')
   const [appPassword, setAppPassword] = useState(initial?.appPassword ?? '')
 
@@ -33,9 +33,9 @@ export function SettingsForm({ initial, onSave }: Props) {
             type="url"
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
-            placeholder="https://nextcloud.example.com"
-            required
+            placeholder="same origin (leave empty)"
           />
+          <span className="muted hint">Leave empty when served from dripfeed.zachmanson.com — the /apps proxy handles it.</span>
         </label>
         <label>
           Username

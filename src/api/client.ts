@@ -12,8 +12,8 @@ export class ApiError extends Error {
 }
 
 export function apiUrl(settings: Settings, path: string): string {
-  // Normalize: strip trailing slash so concatenation is predictable.
-  const base = settings.baseUrl.replace(/\/+$/, '')
+  // Empty baseUrl = same origin (deployed behind the caddy /apps proxy).
+  const base = settings.baseUrl.trim().replace(/\/+$/, '')
   return `${base}${NEWS_API_PREFIX}${path}`
 }
 
