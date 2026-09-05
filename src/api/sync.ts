@@ -1,10 +1,32 @@
 import { apiGet } from './client'
+import { fetchItems } from './news'
 import type { FeedsResponse, FoldersResponse, ItemsResponse, NewsFeed, NewsItem } from './types'
 import type { Settings } from '../settings'
 
 export const FEED_WINDOW = 20 // server batch per feed for the initial pull
 
 const CONCURRENCY = 6
+
+/**
+ * Direct unread-only pull for one feed (type 0) or folder (type 1).
+ * getRead=false makes the server filter items.unread=1, and batchSize=-1
+ * disables the server LIMIT, so a single request returns EVERY unread item
+ * for the scope — no need to walk history pages looking for unread ones.
+ */
+export async function fetchUnreadScope(
+  settings: Settings,
+  type: 0 | 1,
+  id: number,
+): Promise<NewsItem[]> {
+  const resp = await fetchItems(settings, {
+    type,
+    id,
+    getRead: false,
+    batchSize: -1,
+    oldestFirst: false,
+  })
+  return resp.items
+}
 
 /**
  * Initial hydration: newest FEED_WINDOW per feed, in parallel, plus the full

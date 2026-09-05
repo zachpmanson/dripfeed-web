@@ -1,5 +1,5 @@
 import { dbClear, dbGetCursor, dbGetFeedItems, dbGetAllFeeds, dbGetAllFolders, dbGetAllItems, dbGetMeta, dbPutFeeds, dbPutFolders, dbPutItems, dbSetCursor, dbSetMeta } from './db'
-import { fetchFeedWindow, fetchInitial, fetchMeta } from './api/sync'
+import { fetchFeedWindow, fetchInitial, fetchMeta, fetchUnreadScope } from './api/sync'
 import { fetchItems } from './api/news'
 import { LIST_TYPES } from './api/types'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
@@ -76,6 +76,30 @@ export async function fullSync(settings: Settings): Promise<void> {
   dbReady = true
   status = { stage: 'done', done: items.length }
   emit()
+}
+
+/** Map a feed (0) / folder (1) scope to its view-id key for tracking. */
+export function unreadScopeKey(type: 0 | 1, id: number): string {
+  return `${type === 0 ? 'feed' : 'folder'}:${id}`
+}
+
+/**
+ * Unread-only browsing: pull the scope's unread items straight from the
+ * server with the native unread filter (getRead=false, batchSize=-1 → one
+ * no-limit request) and merge them locally. Leaves the history cursors
+ * untouched so "all" mode still pages normally. Returns how many were
+ * added (0 = the scope genuinely has no unread items — no deep walk).
+ */
+export async function ensureUnreadScope(
+  settings: Settings,
+  type: 0 | 1,
+  id: number,
+): Promise<number> {
+  const items = await fetchUnreadScope(settings, type, id)
+  if (items.length > 0) {
+    await dbPutItems(items.map(normalize))
+  }
+  return items.length
 }
 
 /** Light refresh: newest-500 window merged + feeds/folders meta. */

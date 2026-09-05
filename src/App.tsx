@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './hooks'
+import { unreadScopeKey } from './store'
 import { loadSettings } from './settings'
 import type { Settings } from './settings'
 import { SettingsForm } from './components/SettingsForm'
@@ -44,7 +45,7 @@ export default function App() {
     localStorage.setItem(SHOW_ALL_KEY, showAll ? '1' : '0')
   }, [showAll])
 
-  const store = useStore(settings, view)
+  const store = useStore(settings, view, !showAll)
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
 
@@ -84,13 +85,38 @@ export default function App() {
   // feed auto-fills and the load-more button reflects reality). In-flight
   // guard so StrictMode's double effect fires at most one probe/refill.
   const ensureRef = useRef<Promise<void> | null>(null)
+  const unreadEnsureRef = useRef<Promise<void> | null>(null)
   useEffect(() => {
     if (view.kind !== 'feed' || !settings) return
+    // In unread-only mode the native unread query below supersedes the
+    // window top-up for THIS visit; the window/cursor probe still runs so
+    // toggling to "all" pages instantly.
     if (ensureRef.current) return
     ensureRef.current = store.actions.ensureFeed(view.id).finally(() => {
       ensureRef.current = null
     })
   }, [view, settings, store.actions])
+
+  // Unread-only mode: feed/folder views pull their WHOLE unread set via the
+  // native unread query (getRead=false, batchSize=-1 → one no-limit server
+  // request) instead of walking history pages looking for unread items. If
+  // the query returns nothing we know the scope genuinely has no unread
+  // items — no fruitless deep pagination — and the scope is marked drained.
+  useEffect(() => {
+    if (!settings) return
+    if (showAll) return
+    if (view.kind !== 'feed' && view.kind !== 'folder') return
+    const type = view.kind === 'feed' ? 0 : 1
+    if (store.unreadDrained.has(unreadScopeKey(type, view.id))) return
+    if (unreadEnsureRef.current) return
+    unreadEnsureRef.current = store.actions
+      .ensureUnread(type, view.id)
+      .then(() => undefined)
+      .catch((e) => console.warn('unread probe failed', e))
+      .finally(() => {
+        unreadEnsureRef.current = null
+      })
+  }, [view, settings, showAll, store.actions, store.unreadDrained])
 
   if (!settings) {
     return (
@@ -149,10 +175,17 @@ export default function App() {
   else scopeIds = cursors.keys()
   const scope = [...scopeIds]
   const liveCount = scope.filter((fid) => (cursors.get(fid) ?? -1) >= 0).length
-  const moreServer = liveCount > 0
+  // In unread-only mode, a feed/folder scope probed by the native unread
+  // query (getRead=false, no limit) contains ALL its unread items locally —
+  // there is nothing left to page, so suppress the history walk entirely.
+  const unreadScopeProbed =
+    !showAll &&
+    (view.kind === 'feed' || view.kind === 'folder') &&
+    store.unreadDrained.has(unreadScopeKey(view.kind === 'feed' ? 0 : 1, view.id))
+  const moreServer = unreadScopeProbed ? false : liveCount > 0
   // Drained = the view's feeds are all paged to the server end (or the
   // view has no feeds of its own to page, e.g. an empty folder).
-  const drained = scope.length === 0 || liveCount === 0
+  const drained = unreadScopeProbed || scope.length === 0 || liveCount === 0
 
   // Filter + rank the WHOLE pool, then slice for display. Rarity/selected
   // operate over the full pool (rarity's 20-item feed sample is stable

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   fullSync, incrementalSync, isInitialized, isDbReady, loadAllItems,
-  loadFeeds, loadFolders, loadMoreInto, ensureFeedWindow, onStoreChange, getStatus, resetLocal,
+  loadFeeds, loadFolders, loadMoreInto, ensureFeedWindow, ensureUnreadScope,
+  unreadScopeKey, onStoreChange, getStatus, resetLocal,
   type LoadMoreProgress,
 } from './store'
 import { setRead, setStar } from './actions'
@@ -21,10 +22,12 @@ export interface AppData {
   error: string | null
   loadMore: () => Promise<void>
   cursors: Map<number, number> // per-feed paging cursors (-1 = drained)
+  unreadDrained: Set<string> // scopes probed for unread via getRead=false
   actions: {
     setRead: (item: NewsItem, unread: boolean) => Promise<void>
     setStar: (item: NewsItem, starred: boolean) => Promise<void>
     ensureFeed: (feedId: number) => Promise<void>
+    ensureUnread: (type: 0 | 1, id: number) => Promise<number>
     refreshMeta: () => Promise<void>
     reset: () => Promise<void>
   }
@@ -35,7 +38,11 @@ export interface AppData {
  * run, instant reads from the DB, growing server pool + render window via
  * loadMore, background poll.
  */
-export function useStore(settings: Settings | null, view: View): AppData {
+export function useStore(
+  settings: Settings | null,
+  view: View,
+  unreadOnly: boolean,
+): AppData {
   const [ready, setReady] = useState(false)
   const [pool, setPool] = useState<NewsItem[]>([])
   const [feeds, setFeeds] = useState<Map<number, NewsFeed>>(new Map())
@@ -49,6 +56,9 @@ export function useStore(settings: Settings | null, view: View): AppData {
   viewRef.current = view
   const settingsRef = useRef(settings)
   settingsRef.current = settings
+  const unreadOnlyRef = useRef(unreadOnly)
+  unreadOnlyRef.current = unreadOnly
+  const [unreadDrained, setUnreadDrained] = useState<Set<string>>(new Set())
 
   const refreshPool = useCallback(async () => {
     const [all, fs, fo] = await Promise.all([loadAllItems(), loadFeeds(), loadFolders()])
@@ -116,9 +126,19 @@ export function useStore(settings: Settings | null, view: View): AppData {
   const loadMore = useCallback(async () => {
     const s = settingsRef.current
     if (!s || loadingMore) return
+    const v = viewRef.current
+    // In unread-only mode, feed/folder scopes are served by the native
+    // unread query (getRead=false, no server limit) — the whole unread set
+    // arrives in one request and there is never a history walk here. If the
+    // probe hasn't landed yet, the ensureUnread effect owns it; skip.
+    if (
+      unreadOnlyRef.current &&
+      (v.kind === 'feed' || v.kind === 'folder')
+    ) {
+      return
+    }
     setLoadingMore(true)
     try {
-      const v = viewRef.current
       // In-scope feeds for this view: a feed view pages just that feed; a
       // folder view pages its members; all/unread/starred page every feed.
       const scope =
@@ -134,8 +154,7 @@ export function useStore(settings: Settings | null, view: View): AppData {
       setLoadingMore(false)
       setPaging(null)
     }
-  }, [loadingMore, refreshPool, feeds])
-
+  }, [loadingMore, refreshPool, feeds, unreadDrained])
   const actions = useCallback(
     () => ({
       setRead: (item: NewsItem, unread: boolean) => setRead(settingsRef.current!, item, unread),
@@ -145,6 +164,22 @@ export function useStore(settings: Settings | null, view: View): AppData {
         if (!s) return
         await ensureFeedWindow(s, feedId)
         await refreshPool()
+      },
+      /**
+       * Pull the whole unread set for a feed/folder scope in one native
+       * unread query and remember the scope as probed, so the UI stops
+       * offering "load more" for it in unread-only mode. Returns how many
+       * unread items the server had (0 = genuinely none).
+       */
+      ensureUnread: async (type: 0 | 1, id: number) => {
+        const s = settingsRef.current
+        if (!s) return 0
+        const n = await ensureUnreadScope(s, type, id)
+        // only mark probed once the query actually succeeded, so a transient
+        // network failure doesn't permanently hide the unread items
+        setUnreadDrained((prev) => new Set(prev).add(unreadScopeKey(type, id)))
+        await refreshPool()
+        return n
       },
       refreshMeta: async () => {
         const s = settingsRef.current
@@ -156,6 +191,7 @@ export function useStore(settings: Settings | null, view: View): AppData {
         await resetLocal()
         setReady(false)
         setPool([])
+        setUnreadDrained(new Set())
       },
     }),
     [refreshPool],
@@ -178,6 +214,7 @@ export function useStore(settings: Settings | null, view: View): AppData {
     feeds,
     folders,
     cursors,
+    unreadDrained,
     loadingMore,
     paging,
     progress,
