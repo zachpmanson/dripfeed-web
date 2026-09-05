@@ -3,7 +3,8 @@ import type { NewsFolder, NewsFeed, NewsItem } from '../api/types'
 import { unreadCount, starredCount } from '../selectors'
 
 export type View =
-  | { kind: 'all' }
+  | { kind: 'all' } // ALL items, ignores the only-unread/all toggle
+  | { kind: 'allUnread' } // unread only, ignores the only-unread/all toggle
   | { kind: 'starred' }
   | { kind: 'feed'; id: number }
 
@@ -78,6 +79,13 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
           onClick={() => onSelect({ kind: 'all' })}
         >
           <span>All items</span>
+          <span className="count">{totalUnread}</span>
+        </button>
+        <button
+          className={view.kind === 'allUnread' ? 'active' : ''}
+          onClick={() => onSelect({ kind: 'allUnread' })}
+        >
+          <span>All unread</span>
           <span className="count">{totalUnread}</span>
         </button>
         <button
