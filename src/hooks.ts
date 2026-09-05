@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   fullSync, incrementalSync, isInitialized, isDbReady, loadAllItems,
   loadFeeds, loadFolders, loadMoreInto, ensureFeedWindow, onStoreChange, getStatus, resetLocal,
+  type LoadMoreProgress,
 } from './store'
 import { setRead, setStar } from './actions'
 import { dbGetCursor } from './db'
@@ -9,16 +10,13 @@ import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
 import type { Settings } from './settings'
 import type { View } from './components/Sidebar'
 
-const RENDER_STEP = 60 // items to reveal per load-more
-
 export interface AppData {
   ready: boolean
   pool: NewsItem[] // full local mirror (sorted newest-first)
   feeds: Map<number, NewsFeed>
   folders: NewsFolder[]
-  rendered: number // how many of the sorted pool to show
-  moreAvailable: boolean
   loadingMore: boolean
+  paging: LoadMoreProgress | null // per-feed progress while paging
   progress: { done: number } | null
   error: string | null
   loadMore: () => Promise<void>
@@ -42,10 +40,9 @@ export function useStore(settings: Settings | null, view: View): AppData {
   const [pool, setPool] = useState<NewsItem[]>([])
   const [feeds, setFeeds] = useState<Map<number, NewsFeed>>(new Map())
   const [folders, setFolders] = useState<NewsFolder[]>([])
-  const [rendered, setRendered] = useState(RENDER_STEP)
-  const [moreAvailable, setMoreAvailable] = useState(false)
   const [cursors, setCursors] = useState<Map<number, number>>(new Map())
   const [loadingMore, setLoadingMore] = useState(false)
+  const [paging, setPaging] = useState<LoadMoreProgress | null>(null)
   const [progress, setProgress] = useState<{ done: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const viewRef = useRef<View>(view)
@@ -68,8 +65,7 @@ export function useStore(settings: Settings | null, view: View): AppData {
       if (c !== undefined) cm.set(f.id, c)
     }
     setCursors(cm)
-    setMoreAvailable(all.length > rendered)
-  }, [rendered])
+  }, [])
 
   // hydrate / poll
   useEffect(() => {
@@ -123,19 +119,22 @@ export function useStore(settings: Settings | null, view: View): AppData {
     setLoadingMore(true)
     try {
       const v = viewRef.current
-      const feedId =
+      // In-scope feeds for this view: a feed view pages just that feed; a
+      // folder view pages its members; all/unread/starred page every feed.
+      const scope =
         v.kind === 'feed'
-          ? (v.id as number)
+          ? [v.id]
           : v.kind === 'folder'
-            ? undefined /* load all feeds of the folder */
-            : undefined
-      await loadMoreInto(s, feedId)
+            ? [...feeds.values()].filter((f) => f.folderId === v.id).map((f) => f.id)
+            : [...feeds.values()].map((f) => f.id)
+      setPaging({ added: 0, feedsPaged: 0, totalFeeds: 0 })
+      await loadMoreInto(s, scope, undefined, (p) => setPaging(p))
       await refreshPool()
-      setRendered((r) => r + RENDER_STEP)
     } finally {
       setLoadingMore(false)
+      setPaging(null)
     }
-  }, [loadingMore, refreshPool])
+  }, [loadingMore, refreshPool, feeds])
 
   const actions = useCallback(
     () => ({
@@ -157,8 +156,6 @@ export function useStore(settings: Settings | null, view: View): AppData {
         await resetLocal()
         setReady(false)
         setPool([])
-        setRendered(RENDER_STEP)
-        setMoreAvailable(false)
       },
     }),
     [refreshPool],
@@ -180,10 +177,9 @@ export function useStore(settings: Settings | null, view: View): AppData {
     pool,
     feeds,
     folders,
-    rendered,
-    moreAvailable,
     cursors,
     loadingMore,
+    paging,
     progress,
     error,
     loadMore,

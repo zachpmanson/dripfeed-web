@@ -1,4 +1,4 @@
-import { dbClear, dbGetCursor, dbGetAllFeeds, dbGetAllFolders, dbGetAllItems, dbGetMeta, dbPutFeeds, dbPutFolders, dbPutItems, dbSetCursor, dbSetMeta } from './db'
+import { dbClear, dbGetCursor, dbGetFeedItems, dbGetAllFeeds, dbGetAllFolders, dbGetAllItems, dbGetMeta, dbPutFeeds, dbPutFolders, dbPutItems, dbSetCursor, dbSetMeta } from './db'
 import { fetchFeedWindow, fetchInitial, fetchMeta } from './api/sync'
 import { fetchItems } from './api/news'
 import { LIST_TYPES } from './api/types'
@@ -6,6 +6,9 @@ import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
 import { clearSettings } from './settings'
 import type { Settings } from './settings'
 import { FEED_WINDOW } from './api/sync'
+
+/** Target items to add per load-more invocation (≈ a screenful). */
+export const LOAD_STEP = 60
 
 /**
  * IndexedDB-backed mirror. Initial hydration is per-feed: the newest
@@ -94,35 +97,83 @@ export async function incrementalSync(settings: Settings): Promise<void> {
  * Fetch the next FEED_WINDOW of history per feed (or one feed if feedId is
  * given), appending into the DB. Returns how many items were added.
  */
+export interface LoadMoreProgress {
+  added: number
+  feedsPaged: number
+  totalFeeds: number
+}
+
+/**
+ * Pull more history into the local store for a set of feeds, list-driven.
+ *
+ * Instead of blasting a whole window from every feed at once (the old
+ * behaviour — N requests per click, DB grew unevenly), it pages ONE feed
+ * at a time, always choosing the feed whose next-older items belong
+ * nearest the bottom of the currently-sorted visible list. For the newest
+ * sort that's the in-scope feed with the LARGEST oldest-loaded pubDate;
+ * it's a good heuristic for rarity too (rarity re-ranks the whole pool, so
+ * we just need to surface older items from *some* feed).
+ *
+ * It stops once it has added ~step items (a screenful) or every in-scope
+ * feed has drained, so the pool grows only as much as the view needs and
+ * onProgress can report per-feed progress.
+ *
+ * Returns how many items were added.
+ */
 export async function loadMoreInto(
   settings: Settings,
-  feedId?: number,
-  onProgress?: (done: number) => void,
+  feedIds: number[],
+  step = LOAD_STEP,
+  onProgress?: (p: LoadMoreProgress) => void,
 ): Promise<number> {
-  const feeds = await dbGetAllFeeds()
-  const targets = feedId !== undefined ? feeds.filter((f) => f.id === feedId) : feeds
+  const allFeeds = await dbGetAllFeeds()
+  const targets = feedIds
+    .map((id) => allFeeds.find((f) => f.id === id))
+    .filter((f): f is NewsFeed => !!f)
+  let live = (
+    await Promise.all(
+      targets.map(async (f) => ({ f, cursor: await dbGetCursor(f.id) })),
+    )
+  ).filter((x) => x.cursor !== undefined && x.cursor >= 0)
+
+  const totalFeeds = live.length
+  if (totalFeeds === 0) return 0
+
   let added = 0
-  let i = 0
-  const workers = Array.from({ length: Math.min(6, targets.length) }, async () => {
-    while (i < targets.length) {
-      const f = targets[i++]
-      const cursor = await dbGetCursor(f.id)
-      if (cursor === undefined || cursor < 0) continue // no/empty window
-      const items = await fetchFeedWindow(settings, f.id, cursor)
-      if (items.length === 0) {
-        await dbSetCursor(f.id, -1) // drained
-        continue
-      }
-      await dbPutItems(items.map(normalize))
-      // Next page = below the oldest id in this batch (per-feed cursor,
-      // never derived from starred items).
-      const nextMin = items.reduce((m, i) => Math.min(m, i.id), items[0].id)
-      await dbSetCursor(f.id, items.length < FEED_WINDOW ? -1 : nextMin)
-      added += items.length
-      onProgress?.(added)
+  let paged = 0
+  while (live.length > 0 && added < step) {
+    // Oldest-loaded (non-starred) pubDate per live feed — the candidate
+    // whose next page sits nearest the bottom of the newest-sorted list.
+    const dated = await Promise.all(
+      live.map(async ({ f, cursor }) => {
+        const items = await dbGetFeedItems(f.id)
+        let min: number | null = null
+        for (const it of items) {
+          if (it.starred) continue
+          const d = it.pubDate ?? 0
+          if (min === null || d < min) min = d
+        }
+        return { f, cursor: cursor as number, min: min ?? 0 }
+      }),
+    )
+    dated.sort((a, b) => b.min - a.min)
+    const pick = dated[0]
+
+    const items = await fetchFeedWindow(settings, pick.f.id, pick.cursor)
+    if (items.length === 0) {
+      await dbSetCursor(pick.f.id, -1) // drained
+      live = live.filter((x) => x.f.id !== pick.f.id)
+      continue
     }
-  })
-  await Promise.all(workers)
+    await dbPutItems(items.map(normalize))
+    const nextMin = items.reduce((m, i) => Math.min(m, i.id), items[0].id)
+    const drained = items.length < FEED_WINDOW
+    await dbSetCursor(pick.f.id, drained ? -1 : nextMin)
+    added += items.length
+    paged += 1
+    onProgress?.({ added, feedsPaged: paged, totalFeeds })
+    if (drained) live = live.filter((x) => x.f.id !== pick.f.id)
+  }
   return added
 }
 

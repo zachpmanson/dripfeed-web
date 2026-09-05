@@ -123,7 +123,7 @@ export default function App() {
     )
   }
 
-  const { pool, feeds, folders, rendered, loadingMore, cursors } = store
+  const { pool, feeds, folders, loadingMore, paging, cursors } = store
 
   // folder id -> set of member feed ids (items only know feedId)
   const feedOfFolder = new Map<number, Set<number>>()
@@ -136,26 +136,29 @@ export default function App() {
 
   // Cursor-aware "server has more" derived PER VIEW: feed view → that
   // feed's cursor; folder view → any member feed's cursor; all/unread/
-  // starred → any feed with a live cursor.
-  let serverFeeds: Iterable<number>
-  if (view.kind === 'feed') serverFeeds = [view.id]
-  else if (view.kind === 'folder') serverFeeds = feedOfFolder.get(view.id) ?? []
-  else serverFeeds = cursors.keys()
-  const moreServer = [...serverFeeds].some((fid) => (cursors.get(fid) ?? -1) >= 0)
+  // starred → any feed with a live cursor. A feed with no cursor yet
+  // (window still unseeded) is treated as having more.
+  let scopeIds: Iterable<number>
+  if (view.kind === 'feed') scopeIds = [view.id]
+  else if (view.kind === 'folder') scopeIds = feedOfFolder.get(view.id) ?? []
+  else scopeIds = cursors.keys()
+  const scope = [...scopeIds]
+  const liveCount = scope.filter((fid) => (cursors.get(fid) ?? -1) >= 0).length
+  const moreServer = liveCount > 0
+  // Drained = the view's feeds are all paged to the server end (or the
+  // view has no feeds of its own to page, e.g. an empty folder).
+  const drained = scope.length === 0 || liveCount === 0
 
-  // Filter + rank the WHOLE pool first, then window the result. Slicing the
-  // pool before filtering/sorting hid any feed whose items fell past the
-  // rendered window (fresh login: pool ≈ 20×feeds + stars, window = 60) —
-  // load-more grew the pool but the same items stayed beyond the cut.
+  // Filter + rank the WHOLE pool, then slice for display. Rarity/selected
+  // operate over the full pool (rarity's 20-item feed sample is stable
+  // regardless of how much history load-more has pulled in).
   const rarMult = sortMode === 'rarity' ? rarityMultipliers(pool) : undefined
   const rarStats = sortMode === 'rarity' ? rarityStats(pool) : undefined
   const visibleItems = filterView(pool, view, sortMode, showAll, rarMult, feedOfFolder)
-  const slice = visibleItems.slice(0, rendered)
-  const moreAvailable = visibleItems.length > rendered
 
   const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
   const selected =
-    (selectedId !== null && slice.find((i) => i.id === selectedId)) || visibleItems[0] || null
+    (selectedId !== null && visibleItems.find((i) => i.id === selectedId)) || visibleItems[0] || null
 
   return (
     <div className="app">
@@ -228,9 +231,10 @@ export default function App() {
             rarityStats={rarStats}
             emptyText={showAll ? 'No items here.' : 'No unread items. Nothing dripping?'}
             onLoadMore={store.loadMore}
-            moreAvailable={moreAvailable}
             moreServer={moreServer}
+            drained={drained}
             loadingMore={loadingMore}
+            paging={paging}
           />
         </div>
         <ItemView

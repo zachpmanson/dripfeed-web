@@ -110,6 +110,12 @@ export async function dbGetAllItems(): Promise<NewsItem[]> {
   return db.getAll('items')
 }
 
+/** All locally stored items for a single feed (via the by-feed index). */
+export async function dbGetFeedItems(feedId: number): Promise<NewsItem[]> {
+  const db = await getDB()
+  return db.getAllFromIndex('items', 'by-feed', feedId)
+}
+
 /** Local pagination: items sorted by pubDate DESC, newest-first window. */
 export async function dbQueryItems(batch: number, offset: number): Promise<NewsItem[]> {
   const db = await getDB()

@@ -593,6 +593,13 @@ body {
   list-style: none;
   padding: 0.5rem;
   border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+
+.load-more-row.done {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .load-more {

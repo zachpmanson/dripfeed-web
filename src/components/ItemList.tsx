@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react'
 import type { NewsItem } from '../api/types'
 import type { RarityInfo } from '../rarity'
+import type { LoadMoreProgress } from '../store'
 
 /**
  * Fallback title for untitled items: strip HTML from the body and take the
@@ -25,9 +27,10 @@ interface Props {
   rarityStats?: Map<number, RarityInfo>
   emptyText?: string
   onLoadMore?: () => void
-  moreAvailable?: boolean
   moreServer?: boolean // a live cursor in the current view still pages deeper
+  drained?: boolean // view's feeds are all paged to the server end
   loadingMore?: boolean
+  paging?: LoadMoreProgress | null
 }
 
 export function ItemList({
@@ -40,10 +43,37 @@ export function ItemList({
   rarityStats,
   emptyText = 'No unread items. Nothing dripping?',
   onLoadMore,
-  moreAvailable = false,
   moreServer = false,
+  drained = false,
   loadingMore = false,
+  paging = null,
 }: Props) {
+  // Auto-load-more: when the trailing row scrolls into view (a little
+  // before the actual bottom), page the next batch — natural infinite scroll.
+  const sentinelRef = useRef<HTMLLIElement>(null)
+  const onLoadMoreRef = useRef(onLoadMore)
+  onLoadMoreRef.current = onLoadMore
+  const more = moreServer && !drained
+  const activeRef = useRef(more && !loadingMore)
+  activeRef.current = more && !loadingMore
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !onLoadMoreRef.current) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        // Only auto-page when this view can still pull more and isn't
+        // mid-fetch; otherwise (drained/loading) do nothing.
+        if (entries[0]?.isIntersecting && activeRef.current) {
+          onLoadMoreRef.current?.()
+        }
+      },
+      { rootMargin: '400px 0px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+
   // Order is owned by the caller (App applies newest or rarity); never
   // re-sort here or the toggle silently no-ops.
   return (
@@ -73,14 +103,57 @@ export function ItemList({
         </li>
       ))}
       {items.length === 0 && <li className="empty muted">{emptyText}</li>}
-      {onLoadMore && (moreAvailable || moreServer) && (
-        <li className="load-more-row">
-          <button className="load-more" onClick={onLoadMore} disabled={loadingMore}>
-            {loadingMore ? 'loading…' : 'load more'}
-          </button>
-        </li>
-      )}
+      <TrailingRow
+        sentinelRef={sentinelRef}
+        onLoadMore={onLoadMore}
+        moreServer={moreServer}
+        drained={drained}
+        loadingMore={loadingMore}
+        paging={paging}
+      />
     </ul>
+  )
+}
+
+function TrailingRow({
+  sentinelRef,
+  onLoadMore,
+  moreServer,
+  drained,
+  loadingMore,
+  paging,
+}: {
+  sentinelRef: React.RefObject<HTMLLIElement>
+  onLoadMore?: () => void
+  moreServer: boolean
+  drained: boolean
+  loadingMore: boolean
+  paging?: LoadMoreProgress | null
+}) {
+  const more = moreServer && !drained
+  const progress =
+    paging && paging.totalFeeds > 0
+      ? `paging feed ${Math.min(paging.feedsPaged, paging.totalFeeds)} of ${paging.totalFeeds}…`
+      : null
+
+  if (!more) {
+    // Drained: the current view has no more server history to pull.
+    return (
+      <li ref={sentinelRef} className="load-more-row done">
+        <span className="muted">— up to date —</span>
+      </li>
+    )
+  }
+  return (
+    <li ref={sentinelRef} className="load-more-row">
+      {loadingMore || progress ? (
+        <span className="muted">{progress ?? 'loading…'}</span>
+      ) : (
+        <button className="load-more" onClick={onLoadMore}>
+          load more
+        </button>
+      )}
+    </li>
   )
 }
 
