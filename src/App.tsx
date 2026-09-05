@@ -70,12 +70,17 @@ export default function App() {
     )
   }
 
-  const { pool, feeds, folders, rendered, moreAvailable, loadingMore } = store
+  const { pool, feeds, folders, rendered, loadingMore } = store
 
-  const slice = pool.slice(0, rendered)
+  // Filter + rank the WHOLE pool first, then window the result. Slicing the
+  // pool before filtering/sorting hid any feed whose items fell past the
+  // rendered window (fresh login: pool ≈ 20×feeds + stars, window = 60) —
+  // load-more grew the pool but the same items stayed beyond the cut.
   const rarMult = sortMode === 'rarity' ? rarityMultipliers(pool) : undefined
   const rarStats = sortMode === 'rarity' ? rarityStats(pool) : undefined
-  const visibleItems = filterView(slice, view, sortMode, showAll, rarMult)
+  const visibleItems = filterView(pool, view, sortMode, showAll, rarMult)
+  const slice = visibleItems.slice(0, rendered)
+  const moreAvailable = visibleItems.length > rendered
 
   const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
   const selected =
