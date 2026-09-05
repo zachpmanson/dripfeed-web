@@ -17,7 +17,7 @@ interface Props {
 
 /**
  * Right-click menu on a feed row: mark all read, delete the feed, or move it
- * to another folder (opens a picker popup). All hit the News API then refresh.
+ * to another folder (flyout submenu). All hit the News API then refresh.
  */
 export function FeedContextMenu({
   feed,
@@ -29,7 +29,7 @@ export function FeedContextMenu({
   onClose,
   onChanged,
 }: Props) {
-  const [picking, setPicking] = useState(false)
+  const [moveOpen, setMoveOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -90,36 +90,40 @@ export function FeedContextMenu({
         style={{ left: x, top: y }}
         onClick={(e) => e.stopPropagation()}
       >
-        {picking ? (
-          <>
-            <div className="ctx-title">Move "{feed.title}" to…</div>
-            <button className="ctx-item" onClick={() => doMove(null)}>
-              no folder
-            </button>
-            {folders.map((f) => (
-              <button key={f.id} className="ctx-item" onClick={() => doMove(f.id)}>
-                {f.name}
-              </button>
-            ))}
-            <button className="ctx-item muted" onClick={() => setPicking(false)}>
-              back
-            </button>
-          </>
-        ) : (
-          <>
-            {unread > 0 && (
-              <button className="ctx-item" onClick={doMarkAllRead}>
-                mark all as read
-              </button>
-            )}
-            <button className="ctx-item" onClick={() => setPicking(true)}>
-              move to folder…
-            </button>
-            <button className="ctx-item danger" onClick={doDelete}>
-              delete
-            </button>
-          </>
+        {unread > 0 && (
+          <button className="ctx-item" onClick={doMarkAllRead}>
+            mark all as read
+          </button>
         )}
+        <div
+          className="ctx-sub"
+          onMouseEnter={() => setMoveOpen(true)}
+          onMouseLeave={() => setMoveOpen(false)}
+        >
+          <button
+            className="ctx-item"
+            aria-haspopup="menu"
+            aria-expanded={moveOpen}
+            onClick={() => setMoveOpen((o) => !o)}
+          >
+            move to folder…
+          </button>
+          {moveOpen && (
+            <div className="ctx-menu ctx-submenu" role="menu">
+              <button className="ctx-item" onClick={() => doMove(null)}>
+                no folder
+              </button>
+              {folders.map((f) => (
+                <button key={f.id} className="ctx-item" onClick={() => doMove(f.id)}>
+                  {f.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button className="ctx-item danger" onClick={doDelete}>
+          delete
+        </button>
         {error && <div className="error ctx-error">{error}</div>}
         {busy && <div className="muted ctx-busy">working…</div>}
       </div>

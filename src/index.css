@@ -381,6 +381,17 @@ body {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
 }
 
+.ctx-sub {
+  position: relative;
+}
+
+.ctx-submenu {
+  position: absolute;
+  left: calc(100% + 2px);
+  top: -0.35rem;
+  min-width: 11rem;
+}
+
 .ctx-title {
   font-size: 0.7rem;
   text-transform: uppercase;
