@@ -1,54 +1,64 @@
 import { apiGet } from './client'
-import type { FeedsResponse, FoldersResponse, ItemsResponse, NewsItem } from './types'
+import type { FeedsResponse, FoldersResponse, ItemsResponse, NewsFeed, NewsItem } from './types'
 import type { Settings } from '../settings'
 
-export const PAGE_SIZE = 40
-const FETCH_CONCURRENCY = 6
-const MAX_ITEMS = 20000 // per-feed autoPurgeCount cap: 200 × feeds ~ 4k; headroom
+export const PAGE_SIZE = 40 // local render window (not a server page)
+export const FEED_WINDOW = 20 // server batch per feed for the initial pull
+
+const CONCURRENCY = 6
 
 /**
- * Pull the FULL item history, paged oldest-first in PARALLEL chunks.
- * Best-effort: stops early on failure (a partial mirror beats nothing);
- * the caller treats a short mirror as "backfill later".
+ * Initial hydration: newest FEED_WINDOW per feed, in parallel, plus the full
+ * starred set. The main page (unread/rarity) only needs the newest few per
+ * feed; deeper history is fetched on demand by "load more" (see store.ts).
+ *
+ * Per-feed paging is newest-first: offset = lowest id already loaded for
+ * that feed (the API's offset is `id < offset` when oldestFirst=false), and
+ * offset 0 means "no filter" (first page).
  */
-export async function fetchAllItems(
+export async function fetchInitial(
   settings: Settings,
+  feeds: NewsFeed[],
   onProgress?: (done: number) => void,
-): Promise<NewsItemBatch> {
-  const first = await apiGet<ItemsResponse>(
-    settings,
-    `/items?type=3&getRead=true&oldestFirst=true&batchSize=${PAGE_SIZE}&offset=0`,
-  )
-  const all: NewsItem[] = [...first.items]
-  onProgress?.(all.length)
-
-  // Items are paged by id: batch N offset = max(id) seen so far.
-  let lastId = first.items.reduce((m, i) => Math.max(m, i.id), 0)
-  // Parallel fetch in waves until a short page.
-  while (true) {
-    if (all.length >= MAX_ITEMS) break
-    const wants = Math.min(FETCH_CONCURRENCY, Math.ceil((MAX_ITEMS - all.length) / PAGE_SIZE))
-    if (wants <= 0) break
-    const pages = await Promise.all(
-      Array.from({ length: wants }, (_, k) =>
-        apiGet<ItemsResponse>(
-          settings,
-          `/items?type=3&getRead=true&oldestFirst=true&batchSize=${PAGE_SIZE}&offset=${lastId + k * PAGE_SIZE}`,
-        ),
-      ),
-    )
-    const merged: NewsItem[] = []
-    for (const p of pages) merged.push(...p.items)
-    if (merged.length === 0) break // exhausted
-    all.push(...merged)
-    lastId = merged.reduce((m, i) => Math.max(m, i.id), lastId)
-    onProgress?.(all.length)
+): Promise<{ items: NewsItem[] }> {
+  let done = 0
+  const map = (arr: NewsFeed[], fn: (f: NewsFeed) => Promise<NewsItem[]>) => {
+    let i = 0
+    const workers = Array.from({ length: Math.min(CONCURRENCY, arr.length) }, async () => {
+      while (i < arr.length) {
+        const f = arr[i++]
+        const items = await fn(f)
+        done += items.length
+        onProgress?.(done)
+        return items
+      }
+      return []
+    })
+    return Promise.all(workers).then((r) => r.flat())
   }
-  return { items: all }
+
+  const [perFeed, starred] = await Promise.all([
+    map(feeds, (f) => fetchFeedWindow(settings, f.id)),
+    apiGet<ItemsResponse>(
+      settings,
+      `/items?type=2&getRead=true&oldestFirst=false&batchSize=-1&offset=0`,
+    ).then((r) => r.items),
+  ])
+  onProgress?.(perFeed.length + starred.length)
+
+  return { items: [...perFeed, ...starred] }
 }
 
-export interface NewsItemBatch {
-  items: NewsItem[]
+/** Newest `limit` items of one feed, older than `beforeId` (0 = newest). */
+export async function fetchFeedWindow(
+  settings: Settings,
+  feedId: number,
+  beforeId = 0,
+  limit = FEED_WINDOW,
+): Promise<NewsItem[]> {
+  const q = `type=0&id=${feedId}&getRead=true&oldestFirst=false&batchSize=${limit}&offset=${beforeId}`
+  const r = await apiGet<ItemsResponse>(settings, `/items?${q}`)
+  return r.items
 }
 
 /** Feed list + folder tree (small). */

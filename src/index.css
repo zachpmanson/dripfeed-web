@@ -274,9 +274,14 @@ body {
   flex: 1;
 }
 
+.load-more-row {
+  list-style: none;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
 .load-more {
-  margin: 0.6rem;
-  width: calc(100% - 1.2rem);
+  width: 100%;
   padding: 0.5rem;
 }
 

@@ -32,7 +32,7 @@ export default function App() {
     localStorage.setItem(SHOW_ALL_KEY, showAll ? '1' : '0')
   }, [showAll])
 
-  const store = useStore(settings)
+  const store = useStore(settings, view)
 
   if (!settings) {
     return (
@@ -70,14 +70,16 @@ export default function App() {
     )
   }
 
-  const { items, feeds, folders, count, allLoaded } = store
+  const { pool, feeds, folders, rendered, moreAvailable, loadingMore } = store
 
-  const visibleItems = filterView(items, view, sortMode, showAll)
-  const rarStats = sortMode === 'rarity' ? rarityStats(items) : undefined
+  const slice = pool.slice(0, rendered)
+  const rarMult = sortMode === 'rarity' ? rarityMultipliers(pool) : undefined
+  const rarStats = sortMode === 'rarity' ? rarityStats(pool) : undefined
+  const visibleItems = filterView(slice, view, sortMode, showAll, rarMult)
 
   const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
   const selected =
-    (selectedId !== null && items.find((i) => i.id === selectedId)) || visibleItems[0] || null
+    (selectedId !== null && slice.find((i) => i.id === selectedId)) || visibleItems[0] || null
 
   return (
     <div className="app">
@@ -104,8 +106,15 @@ export default function App() {
               rarity
             </button>
           </div>
-          <span className="muted sync">{count} local</span>
-          <button onClick={() => store.actions.reset()}>settings</button>
+          <span className="muted sync">{pool.length} local</span>
+          <button
+            onClick={() => {
+              void store.actions.reset()
+              setSettings(null)
+            }}
+          >
+            settings
+          </button>
         </div>
       </header>
 
@@ -114,7 +123,7 @@ export default function App() {
         <Sidebar
           feeds={feeds}
           folders={folders}
-          items={items}
+          items={pool}
           view={view}
           onSelect={(v) => {
             setView(v)
@@ -133,12 +142,10 @@ export default function App() {
             rarityMode={sortMode === 'rarity'}
             rarityStats={rarStats}
             emptyText={showAll ? 'No items here.' : 'No unread items. Nothing dripping?'}
+            onLoadMore={store.loadMore}
+            moreAvailable={moreAvailable}
+            loadingMore={loadingMore}
           />
-          {!allLoaded && visibleItems.length > 0 && (
-            <button className="load-more" onClick={() => store.loadMore()}>
-              load more
-            </button>
-          )}
         </div>
         <ItemView item={selected} feedTitle={feedTitle} actions={store.actions} />
       </main>
@@ -151,6 +158,7 @@ function filterView(
   view: View,
   sortMode: SortMode,
   showAll: boolean,
+  rarMult?: Map<number, number>,
 ): NewsItem[] {
   let list: NewsItem[]
   switch (view.kind) {
@@ -165,9 +173,8 @@ function filterView(
       break
   }
   if (view.kind !== 'feed' && sortMode === 'rarity') {
-    // Multipliers over the loaded set (DB-backed: full history after sync).
-    const mult = rarityMultipliers(items)
-    return sortByRarity(list, mult)
+    // Multipliers over the full pool, not the visible slice.
+    return sortByRarity(list, rarMult)
   }
   return list.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
 }

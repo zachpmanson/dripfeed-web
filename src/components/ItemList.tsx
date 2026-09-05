@@ -10,6 +10,9 @@ interface Props {
   rarityMode?: boolean
   rarityStats?: Map<number, RarityInfo>
   emptyText?: string
+  onLoadMore?: () => void
+  moreAvailable?: boolean
+  loadingMore?: boolean
 }
 
 export function ItemList({
@@ -21,6 +24,9 @@ export function ItemList({
   rarityMode = false,
   rarityStats,
   emptyText = 'No unread items. Nothing dripping?',
+  onLoadMore,
+  moreAvailable = false,
+  loadingMore = false,
 }: Props) {
   // Order is owned by the caller (App applies newest or rarity); never
   // re-sort here or the toggle silently no-ops.
@@ -51,6 +57,13 @@ export function ItemList({
         </li>
       ))}
       {items.length === 0 && <li className="muted">{emptyText}</li>}
+      {onLoadMore && moreAvailable && (
+        <li className="load-more-row">
+          <button className="load-more" onClick={onLoadMore} disabled={loadingMore}>
+            {loadingMore ? 'loading…' : 'load more'}
+          </button>
+        </li>
+      )}
     </ul>
   )
 }

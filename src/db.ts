@@ -87,6 +87,26 @@ export async function dbGetAllFolders(): Promise<NewsFolder[]> {
   return db.getAll('folders')
 }
 
+/**
+ * Per-feed stats over the whole local store: min item id (the server
+ * paging cursor — older items are fetched with offset=minId) and count.
+ * Small table (20/feed), so a full scan is fine.
+ */
+export async function dbFeedStats(): Promise<{
+  min: Map<number, number>
+  count: Map<number, number>
+}> {
+  const db = await getDB()
+  const all = await db.getAll('items')
+  const min = new Map<number, number>()
+  const count = new Map<number, number>()
+  for (const i of all) {
+    count.set(i.feedId, (count.get(i.feedId) ?? 0) + 1)
+    if (!min.has(i.feedId) || i.id < min.get(i.feedId)!) min.set(i.feedId, i.id)
+  }
+  return { min, count }
+}
+
 export async function dbPutItem(item: NewsItem): Promise<void> {
   await dbPutItems([item])
 }

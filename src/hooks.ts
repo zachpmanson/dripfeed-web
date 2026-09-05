@@ -1,77 +1,86 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   fullSync, incrementalSync, isInitialized, isDbReady, loadAllItems,
-  loadFeeds, loadFolders, onStoreChange, getStatus, resetLocal,
+  loadFeeds, loadFolders, loadMoreInto, onStoreChange, getStatus, resetLocal,
 } from './store'
-import { dbQueryItems } from './db'
 import { setRead, setStar } from './actions'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
 import type { Settings } from './settings'
-import { PAGE_SIZE } from './api/sync'
+import type { View } from './components/Sidebar'
+
+const RENDER_STEP = 60 // items to reveal per load-more
 
 export interface AppData {
   ready: boolean
-  items: NewsItem[] // loaded window
+  pool: NewsItem[] // full local mirror (sorted newest-first)
   feeds: Map<number, NewsFeed>
   folders: NewsFolder[]
-  allLoaded: boolean
-  count: number
+  rendered: number // how many of the sorted pool to show
+  moreAvailable: boolean
+  loadingMore: boolean
+  progress: { done: number } | null
+  error: string | null
+  loadMore: () => Promise<void>
+  actions: {
+    setRead: (item: NewsItem, unread: boolean) => Promise<void>
+    setStar: (item: NewsItem, starred: boolean) => Promise<void>
+    reset: () => Promise<void>
+  }
 }
 
 /**
- * Owns the whole data lifecycle: hydrates IndexedDB on first run (full
- * sync, progress surfaced via bundle), then keeps it fresh with a poll.
- * The UI reads a rendered window; "load more" widens it locally.
+ * Owns the whole data lifecycle: per-feed hydration into IndexedDB on first
+ * run, instant reads from the DB, growing server pool + render window via
+ * loadMore, background poll.
  */
-export function useStore(settings: Settings | null) {
+export function useStore(settings: Settings | null, view: View): AppData {
   const [ready, setReady] = useState(false)
-  const [items, setItems] = useState<NewsItem[]>([])
+  const [pool, setPool] = useState<NewsItem[]>([])
   const [feeds, setFeeds] = useState<Map<number, NewsFeed>>(new Map())
   const [folders, setFolders] = useState<NewsFolder[]>([])
-  const [count, setCount] = useState(0)
-  const [allLoaded, setAllLoaded] = useState(false)
+  const [rendered, setRendered] = useState(RENDER_STEP)
+  const [moreAvailable, setMoreAvailable] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [progress, setProgress] = useState<{ done: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const viewRef = useRef<View>(view)
+  viewRef.current = view
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
 
-  const refreshWindow = useCallback(async () => {
-    const [win, all, fs, fo] = await Promise.all([
-      dbQueryItems(PAGE_SIZE, 0),
-      loadAllItems(),
-      loadFeeds(),
-      loadFolders(),
-    ])
-    setItems(win)
+  const refreshPool = useCallback(async () => {
+    const [all, fs, fo] = await Promise.all([loadAllItems(), loadFeeds(), loadFolders()])
+    all.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
+    setPool(all)
     setFeeds(new Map(fs.map((f) => [f.id, f])))
     setFolders(fo)
-    setCount(all.length)
-    setAllLoaded(all.length <= PAGE_SIZE)
-  }, [])
+    setMoreAvailable(all.length > rendered)
+  }, [rendered])
 
+  // hydrate / poll
   useEffect(() => {
     if (!settings) return
     let cancelled = false
 
     const off = onStoreChange(() => {
-      if (cancelled) return
-      void refreshWindow()
+      if (!cancelled) void refreshPool()
     })
 
     ;(async () => {
       if (await isInitialized()) {
-        await refreshWindow()
+        await refreshPool()
         setReady(true)
         try {
           await incrementalSync(settings)
-          void refreshWindow()
+          if (!cancelled) await refreshPool()
         } catch (e) {
-          // background refresh failure is non-fatal
           console.warn('incremental sync failed', e)
         }
       } else {
         try {
           await fullSync(settings)
           if (cancelled) return
-          await refreshWindow()
+          await refreshPool()
           setReady(true)
         } catch (e) {
           if (!cancelled) setError(String(e))
@@ -80,8 +89,10 @@ export function useStore(settings: Settings | null) {
     })()
 
     const poll = setInterval(() => {
-      if (isDbReady()) {
-        incrementalSync(settings).catch((e) => console.warn('poll sync failed', e))
+      if (isDbReady() && settingsRef.current) {
+        incrementalSync(settingsRef.current)
+          .then(() => refreshPool())
+          .catch((e) => console.warn('poll sync failed', e))
       }
     }, 3 * 60_000)
 
@@ -90,64 +101,59 @@ export function useStore(settings: Settings | null) {
       clearInterval(poll)
       off()
     }
-  }, [settings, refreshWindow])
+  }, [settings, refreshPool])
 
   const loadMore = useCallback(async () => {
-    const win = await dbQueryItems(PAGE_SIZE, items.length)
-    setItems((prev) => {
-      const ids = new Set(prev.map((i) => i.id))
-      const merged = [...prev, ...win.filter((i) => !ids.has(i.id))]
-      // keep sorted by pubDate desc
-      merged.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
-      setAllLoaded(allLoaded || count <= merged.length)
-      return merged
-    })
-  }, [items, allLoaded, count])
+    const s = settingsRef.current
+    if (!s || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const feedId = viewRef.current.kind === 'feed' ? (viewRef.current.id as number) : undefined
+      await loadMoreInto(s, feedId)
+      await refreshPool()
+      setRendered((r) => r + RENDER_STEP)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [loadingMore, refreshPool])
 
-  const actions = {
-    setRead: useCallback(
-      (item: NewsItem, unread: boolean) => setRead(settings!, item, unread),
-      [settings],
-    ),
-    setStar: useCallback(
-      (item: NewsItem, starred: boolean) => setStar(settings!, item, starred),
-      [settings],
-    ),
-    reset: useCallback(async () => {
-      await resetLocal()
-      setReady(false)
-      setItems([])
-      setAllLoaded(false)
-      // wipe UI; next load re-hydrates
-    }, []),
-  }
+  const actions = useCallback(
+    () => ({
+      setRead: (item: NewsItem, unread: boolean) => setRead(settingsRef.current!, item, unread),
+      setStar: (item: NewsItem, starred: boolean) => setStar(settingsRef.current!, item, starred),
+      reset: async () => {
+        await resetLocal()
+        setReady(false)
+        setPool([])
+        setRendered(RENDER_STEP)
+        setMoreAvailable(false)
+      },
+    }),
+    [],
+  )
 
-  // subscribe to progress
+  // progress subscription
   useEffect(() => {
     const tick = () => {
-      const s = getStatus()
-      if (s.stage === 'fetching') setProgress({ done: s.done })
-      else if (s.stage === 'done') setProgress(null)
+      const st = getStatus()
+      if (st.stage === 'fetching') setProgress({ done: st.done })
+      else if (st.stage === 'done') setProgress(null)
     }
     tick()
-    const off = onStoreChange(tick)
-    return off
+    return onStoreChange(tick)
   }, [])
 
   return {
     ready,
-    items,
+    pool,
     feeds,
     folders,
-    count,
-    allLoaded,
+    rendered,
+    moreAvailable,
+    loadingMore,
     progress,
     error,
     loadMore,
-    actions,
+    actions: actions(),
   }
-}
-
-export interface Bundle {
-  store: ReturnType<typeof useStore>
 }
