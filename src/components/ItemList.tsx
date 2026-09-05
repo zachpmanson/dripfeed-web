@@ -50,7 +50,7 @@ export function ItemList({
                 {rarityLine(item, rarityStats)}
               </span>
             ) : (
-              <span className="muted">{formatDate(item.pubDate)}</span>
+              <span className="date muted">{formatDate(item.pubDate)}</span>
             )}
             {item.starred && <span aria-label="starred">★</span>}
           </div>

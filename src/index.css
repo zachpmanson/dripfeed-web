@@ -290,12 +290,23 @@ body {
   align-items: baseline;
 }
 
+/* Date / rarity line right-aligned against the row edge; feed name stays
+   left. margin-left:auto pushes the trailing cluster to the right. */
+.item-meta .feed {
+  margin-right: auto;
+}
+
 .rarity-line {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
+  text-align: right;
 }
 
-.feed {
+.item-meta .date {
+  text-align: right;
+}
+
+.item-meta .feed {
   color: var(--accent);
 }
 
