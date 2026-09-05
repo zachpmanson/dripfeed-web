@@ -165,8 +165,15 @@ export default function App() {
 
   const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
   const feedById = (feedId: number) => feeds.get(feedId)
+  // Selection: prefer the id in the CURRENT view; if the item dropped out of
+  // the filter (e.g. marked read in the unread view) fall back to the same
+  // id in the full pool so the reader stays on it. Only when the item is
+  // gone entirely do we jump to the first visible item.
   const selected =
-    (selectedId !== null && visibleItems.find((i) => i.id === selectedId)) || visibleItems[0] || null
+    (selectedId !== null &&
+      (visibleItems.find((i) => i.id === selectedId) ?? pool.find((i) => i.id === selectedId))) ||
+    visibleItems[0] ||
+    null
 
   return (
     <div className="app">
