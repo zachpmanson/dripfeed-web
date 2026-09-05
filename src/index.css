@@ -307,13 +307,17 @@ body {
   vertical-align: middle;
 }
 
-.reader .item-meta {
+.item-meta {
   font-size: 0.75rem;
   color: var(--muted);
   display: flex;
   gap: 0.5rem;
   align-items: baseline;
-  margin-bottom: 0.9rem; /* whole header (title + date + author) sits above this */
+}
+
+/* reader pane: whole header (title + date + author) sits above this */
+.reader .item-meta {
+  margin-bottom: 0.9rem;
 }
 
 /* Date / rarity line right-aligned against the row edge; feed name stays
