@@ -51,7 +51,8 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
     else next.add(id)
     applyCollapsed(next)
   }
-  const folderIds = sortedFolders.map((f) => f.id)
+  const allCollapsed =
+    sortedFolders.length > 0 && sortedFolders.every((f) => collapsed.has(f.id))
 
   return (
     <nav className="sidebar">
@@ -60,19 +61,14 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
         <div className="sidebar-actions">
           <button
             className="icon-btn"
-            title="Expand all folders"
-            onClick={() => applyCollapsed(new Set())}
-            aria-label="expand all"
+            title={allCollapsed ? 'Expand all folders' : 'Collapse all folders'}
+            onClick={() => {
+              if (allCollapsed) applyCollapsed(new Set())
+              else applyCollapsed(fold(sortedFolders.map((f) => f.id), new Set()))
+            }}
+            aria-label={allCollapsed ? 'expand all' : 'collapse all'}
           >
-            ▸▸
-          </button>
-          <button
-            className="icon-btn"
-            title="Collapse all folders"
-            onClick={() => applyCollapsed(fold(folderIds, new Set()))}
-            aria-label="collapse all"
-          >
-            ▾▾
+            {allCollapsed ? '▸' : '▾'}
           </button>
         </div>
       </div>
