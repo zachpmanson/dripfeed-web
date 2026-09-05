@@ -84,7 +84,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>dripfeed</h1>
+        <h1>Dripfeed</h1>
         <div className="header-right">
           <div className="seg" title="items shown: all, or only unread">
             <button className={!showAll ? 'active' : ''} onClick={() => setShowAll(false)}>
