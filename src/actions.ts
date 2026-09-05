@@ -1,5 +1,5 @@
-import { dbPutItem } from './db'
-import { markRead, markUnread, setStar as setStarApi } from './api/news'
+import { dbPutItem, dbGetFeedItems } from './db'
+import { markRead, markUnread, setStar as setStarApi, markFeedRead } from './api/news'
 import { notifyLocalChange } from './store'
 import type { NewsItem } from './api/types'
 import type { Settings } from './settings'
@@ -32,6 +32,31 @@ export async function setStar(settings: Settings, item: NewsItem, starred: boole
     await setStarApi(settings, item.id)
   } catch (e) {
     await dbPutItem(item)
+    notifyLocalChange()
+    throw e
+  }
+}
+
+/**
+ * Mark every locally-stored item of a feed as read (optimistic), then tell
+ * the server to mark the whole feed read via POST /feeds/{id}/read. Passing
+ * MAX_SAFE_INTEGER as newestItemId covers items we haven't loaded locally.
+ * On server failure the local read flags are reverted.
+ */
+export async function markFeedAllRead(settings: Settings, feedId: number): Promise<void> {
+  const local = await dbGetFeedItems(feedId)
+  const prev = new Map(local.map((i) => [i.id, i]))
+  const next = local
+    .filter((i) => i.unread)
+    .map((i) => ({ ...i, unread: false }))
+  if (next.length > 0) {
+    for (const it of next) await dbPutItem(it)
+    notifyLocalChange()
+  }
+  try {
+    await markFeedRead(settings, feedId, Number.MAX_SAFE_INTEGER)
+  } catch (e) {
+    for (const orig of prev.values()) await dbPutItem(orig)
     notifyLocalChange()
     throw e
   }

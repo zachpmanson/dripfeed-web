@@ -24,27 +24,17 @@ export function fetchItems(settings: Settings, params: ItemsParams): Promise<Ite
   return apiGet<ItemsResponse>(settings, `/items?${q}`)
 }
 
-/**
- * GET /items/updated — incremental sync. Returns items whose lastModified is
- * newer than `lastModified` for the given list, plus a `newestItemId` field
- * (in ItemsResponse) usable as the next cursor.
- */
-export function fetchUpdated(
-  settings: Settings,
-  lastModified: number,
-  type: ListType = 3,
-  id = 0,
-): Promise<ItemsResponse> {
-  const q = new URLSearchParams({
-    type: String(type),
-    id: String(id),
-    lastModified: String(lastModified),
-  })
-  return apiGet<ItemsResponse>(settings, `/items/updated?${q}`)
-}
-
 export function markRead(settings: Settings, itemId: number): Promise<void> {
   return apiPost(settings, `/items/${itemId}/read`)
+}
+
+/** Mark a whole feed read server-side: POST /feeds/{feedId}/read { newestItemId }. */
+export function markFeedRead(
+  settings: Settings,
+  feedId: number,
+  newestItemId: number,
+): Promise<void> {
+  return apiPost(settings, `/feeds/${feedId}/read`, { newestItemId })
 }
 
 export function markUnread(settings: Settings, itemId: number): Promise<void> {

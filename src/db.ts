@@ -116,39 +116,6 @@ export async function dbGetFeedItems(feedId: number): Promise<NewsItem[]> {
   return db.getAllFromIndex('items', 'by-feed', feedId)
 }
 
-/** Local pagination: items sorted by pubDate DESC, newest-first window. */
-export async function dbQueryItems(batch: number, offset: number): Promise<NewsItem[]> {
-  const db = await getDB()
-  // index by-pubDate asc; we want descending. Walk the index backwards —
-  // idb's getAllFromIndex is asc-only, so fetch a window backwards via
-  // openCursor.
-  const results: NewsItem[] = []
-  let skipped = 0
-  const total = await db.count('items')
-  // items with null pubDate sort last in the asc index; we ignore them for
-  // cursor positioning and append them at the end.
-  let cursor = await db.transaction('items').store.index('by-pubDate').openCursor(null, 'prev')
-  while (cursor && results.length < batch) {
-    if (cursor.value.pubDate === null) {
-      cursor = await cursor.continue()
-      continue
-    }
-    if (skipped < offset) {
-      skipped++
-    } else {
-      results.push(cursor.value)
-    }
-    cursor = await cursor.continue()
-  }
-  void total
-  return results
-}
-
-export async function dbCount(): Promise<number> {
-  const db = await getDB()
-  return db.count('items')
-}
-
 export async function dbGetMeta(key: string): Promise<string | undefined> {
   const db = await getDB()
   const row = await db.get('meta', key)

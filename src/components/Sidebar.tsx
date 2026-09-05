@@ -158,6 +158,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, onMet
           settings={settings}
           x={ctx.x}
           y={ctx.y}
+          unread={unreadCount(items, ctx.feed.id)}
           onClose={() => setCtx(null)}
           onChanged={onMetaChanged}
         />

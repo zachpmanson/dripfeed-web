@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { NewsFeed, NewsFolder } from '../api/types'
 import type { Settings } from '../settings'
 import { deleteFeed, moveFeed } from '../api/news'
+import { markFeedAllRead } from '../actions'
 
 interface Props {
   feed: NewsFeed
@@ -9,18 +10,42 @@ interface Props {
   settings: Settings
   x: number
   y: number
+  unread: number
   onClose: () => void
   onChanged: () => void // refresh sidebar meta after delete/move
 }
 
 /**
- * Right-click menu on a feed row: delete the feed, or move it to another
- * folder (opens a picker popup). Both hit the News API then refresh meta.
+ * Right-click menu on a feed row: mark all read, delete the feed, or move it
+ * to another folder (opens a picker popup). All hit the News API then refresh.
  */
-export function FeedContextMenu({ feed, folders, settings, x, y, onClose, onChanged }: Props) {
+export function FeedContextMenu({
+  feed,
+  folders,
+  settings,
+  x,
+  y,
+  unread,
+  onClose,
+  onChanged,
+}: Props) {
   const [picking, setPicking] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const doMarkAllRead = async () => {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      await markFeedAllRead(settings, feed.id)
+      onChanged()
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setBusy(false)
+    }
+  }
 
   const doDelete = async () => {
     if (busy) return
@@ -82,6 +107,11 @@ export function FeedContextMenu({ feed, folders, settings, x, y, onClose, onChan
           </>
         ) : (
           <>
+            {unread > 0 && (
+              <button className="ctx-item" onClick={doMarkAllRead}>
+                mark all as read
+              </button>
+            )}
             <button className="ctx-item" onClick={() => setPicking(true)}>
               move to folder…
             </button>

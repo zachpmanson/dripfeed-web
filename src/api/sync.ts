@@ -2,7 +2,6 @@ import { apiGet } from './client'
 import type { FeedsResponse, FoldersResponse, ItemsResponse, NewsFeed, NewsItem } from './types'
 import type { Settings } from '../settings'
 
-export const PAGE_SIZE = 40 // local render window (not a server page)
 export const FEED_WINDOW = 20 // server batch per feed for the initial pull
 
 const CONCURRENCY = 6
