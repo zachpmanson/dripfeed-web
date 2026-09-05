@@ -12,6 +12,7 @@ interface Props {
   emptyText?: string
   onLoadMore?: () => void
   moreAvailable?: boolean
+  moreServer?: boolean // a live cursor in the current view still pages deeper
   loadingMore?: boolean
 }
 
@@ -26,6 +27,7 @@ export function ItemList({
   emptyText = 'No unread items. Nothing dripping?',
   onLoadMore,
   moreAvailable = false,
+  moreServer = false,
   loadingMore = false,
 }: Props) {
   // Order is owned by the caller (App applies newest or rarity); never
@@ -57,7 +59,7 @@ export function ItemList({
         </li>
       ))}
       {items.length === 0 && <li className="muted">{emptyText}</li>}
-      {onLoadMore && moreAvailable && (
+      {onLoadMore && (moreAvailable || moreServer) && (
         <li className="load-more-row">
           <button className="load-more" onClick={onLoadMore} disabled={loadingMore}>
             {loadingMore ? 'loading…' : 'load more'}

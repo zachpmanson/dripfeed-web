@@ -4,6 +4,7 @@ import {
   loadFeeds, loadFolders, loadMoreInto, onStoreChange, getStatus, resetLocal,
 } from './store'
 import { setRead, setStar } from './actions'
+import { dbGetCursor } from './db'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
 import type { Settings } from './settings'
 import type { View } from './components/Sidebar'
@@ -21,6 +22,7 @@ export interface AppData {
   progress: { done: number } | null
   error: string | null
   loadMore: () => Promise<void>
+  moreServer: boolean // any feed in the current view still has history on the server
   actions: {
     setRead: (item: NewsItem, unread: boolean) => Promise<void>
     setStar: (item: NewsItem, starred: boolean) => Promise<void>
@@ -40,6 +42,7 @@ export function useStore(settings: Settings | null, view: View): AppData {
   const [folders, setFolders] = useState<NewsFolder[]>([])
   const [rendered, setRendered] = useState(RENDER_STEP)
   const [moreAvailable, setMoreAvailable] = useState(false)
+  const [moreServer, setMoreServer] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [progress, setProgress] = useState<{ done: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -54,6 +57,19 @@ export function useStore(settings: Settings | null, view: View): AppData {
     setPool(all)
     setFeeds(new Map(fs.map((f) => [f.id, f])))
     setFolders(fo)
+    // Cursor-aware "server has more": any feed relevant to the current view
+    // with a live cursor (>= 0, i.e. not drained) can still page deeper.
+    const v = viewRef.current
+    const relevant = v.kind === 'feed' ? fs.filter((f) => f.id === v.id) : fs
+    let anyLive = false
+    for (const f of relevant) {
+      const c = await dbGetCursor(f.id)
+      if (c !== undefined && c >= 0) {
+        anyLive = true
+        break
+      }
+    }
+    setMoreServer(anyLive)
     setMoreAvailable(all.length > rendered)
   }, [rendered])
 
@@ -150,6 +166,7 @@ export function useStore(settings: Settings | null, view: View): AppData {
     folders,
     rendered,
     moreAvailable,
+    moreServer,
     loadingMore,
     progress,
     error,

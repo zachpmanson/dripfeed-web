@@ -70,7 +70,7 @@ export default function App() {
     )
   }
 
-  const { pool, feeds, folders, rendered, loadingMore } = store
+  const { pool, feeds, folders, rendered, loadingMore, moreServer } = store
 
   // Filter + rank the WHOLE pool first, then window the result. Slicing the
   // pool before filtering/sorting hid any feed whose items fell past the
@@ -151,6 +151,7 @@ export default function App() {
             emptyText={showAll ? 'No items here.' : 'No unread items. Nothing dripping?'}
             onLoadMore={store.loadMore}
             moreAvailable={moreAvailable}
+            moreServer={moreServer}
             loadingMore={loadingMore}
           />
         </div>
@@ -176,7 +177,9 @@ function filterView(
       list = items.filter((i) => i.starred && (showAll || i.unread))
       break
     case 'feed':
-      list = items.filter((i) => i.feedId === view.id && (showAll || i.unread))
+      // B: browsing a feed is about reading old posts — always show all
+      // items (read grayed) regardless of the global only-unread toggle.
+      list = items.filter((i) => i.feedId === view.id)
       break
   }
   if (view.kind !== 'feed' && sortMode === 'rarity') {
