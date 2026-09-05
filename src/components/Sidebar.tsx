@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { NewsFolder, NewsFeed, NewsItem } from '../api/types'
 import { unreadCount, starredCount } from '../selectors'
+import { FeedContextMenu } from './FeedContextMenu'
+import type { Settings } from '../settings'
 
 export type View =
   | { kind: 'all' } // ALL items, ignores the only-unread/all toggle
@@ -15,11 +17,13 @@ interface Props {
   items: NewsItem[]
   view: View
   onSelect: (v: View) => void
+  settings: Settings
+  onMetaChanged: () => void
 }
 
 const COLLAPSE_KEY = 'dripfeed.folders.collapsed'
 
-export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
+export function Sidebar({ feeds, folders, items, view, onSelect, settings, onMetaChanged }: Props) {
   const totalUnread = unreadCount(items)
   const totalStarred = starredCount(items)
   const feedEntries = [...feeds.values()].sort((a, b) => a.title.localeCompare(b.title))
@@ -39,6 +43,8 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
     }
   })
 
+  const [ctx, setCtx] = useState<{ feed: NewsFeed; x: number; y: number } | null>(null)
+
   const fold = (ids: Iterable<number>, into: Set<number>) => {
     for (const id of ids) into.add(id)
     return into
@@ -56,6 +62,11 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
   const allCollapsed =
     sortedFolders.length > 0 && sortedFolders.every((f) => collapsed.has(f.id))
 
+  const onCtx = (e: React.MouseEvent, feed: NewsFeed) => {
+    e.preventDefault()
+    setCtx({ feed, x: e.clientX, y: e.clientY })
+  }
+
   return (
     <nav className="sidebar">
       <div className="sidebar-toolbar">
@@ -70,7 +81,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
             }}
             aria-label={allCollapsed ? 'expand all' : 'collapse all'}
           >
-            {allCollapsed ? '▸' : '▾'}
+            {allCollapsed ? '❯' : '⌄'}
           </button>
         </div>
       </div>
@@ -117,13 +128,13 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
                     onClick={() => toggle(folder.id)}
                     aria-expanded={!isCollapsed}
                   >
-                    <span className={`caret${isCollapsed ? ' collapsed' : ''}`}>▾</span>
+                    <span className={`caret${isCollapsed ? ' collapsed' : ''}`}>⌄</span>
                   </button>
                 </span>
               </div>
               {!isCollapsed &&
                 inFolder.map((f) => (
-                  <FeedRow key={f.id} feed={f} items={items} view={view} onSelect={onSelect} />
+                  <FeedRow key={f.id} feed={f} items={items} view={view} onSelect={onSelect} onCtx={onCtx} />
                 ))}
             </div>
           )
@@ -135,11 +146,22 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
               <span className="folder-name no-caret">Feeds</span>
             </div>
             {ungrouped.map((f) => (
-              <FeedRow key={f.id} feed={f} items={items} view={view} onSelect={onSelect} />
+              <FeedRow key={f.id} feed={f} items={items} view={view} onSelect={onSelect} onCtx={onCtx} />
             ))}
           </div>
         )}
       </div>
+      {ctx && settings && (
+        <FeedContextMenu
+          feed={ctx.feed}
+          folders={folders}
+          settings={settings}
+          x={ctx.x}
+          y={ctx.y}
+          onClose={() => setCtx(null)}
+          onChanged={onMetaChanged}
+        />
+      )}
     </nav>
   )
 }
@@ -149,11 +171,13 @@ function FeedRow({
   items,
   view,
   onSelect,
+  onCtx,
 }: {
   feed: NewsFeed
   items: NewsItem[]
   view: View
   onSelect: (v: View) => void
+  onCtx: (e: React.MouseEvent, feed: NewsFeed) => void
 }) {
   const n = unreadCount(items, feed.id)
   return (
@@ -162,6 +186,7 @@ function FeedRow({
         view.kind === 'feed' && view.id === feed.id ? 'active feed-row' : 'feed-row'
       }
       onClick={() => onSelect({ kind: 'feed', id: feed.id })}
+      onContextMenu={(e) => onCtx(e, feed)}
     >
       <span className="feed-name">{feed.title}</span>
       {n > 0 && <span className="count">{n}</span>}

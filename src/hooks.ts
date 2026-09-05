@@ -27,6 +27,7 @@ export interface AppData {
     setRead: (item: NewsItem, unread: boolean) => Promise<void>
     setStar: (item: NewsItem, starred: boolean) => Promise<void>
     ensureFeed: (feedId: number) => Promise<void>
+    refreshMeta: () => Promise<void>
     reset: () => Promise<void>
   }
 }
@@ -144,6 +145,12 @@ export function useStore(settings: Settings | null, view: View): AppData {
         const s = settingsRef.current
         if (!s) return
         await ensureFeedWindow(s, feedId)
+        await refreshPool()
+      },
+      refreshMeta: async () => {
+        const s = settingsRef.current
+        if (!s) return
+        await incrementalSync(s)
         await refreshPool()
       },
       reset: async () => {

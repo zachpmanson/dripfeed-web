@@ -6,6 +6,7 @@ import { SettingsForm } from './components/SettingsForm'
 import { Sidebar, type View } from './components/Sidebar'
 import { ItemList } from './components/ItemList'
 import { ItemView } from './components/ItemView'
+import { AddModal } from './components/AddModal'
 import { rarityMultipliers, rarityStats, sortByRarity } from './rarity'
 import type { NewsItem } from './api/types'
 
@@ -33,6 +34,7 @@ export default function App() {
   }, [showAll])
 
   const store = useStore(settings, view)
+  const [showAdd, setShowAdd] = useState(false)
 
   // On navigation to an individual feed: top the local window up to 20 and
   // probe the server for whether more history exists (so a short/partial
@@ -144,6 +146,13 @@ export default function App() {
           </div>
           <span className="muted sync">{pool.length} local</span>
           <button
+            className="add-btn"
+            title="add feed or folder"
+            onClick={() => setShowAdd(true)}
+          >
+            +
+          </button>
+          <button
             className="logout"
             title="forget these credentials and return to the connection screen"
             onClick={() => {
@@ -163,6 +172,8 @@ export default function App() {
           folders={folders}
           items={pool}
           view={view}
+          settings={settings}
+          onMetaChanged={() => void store.actions.refreshMeta()}
           onSelect={(v) => {
             setView(v)
             setSelectedId(null)
@@ -188,6 +199,17 @@ export default function App() {
         </div>
         <ItemView item={selected} feedTitle={feedTitle} actions={store.actions} />
       </main>
+      {showAdd && settings && (
+        <AddModal
+          folders={folders}
+          settings={settings}
+          onClose={() => setShowAdd(false)}
+          onCreated={() => {
+            // refresh feeds/folders meta so the new item shows in the sidebar
+            void store.actions.refreshMeta()
+          }}
+        />
+      )}
     </div>
   )
 }

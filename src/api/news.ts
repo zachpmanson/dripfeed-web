@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from './client'
+import { apiGet, apiPost, apiDelete } from './client'
 import type { FeedsResponse, FoldersResponse, ItemsResponse, ListType } from './types'
 import type { Settings } from '../settings'
 
@@ -61,4 +61,38 @@ export function fetchFeeds(settings: Settings): Promise<FeedsResponse> {
 
 export function fetchFolders(settings: Settings): Promise<FoldersResponse> {
   return apiGet<FoldersResponse>(settings, '/folders')
+}
+
+/** Create a folder. Body: { name }. Returns the folder (or array via wrappers). */
+export function createFolder(
+  settings: Settings,
+  name: string,
+): Promise<FoldersResponse> {
+  return apiPost<FoldersResponse>(settings, '/folders', { name })
+}
+
+/** Add a feed. Body: { url, folderId? } (folderId 0 = no folder). */
+export function createFeed(
+  settings: Settings,
+  url: string,
+  folderId: number | null,
+): Promise<FeedsResponse> {
+  return apiPost<FeedsResponse>(settings, '/feeds', {
+    url,
+    folderId: folderId ?? 0,
+  })
+}
+
+/** Delete a feed. DELETE /feeds/{feedId} */
+export function deleteFeed(settings: Settings, feedId: number): Promise<void> {
+  return apiDelete(settings, `/feeds/${feedId}`)
+}
+
+/** Move a feed to another folder (folderId null = no folder). POST /feeds/{feedId}/move */
+export function moveFeed(
+  settings: Settings,
+  feedId: number,
+  folderId: number | null,
+): Promise<void> {
+  return apiPost(settings, `/feeds/${feedId}/move`, { folderId: folderId ?? 0 })
 }

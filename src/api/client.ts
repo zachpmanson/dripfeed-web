@@ -47,7 +47,21 @@ export async function apiGet<T>(settings: Settings, path: string): Promise<T> {
   return (await res.json()) as T
 }
 
-/** POST with no body (state mutation endpoints like read/star). */
-export async function apiPost(settings: Settings, path: string): Promise<void> {
-  await apiFetch(settings, path, { method: 'POST' })
+/** POST, optionally with a JSON body (returns parsed JSON when present). */
+export async function apiPost<T = void>(
+  settings: Settings,
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const res = await apiFetch(settings, path, {
+    method: 'POST',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const text = await res.text()
+  return (text ? JSON.parse(text) : undefined) as T
+}
+
+/** DELETE with no body. */
+export async function apiDelete(settings: Settings, path: string): Promise<void> {
+  await apiFetch(settings, path, { method: 'DELETE' })
 }
