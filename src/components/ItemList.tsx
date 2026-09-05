@@ -31,7 +31,7 @@ export function ItemList({ items, selectedId, feedTitle, onSelect, onRead }: Pro
           </div>
         </li>
       ))}
-      {sorted.length === 0 && (
+      {items.length === 0 && (
         <li className="muted">No unread items. Nothing dripping?</li>
       )}
     </ul>
