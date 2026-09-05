@@ -80,7 +80,6 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
           onClick={() => onSelect({ kind: 'all' })}
         >
           <span>All items</span>
-          <span className="count">{totalUnread}</span>
         </button>
         <button
           className={view.kind === 'allUnread' ? 'active' : ''}
