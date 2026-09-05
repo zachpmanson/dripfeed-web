@@ -1,6 +1,22 @@
 import type { NewsItem } from '../api/types'
 import type { RarityInfo } from '../rarity'
 
+/**
+ * Fallback title for untitled items: strip HTML from the body and take the
+ * first sentence (or first ~80 chars). Shared by the list and the reader.
+ */
+export function titleFor(item: NewsItem): string {
+  if (item.title && item.title.trim()) return item.title
+  const text = (item.body || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!text) return '(untitled)'
+  const m = text.match(/^[^.?!]*[.?!]/)
+  const first = (m ? m[0] : text).trim()
+  return first.length > 0 ? first : text.slice(0, 80)
+}
+
 interface Props {
   items: NewsItem[]
   selectedId: number | null
@@ -43,7 +59,7 @@ export function ItemList({
         >
           <div className="item-title">
             {item.unread && <span className="unread-dot" />}
-            {item.title || '(untitled)'}
+            {titleFor(item)}
           </div>
           <div className="item-meta">
             <span className="feed">{feedTitle(item.feedId)}</span>

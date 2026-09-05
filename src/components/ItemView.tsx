@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { titleFor } from './ItemList'
 import type { NewsItem } from '../api/types'
 import type { useStore } from '../hooks'
 
@@ -29,7 +30,7 @@ export function ItemView({ item, feedTitle, actions }: Props) {
       <div className="reader-head">
         <h2 className="reader-title">
           <a href={item.url} target="_blank" rel="noreferrer">
-            {item.title || '(untitled)'}
+            {titleFor(item)}
           </a>
         </h2>
         <div className="reader-actions">
