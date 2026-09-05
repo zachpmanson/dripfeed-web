@@ -423,7 +423,8 @@ body {
 
 /* title + date + author block: breathing room before the article frame */
 .reader-head {
-  margin: 0 0 0.25rem;
+  margin: 0;
+  padding-bottom: 0.9rem;
 }
 
 .reader-title {
@@ -466,7 +467,7 @@ body {
   border-radius: 6px;
   background: #fff;
   min-height: 20rem;
-  margin-top: 0.25rem;
+  margin-top: 0;
 }
 
 button {
