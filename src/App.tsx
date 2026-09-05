@@ -303,11 +303,11 @@ function filterView(
   let list: NewsItem[]
   switch (view.kind) {
     case 'all':
-      // Fixed: ALL items, global toggle has no effect here.
-      list = items
+      // Global only-unread/all toggle governs this view.
+      list = showAll ? items : items.filter((i) => i.unread)
       break
     case 'allUnread':
-      // Fixed: unread only, global toggle has no effect here.
+      // Dedicated unread filter: always unread only.
       list = items.filter((i) => i.unread)
       break
     case 'starred':
