@@ -6,6 +6,7 @@
   --text: #d8dce3;
   --muted: #8b93a1;
   --accent: #6ea8fe;
+  --on-accent: #0b0d10;
 }
 
 :root[data-theme='light'] {
@@ -16,6 +17,7 @@
   --text: #1c1f26;
   --muted: #5c6470;
   --accent: #2f6fd6;
+  --on-accent: #ffffff;
 }
 
 * {
@@ -80,7 +82,7 @@ body {
    enough — push the text to the accent and fill the button. */
 .seg button.active {
   background: var(--accent);
-  color: #0b0d10;
+  color: var(--on-accent);
   font-weight: 600;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
   position: relative;
@@ -311,7 +313,7 @@ body {
 
 .modal-form button.primary {
   background: var(--accent);
-  color: #0b0d10;
+  color: var(--on-accent);
   border: none;
   font-weight: 600;
   padding: 0.55rem;
