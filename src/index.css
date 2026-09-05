@@ -306,12 +306,13 @@ body {
   vertical-align: middle;
 }
 
-.item-meta {
+.reader .item-meta {
   font-size: 0.75rem;
   color: var(--muted);
   display: flex;
   gap: 0.5rem;
   align-items: baseline;
+  margin-bottom: 0.9rem; /* whole header (title + date + author) sits above this */
 }
 
 /* Date / rarity line right-aligned against the row edge; feed name stays
@@ -425,7 +426,6 @@ body {
 /* title + date + author block: breathing room before the article frame */
 .reader-head {
   margin: 0;
-  padding-bottom: 0.9rem;
 }
 
 .reader-title {
