@@ -124,6 +124,15 @@ export function FeedContextMenu({
         <button className="ctx-item danger" onClick={doDelete}>
           delete
         </button>
+        <button
+          className="ctx-item"
+          onClick={() => {
+            if (feed.url) window.open(feed.url, '_blank', 'noopener')
+            onClose()
+          }}
+        >
+          open feed URL ↗
+        </button>
         {error && <div className="error ctx-error">{error}</div>}
         {busy && <div className="muted ctx-busy">working…</div>}
       </div>
