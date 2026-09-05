@@ -11,7 +11,6 @@ import { SettingsModal } from './components/SettingsModal'
 import {
   applyUiTheme,
   articleThemeKey,
-  effectiveTheme,
   loadShowFavicons,
   loadThemeSetting,
   saveShowFavicons,
@@ -79,7 +78,6 @@ export default function App() {
     setShowFaviconsState(v)
     saveShowFavicons(v)
   }
-  const articleDark = effectiveTheme(articleTheme) === 'dark'
 
   // On navigation to an individual feed: top the local window up to 20 and
   // probe the server for whether more history exists (so a short/partial
@@ -259,7 +257,7 @@ export default function App() {
           item={selected}
           feedTitle={feedTitle}
           actions={store.actions}
-          articleDark={articleDark}
+          articleTheme={articleTheme}
         />
       </main>
       {showAdd && settings && (
