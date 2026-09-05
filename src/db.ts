@@ -159,3 +159,12 @@ export async function dbSetMeta(key: string, value: string): Promise<void> {
   const db = await getDB()
   await db.put('meta', { key, value })
 }
+
+export async function dbGetCursor(feedId: number): Promise<number | undefined> {
+  const v = await dbGetMeta(`cursor:${feedId}`)
+  return v === undefined ? undefined : Number(v)
+}
+
+export async function dbSetCursor(feedId: number, id: number): Promise<void> {
+  await dbSetMeta(`cursor:${feedId}`, String(id))
+}

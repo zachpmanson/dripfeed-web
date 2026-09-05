@@ -1,4 +1,4 @@
-import { dbClear, dbFeedStats, dbGetAllFeeds, dbGetAllFolders, dbGetAllItems, dbGetMeta, dbPutFeeds, dbPutFolders, dbPutItems, dbSetMeta } from './db'
+import { dbClear, dbGetCursor, dbGetAllFeeds, dbGetAllFolders, dbGetAllItems, dbGetMeta, dbPutFeeds, dbPutFolders, dbPutItems, dbSetCursor, dbSetMeta } from './db'
 import { fetchFeedWindow, fetchInitial, fetchMeta } from './api/sync'
 import { fetchItems } from './api/news'
 import { LIST_TYPES } from './api/types'
@@ -49,11 +49,14 @@ export async function fullSync(settings: Settings): Promise<void> {
   await dbPutFeeds(feeds)
   await dbPutFolders(folders)
 
-  const { items } = await fetchInitial(settings, feeds, (done) => {
+  const { items, feedWindows } = await fetchInitial(settings, feeds, (done) => {
     status = { stage: 'fetching', done }
     emit()
   })
   await dbPutItems(items.map(normalize))
+  // Per-feed window cursors: seeds for load-more paging. Starred items are
+  // deliberately excluded from cursor positions (they're old and separate).
+  for (const [feedId, minId] of feedWindows) await dbSetCursor(feedId, minId)
 
   await dbSetMeta('initialized', '1')
   dbReady = true
@@ -85,17 +88,25 @@ export async function loadMoreInto(
   feedId?: number,
   onProgress?: (done: number) => void,
 ): Promise<number> {
-  const { min } = await dbFeedStats()
   const feeds = await dbGetAllFeeds()
   const targets = feedId !== undefined ? feeds.filter((f) => f.id === feedId) : feeds
-  const todo = targets.filter((f) => min.has(f.id)) // only feeds with items
   let added = 0
   let i = 0
-  const workers = Array.from({ length: Math.min(6, todo.length) }, async () => {
-    while (i < todo.length) {
-      const f = todo[i++]
-      const items = await fetchFeedWindow(settings, f.id, min.get(f.id) ?? 0)
-      if (items.length > 0) await dbPutItems(items.map(normalize))
+  const workers = Array.from({ length: Math.min(6, targets.length) }, async () => {
+    while (i < targets.length) {
+      const f = targets[i++]
+      const cursor = await dbGetCursor(f.id)
+      if (cursor === undefined || cursor < 0) continue // no/empty window
+      const items = await fetchFeedWindow(settings, f.id, cursor)
+      if (items.length === 0) {
+        await dbSetCursor(f.id, -1) // drained
+        continue
+      }
+      await dbPutItems(items.map(normalize))
+      // Next page = below the oldest id in this batch (per-feed cursor,
+      // never derived from starred items).
+      const nextMin = items.reduce((m, i) => Math.min(m, i.id), items[0].id)
+      await dbSetCursor(f.id, items.length < FEED_WINDOW ? -1 : nextMin)
       added += items.length
       onProgress?.(added)
     }

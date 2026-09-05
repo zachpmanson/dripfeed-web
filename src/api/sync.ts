@@ -20,8 +20,9 @@ export async function fetchInitial(
   settings: Settings,
   feeds: NewsFeed[],
   onProgress?: (done: number) => void,
-): Promise<{ items: NewsItem[] }> {
+): Promise<{ items: NewsItem[]; feedWindows: Map<number, number> }> {
   let done = 0
+  const feedWindows = new Map<number, number>()
   const map = (arr: NewsFeed[], fn: (f: NewsFeed) => Promise<NewsItem[]>) => {
     let i = 0
     const workers = Array.from({ length: Math.min(CONCURRENCY, arr.length) }, async () => {
@@ -38,7 +39,15 @@ export async function fetchInitial(
   }
 
   const [perFeed, starred] = await Promise.all([
-    map(feeds, (f) => fetchFeedWindow(settings, f.id)),
+    map(feeds, async (f) => {
+      const items = await fetchFeedWindow(settings, f.id)
+      // Window boundary = oldest id of THIS page (starred items, fetched
+      // separately, may be older and must not move the cursor).
+      if (items.length > 0) {
+        feedWindows.set(f.id, items.reduce((m, i) => Math.min(m, i.id), items[0].id))
+      }
+      return items
+    }),
     apiGet<ItemsResponse>(
       settings,
       `/items?type=2&getRead=true&oldestFirst=false&batchSize=-1&offset=0`,
@@ -46,7 +55,7 @@ export async function fetchInitial(
   ])
   onProgress?.(perFeed.length + starred.length)
 
-  return { items: [...perFeed, ...starred] }
+  return { items: [...perFeed, ...starred], feedWindows }
 }
 
 /** Newest `limit` items of one feed, older than `beforeId` (0 = newest). */
