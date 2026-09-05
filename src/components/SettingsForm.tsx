@@ -14,7 +14,7 @@ export function SettingsForm({ initial, onSave }: Props) {
 
   return (
     <div className="settings">
-      <h1>dripfeed</h1>
+      <h1>Dripfeed</h1>
       <p className="muted">
         Connect to your Nextcloud News instance. Use an <strong>app password</strong> (Profile
         → Security), not your main account password.

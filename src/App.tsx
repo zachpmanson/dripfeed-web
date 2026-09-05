@@ -49,7 +49,7 @@ export default function App() {
     return (
       <div className="sync-gate">
         <div className="sync-card">
-          <h1>dripfeed</h1>
+          <h1>Dripfeed</h1>
           {store.error ? (
             <div className="error">{store.error}</div>
           ) : store.progress ? (
