@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   fullSync, incrementalSync, isInitialized, isDbReady, loadAllItems,
-  loadFeeds, loadFolders, loadMoreInto, onStoreChange, getStatus, resetLocal,
+  loadFeeds, loadFolders, loadMoreInto, ensureFeedWindow, onStoreChange, getStatus, resetLocal,
 } from './store'
 import { setRead, setStar } from './actions'
 import { dbGetCursor } from './db'
@@ -26,6 +26,7 @@ export interface AppData {
   actions: {
     setRead: (item: NewsItem, unread: boolean) => Promise<void>
     setStar: (item: NewsItem, starred: boolean) => Promise<void>
+    ensureFeed: (feedId: number) => Promise<void>
     reset: () => Promise<void>
   }
 }
@@ -139,6 +140,12 @@ export function useStore(settings: Settings | null, view: View): AppData {
     () => ({
       setRead: (item: NewsItem, unread: boolean) => setRead(settingsRef.current!, item, unread),
       setStar: (item: NewsItem, starred: boolean) => setStar(settingsRef.current!, item, starred),
+      ensureFeed: async (feedId: number) => {
+        const s = settingsRef.current
+        if (!s) return
+        await ensureFeedWindow(s, feedId)
+        await refreshPool()
+      },
       reset: async () => {
         await resetLocal()
         setReady(false)
@@ -147,7 +154,7 @@ export function useStore(settings: Settings | null, view: View): AppData {
         setMoreAvailable(false)
       },
     }),
-    [],
+    [refreshPool],
   )
 
   // progress subscription

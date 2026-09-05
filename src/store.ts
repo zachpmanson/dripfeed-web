@@ -126,6 +126,57 @@ export async function loadMoreInto(
   return added
 }
 
+/**
+ * Navigate-to-feed ensure: make the local feed window whole and determine
+ * whether more history exists on the server.
+ *
+ * 1. Auto-load pages while the feed has FEWER than FEED_WINDOW items locally
+ *    and a live cursor (recovers from a mid-sync partial window, and drains
+ *    short feeds so load-more stops showing for them).
+ * 2. Probe: with exactly a full window loaded and a live cursor, one
+ *    batchSize=1 request at the cursor decides "more exist" — if empty the
+ *    feed is fully drained (cursor → -1, no load-more button); if not, the
+ *    button stays.
+ *
+ * Returns how many items were added.
+ */
+export async function ensureFeedWindow(settings: Settings, feedId: number): Promise<number> {
+  const all = await dbGetAllItems()
+  let local = all.reduce((n, i) => (i.feedId === feedId ? n + 1 : n), 0)
+  let added = 0
+  let cursor = await dbGetCursor(feedId)
+
+  // 1. top up to a full window while the server keeps returning pages
+  while (local + added < FEED_WINDOW && cursor !== undefined && cursor >= 0) {
+    const items = await fetchFeedWindow(settings, feedId, cursor)
+    if (items.length === 0) {
+      await dbSetCursor(feedId, -1)
+      cursor = -1
+      break
+    }
+    await dbPutItems(items.map(normalize))
+    added += items.length
+    cursor = items.length < FEED_WINDOW ? -1 : items.reduce((m, i) => Math.min(m, i.id), items[0].id)
+    await dbSetCursor(feedId, cursor)
+  }
+
+  // 2. probe: exactly a full window + live cursor → one 1-item request
+  //    decides whether more history actually exists behind the cursor
+  if (cursor !== undefined && cursor >= 0 && local + added >= FEED_WINDOW) {
+    const probe = await fetchFeedWindow(settings, feedId, cursor, 1)
+    if (probe.length === 0) {
+      await dbSetCursor(feedId, -1) // truly drained — button hides
+    } else {
+      await dbPutItems(probe.map(normalize)) // it exists — keep it
+      added += probe.length
+      const probeMin = probe.reduce((m, i) => Math.min(m, i.id), probe[0].id)
+      await dbSetCursor(feedId, probeMin)
+    }
+  }
+
+  return added
+}
+
 export async function loadAllItems(): Promise<NewsItem[]> {
   return dbGetAllItems()
 }

@@ -159,6 +159,12 @@ body {
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
+.caret-btn {
+  width: auto !important;
+  flex-shrink: 0;
+  padding: 0.25rem 0.4rem;
+}
+
 .folder-name {
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -174,7 +180,7 @@ body {
   justify-content: space-between;
   gap: 0.4rem;
   width: 100%;
-  padding: 0.35rem 0.6rem;
+  padding: 0; /* inner button owns the padding now */
   background: transparent;
   border: none;
   border-radius: 6px;
@@ -183,6 +189,19 @@ body {
   letter-spacing: 0.06em;
   color: var(--muted);
   text-align: left; /* <button> text centers by default — wraps would center */
+}
+
+.folder-name-btn {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0.6rem;
+  margin: 0;
+}
+
+.folder-name-btn.active {
+  background: var(--border);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .folder-head:hover {

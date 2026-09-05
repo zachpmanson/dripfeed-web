@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from './hooks'
 import { loadSettings } from './settings'
 import type { Settings } from './settings'
@@ -33,6 +33,19 @@ export default function App() {
   }, [showAll])
 
   const store = useStore(settings, view)
+
+  // On navigation to an individual feed: top the local window up to 20 and
+  // probe the server for whether more history exists (so a short/partial
+  // feed auto-fills and the load-more button reflects reality). In-flight
+  // guard so StrictMode's double effect fires at most one probe/refill.
+  const ensureRef = useRef<Promise<void> | null>(null)
+  useEffect(() => {
+    if (view.kind !== 'feed' || !settings) return
+    if (ensureRef.current) return
+    ensureRef.current = store.actions.ensureFeed(view.id).finally(() => {
+      ensureRef.current = null
+    })
+  }, [view, settings, store.actions])
 
   if (!settings) {
     return (

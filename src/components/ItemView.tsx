@@ -14,9 +14,9 @@ export function ItemView({ item, feedTitle, actions }: Props) {
     // Body comes from the server already rewritten with target=_blank.
     // srcdoc + sandbox keeps third-party feed HTML from touching the app.
     return `<!doctype html><html><head><meta charset="utf-8"><style>
-      body { font-family: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif; font-weight: normal; line-height: 1.55; max-width: 46rem; margin: 0 auto; padding: 1rem; color: #111; background: #fff; }
+      body { font-family: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif; font-weight: normal; line-height: 1.55; max-width: 46rem; margin: 0 auto; padding: 1rem; color: #111; background: #fff; overflow-wrap: anywhere; word-break: break-word; }
       img { max-width: 100%; height: auto; }
-      a { color: #1a4fb8; }
+      a { color: #1a4fb8; overflow-wrap: anywhere; word-break: break-word; }
     </style></head><body>${item.body}</body></html>`
   }, [item])
 
