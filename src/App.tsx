@@ -70,7 +70,15 @@ export default function App() {
     )
   }
 
-  const { pool, feeds, folders, rendered, loadingMore, moreServer } = store
+  const { pool, feeds, folders, rendered, loadingMore, cursors } = store
+
+  // Cursor-aware "server has more" derived PER VIEW (not a stale boolean
+  // from the last refresh): in a feed view, that feed's cursor live; in
+  // all/unread/starred views, any feed with a live cursor.
+  const moreServer =
+    view.kind === 'feed'
+      ? (cursors.get(view.id) ?? -1) >= 0
+      : [...cursors.values()].some((c) => c >= 0)
 
   // Filter + rank the WHOLE pool first, then window the result. Slicing the
   // pool before filtering/sorting hid any feed whose items fell past the

@@ -22,7 +22,7 @@ export interface AppData {
   progress: { done: number } | null
   error: string | null
   loadMore: () => Promise<void>
-  moreServer: boolean // any feed in the current view still has history on the server
+  cursors: Map<number, number> // per-feed paging cursors (-1 = drained)
   actions: {
     setRead: (item: NewsItem, unread: boolean) => Promise<void>
     setStar: (item: NewsItem, starred: boolean) => Promise<void>
@@ -42,7 +42,7 @@ export function useStore(settings: Settings | null, view: View): AppData {
   const [folders, setFolders] = useState<NewsFolder[]>([])
   const [rendered, setRendered] = useState(RENDER_STEP)
   const [moreAvailable, setMoreAvailable] = useState(false)
-  const [moreServer, setMoreServer] = useState(false)
+  const [cursors, setCursors] = useState<Map<number, number>>(new Map())
   const [loadingMore, setLoadingMore] = useState(false)
   const [progress, setProgress] = useState<{ done: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -57,19 +57,15 @@ export function useStore(settings: Settings | null, view: View): AppData {
     setPool(all)
     setFeeds(new Map(fs.map((f) => [f.id, f])))
     setFolders(fo)
-    // Cursor-aware "server has more": any feed relevant to the current view
-    // with a live cursor (>= 0, i.e. not drained) can still page deeper.
-    const v = viewRef.current
-    const relevant = v.kind === 'feed' ? fs.filter((f) => f.id === v.id) : fs
-    let anyLive = false
-    for (const f of relevant) {
+    // Cache every feed's cursor so the UI can derive per-view moreServer
+    // synchronously (a stale boolean computed under another view hid the
+    // load-more button on all-read feeds after switching views).
+    const cm = new Map<number, number>()
+    for (const f of fs) {
       const c = await dbGetCursor(f.id)
-      if (c !== undefined && c >= 0) {
-        anyLive = true
-        break
-      }
+      if (c !== undefined) cm.set(f.id, c)
     }
-    setMoreServer(anyLive)
+    setCursors(cm)
     setMoreAvailable(all.length > rendered)
   }, [rendered])
 
@@ -166,7 +162,7 @@ export function useStore(settings: Settings | null, view: View): AppData {
     folders,
     rendered,
     moreAvailable,
-    moreServer,
+    cursors,
     loadingMore,
     progress,
     error,
