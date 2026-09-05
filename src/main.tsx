@@ -2,7 +2,11 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
+import { applyUiTheme, loadThemeSetting, uiThemeKey } from './theme'
 import './index.css'
+
+// Apply the persisted UI theme before first paint so there's no flash.
+applyUiTheme(loadThemeSetting(uiThemeKey))
 
 const queryClient = new QueryClient({
   defaultOptions: {

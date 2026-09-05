@@ -7,6 +7,16 @@ import { Sidebar, type View } from './components/Sidebar'
 import { ItemList } from './components/ItemList'
 import { ItemView } from './components/ItemView'
 import { AddModal } from './components/AddModal'
+import { SettingsModal } from './components/SettingsModal'
+import {
+  applyUiTheme,
+  articleThemeKey,
+  effectiveTheme,
+  loadThemeSetting,
+  saveThemeSetting,
+  uiThemeKey,
+  type ThemeSetting,
+} from './theme'
 import { rarityMultipliers, rarityStats, sortByRarity } from './rarity'
 import type { NewsItem } from './api/types'
 
@@ -35,6 +45,34 @@ export default function App() {
 
   const store = useStore(settings, view)
   const [showAdd, setShowAdd] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+
+  // --- theme (UI + article, each light/dark/system) ---
+  const [uiTheme, setUiThemeState] = useState<ThemeSetting>(() =>
+    loadThemeSetting(uiThemeKey),
+  )
+  const [articleTheme, setArticleThemeState] = useState<ThemeSetting>(() =>
+    loadThemeSetting(articleThemeKey),
+  )
+
+  useEffect(() => {
+    applyUiTheme(uiTheme)
+    if (uiTheme !== 'system') return
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = () => applyUiTheme(uiTheme)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [uiTheme])
+
+  const setUiTheme = (v: ThemeSetting) => {
+    setUiThemeState(v)
+    saveThemeSetting(uiThemeKey, v)
+  }
+  const setArticleTheme = (v: ThemeSetting) => {
+    setArticleThemeState(v)
+    saveThemeSetting(articleThemeKey, v)
+  }
+  const articleDark = effectiveTheme(articleTheme) === 'dark'
 
   // On navigation to an individual feed: top the local window up to 20 and
   // probe the server for whether more history exists (so a short/partial
@@ -153,14 +191,12 @@ export default function App() {
             +
           </button>
           <button
-            className="logout"
-            title="forget these credentials and return to the connection screen"
-            onClick={() => {
-              void store.actions.reset()
-              setSettings(null)
-            }}
+            className="add-btn"
+            title="settings"
+            aria-label="settings"
+            onClick={() => setShowSettings(true)}
           >
-            logout
+            ⚙
           </button>
         </div>
       </header>
@@ -197,7 +233,12 @@ export default function App() {
             loadingMore={loadingMore}
           />
         </div>
-        <ItemView item={selected} feedTitle={feedTitle} actions={store.actions} />
+        <ItemView
+          item={selected}
+          feedTitle={feedTitle}
+          actions={store.actions}
+          articleDark={articleDark}
+        />
       </main>
       {showAdd && settings && (
         <AddModal
@@ -208,6 +249,19 @@ export default function App() {
             // refresh feeds/folders meta so the new item shows in the sidebar
             void store.actions.refreshMeta()
           }}
+        />
+      )}
+      {showSettings && (
+        <SettingsModal
+          uiTheme={uiTheme}
+          articleTheme={articleTheme}
+          onUiTheme={setUiTheme}
+          onArticleTheme={setArticleTheme}
+          onLogout={() => {
+            void store.actions.reset()
+            setSettings(null)
+          }}
+          onClose={() => setShowSettings(false)}
         />
       )}
     </div>
