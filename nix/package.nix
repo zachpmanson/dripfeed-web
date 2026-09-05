@@ -1,4 +1,4 @@
-{ lib, stdenv, nodejs, pnpm, pnpmConfigHook, pnpmBuildHook }:
+{ lib, stdenv, nodejs, pnpm, pnpmConfigHook, pnpmBuildHook, fetchPnpmDeps }:
 
 # dripfeed-web — static Vite SPA built with pnpm. Served by caddy on naboo
 # at dripfeed.zachmanson.com; the /apps/* path is proxied to the Nextcloud
@@ -15,7 +15,7 @@ stdenv.mkDerivation {
   inherit pname version;
   src = lib.cleanSource ../.;
 
-  pnpmDeps = pnpm.fetchDeps {
+  pnpmDeps = fetchPnpmDeps {
     inherit pname version;
     src = lib.cleanSource ../.;
     fetcherVersion = 3;
@@ -23,7 +23,6 @@ stdenv.mkDerivation {
   };
 
   nativeBuildInputs = [ nodejs pnpm pnpmConfigHook pnpmBuildHook ];
-
   installPhase = ''
     runHook preInstall
     mkdir -p $out/dist
