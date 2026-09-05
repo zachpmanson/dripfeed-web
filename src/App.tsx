@@ -55,13 +55,10 @@ export default function App() {
           ) : store.progress ? (
             <>
               <p className="muted">
-                syncing… {store.progress.done} items
+                syncing… {store.progress.done.toLocaleString()} items
               </p>
-              <div className="progress">
-                <div
-                  className="progress-bar"
-                  style={{ width: `${Math.min(100, Math.max(4, (store.progress.done / Math.max(1, store.progress.total)) * 100))}%` }}
-                />
+              <div className="progress indeterminate">
+                <div className="progress-bar" />
               </div>
             </>
           ) : (

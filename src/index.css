@@ -243,6 +243,21 @@ body {
   margin: 0.6rem 0;
 }
 
+/* indeterminate: no total known — animated sweep instead of a fake % */
+.progress.indeterminate .progress-bar {
+  width: 40%;
+  animation: sweep 1.2s ease-in-out infinite;
+}
+
+@keyframes sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+
 .progress-bar {
   height: 100%;
   background: var(--accent);

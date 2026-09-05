@@ -13,14 +13,14 @@ const MAX_ITEMS = 20000 // per-feed autoPurgeCount cap: 200 × feeds ~ 4k; headr
  */
 export async function fetchAllItems(
   settings: Settings,
-  onProgress?: (done: number, total: number) => void,
+  onProgress?: (done: number) => void,
 ): Promise<NewsItemBatch> {
   const first = await apiGet<ItemsResponse>(
     settings,
     `/items?type=3&getRead=true&oldestFirst=true&batchSize=${PAGE_SIZE}&offset=0`,
   )
   const all: NewsItem[] = [...first.items]
-  onProgress?.(all.length, all.length)
+  onProgress?.(all.length)
 
   // Items are paged by id: batch N offset = max(id) seen so far.
   let lastId = first.items.reduce((m, i) => Math.max(m, i.id), 0)
@@ -42,7 +42,7 @@ export async function fetchAllItems(
     if (merged.length === 0) break // exhausted
     all.push(...merged)
     lastId = merged.reduce((m, i) => Math.max(m, i.id), lastId)
-    onProgress?.(all.length, all.length)
+    onProgress?.(all.length)
   }
   return { items: all }
 }

@@ -13,12 +13,11 @@ import type { Settings } from './settings'
 export interface SyncStatus {
   stage: 'idle' | 'fetching' | 'done'
   done: number
-  total: number
 }
 
 let dbReady = false
 const listeners = new Set<() => void>()
-let status: SyncStatus = { stage: 'idle', done: 0, total: 0 }
+let status: SyncStatus = { stage: 'idle', done: 0 }
 
 function emit(): void {
   for (const l of listeners) l()
@@ -40,22 +39,22 @@ export async function isInitialized(): Promise<boolean> {
 }
 
 export async function fullSync(settings: Settings): Promise<void> {
-  status = { stage: 'fetching', done: 0, total: 0 }
+  status = { stage: 'fetching', done: 0 }
   emit()
 
   const { feeds, folders } = await fetchMeta(settings)
   await dbPutFeeds(feeds)
   await dbPutFolders(folders)
 
-  const all = await fetchAllItems(settings, (done, total) => {
-    status = { stage: 'fetching', done, total }
+  const all = await fetchAllItems(settings, (done) => {
+    status = { stage: 'fetching', done }
     emit()
   })
   await dbPutItems(all.items)
 
   await dbSetMeta('initialized', '1')
   dbReady = true
-  status = { stage: 'done', done: all.items.length, total: all.items.length }
+  status = { stage: 'done', done: all.items.length }
   emit()
 }
 
@@ -93,7 +92,7 @@ export async function loadFolders(): Promise<NewsFolder[]> {
 export async function resetLocal(): Promise<void> {
   await dbClear()
   dbReady = false
-  status = { stage: 'idle', done: 0, total: 0 }
+  status = { stage: 'idle', done: 0 }
 }
 
 export function isDbReady(): boolean {

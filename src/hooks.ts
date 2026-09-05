@@ -30,7 +30,7 @@ export function useStore(settings: Settings | null) {
   const [folders, setFolders] = useState<NewsFolder[]>([])
   const [count, setCount] = useState(0)
   const [allLoaded, setAllLoaded] = useState(false)
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [progress, setProgress] = useState<{ done: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const refreshWindow = useCallback(async () => {
@@ -126,7 +126,7 @@ export function useStore(settings: Settings | null) {
   useEffect(() => {
     const tick = () => {
       const s = getStatus()
-      if (s.stage === 'fetching') setProgress({ done: s.done, total: s.total })
+      if (s.stage === 'fetching') setProgress({ done: s.done })
       else if (s.stage === 'done') setProgress(null)
     }
     tick()
