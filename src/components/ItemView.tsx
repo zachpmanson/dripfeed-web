@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { titleFor } from './ItemList'
 import type { NewsItem } from '../api/types'
 import type { useStore } from '../hooks'
@@ -12,6 +12,13 @@ interface Props {
 }
 
 export function ItemView({ item, feedTitle, actions, articleTheme }: Props) {
+  // Full-article extraction state: per selected item, reset on change.
+  const [extracting, setExtracting] = useState(false)
+  const [extractError, setExtractError] = useState<string | null>(null)
+  useEffect(() => {
+    setExtracting(false)
+    setExtractError(null)
+  }, [item?.id])
   // Only used for the iframe element's own background while srcdoc loads;
   // the article colours themselves live in CSS inside the frame (below).
   const articleDark = effectiveTheme(articleTheme) === 'dark'
@@ -57,6 +64,19 @@ export function ItemView({ item, feedTitle, actions, articleTheme }: Props) {
     return <div className="reader empty muted">Select an item</div>
   }
 
+  const handleExtract = async () => {
+    if (extracting) return
+    setExtracting(true)
+    setExtractError(null)
+    try {
+      await actions.extractFulltext(item)
+    } catch (e) {
+      setExtractError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setExtracting(false)
+    }
+  }
+
   return (
     <article className="reader">
       <div className="reader-head">
@@ -82,6 +102,36 @@ export function ItemView({ item, feedTitle, actions, articleTheme }: Props) {
           >
             {item.starred ? '★' : '☆'}
           </button>
+          <button
+            className="icon-btn"
+            title={
+              extractError
+                ? `extract full article — ${extractError}`
+                : 'extract full article from the original URL'
+            }
+            aria-label="extract full article"
+            disabled={extracting}
+            onClick={() => void handleExtract()}
+          >
+            {extracting ? (
+              <span className="spinner" />
+            ) : (
+              <svg
+                viewBox="0 0 16 16"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3.5" y="2" width="9" height="12" rx="1" />
+                <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
+              </svg>
+            )}
+          </button>
         </div>
       </div>
       <div className="item-meta">
@@ -89,6 +139,12 @@ export function ItemView({ item, feedTitle, actions, articleTheme }: Props) {
         {item.author && <span className="muted">by {item.author}</span>}
         <span className="muted">{item.pubDate ? new Date(item.pubDate).toLocaleString() : ''}</span>
       </div>
+      {extractError && (
+        <div className="extract-error" role="alert">
+          full article unavailable — {extractError}
+        </div>
+      )}
+
       <iframe
         className={`reader-frame${articleDark ? ' dark' : ''}`}
         sandbox="allow-same-origin"

@@ -67,7 +67,7 @@ export async function fullSync(settings: Settings): Promise<void> {
     status = { stage: 'fetching', done }
     emit()
   })
-  await dbPutItems(items.map(normalize))
+  await dbPutItems(items.map(normalizeItem))
   // Per-feed window cursors: seeds for load-more paging. Starred items are
   // deliberately excluded from cursor positions (they're old and separate).
   for (const [feedId, minId] of feedWindows) await dbSetCursor(feedId, minId)
@@ -97,7 +97,7 @@ export async function ensureUnreadScope(
 ): Promise<number> {
   const items = await fetchUnreadScope(settings, type, id)
   if (items.length > 0) {
-    await dbPutItems(items.map(normalize))
+    await dbPutItems(items.map(normalizeItem))
   }
   return items.length
 }
@@ -114,7 +114,7 @@ export async function incrementalSync(settings: Settings): Promise<void> {
     oldestFirst: false,
     batchSize: 500,
   })
-  await dbPutItems(resp.items.map(normalize))
+  await dbPutItems(resp.items.map(normalizeItem))
 }
 
 /**
@@ -189,7 +189,7 @@ export async function loadMoreInto(
       live = live.filter((x) => x.f.id !== pick.f.id)
       continue
     }
-    await dbPutItems(items.map(normalize))
+    await dbPutItems(items.map(normalizeItem))
     const nextMin = items.reduce((m, i) => Math.min(m, i.id), items[0].id)
     const drained = items.length < FEED_WINDOW
     await dbSetCursor(pick.f.id, drained ? -1 : nextMin)
@@ -229,7 +229,7 @@ export async function ensureFeedWindow(settings: Settings, feedId: number): Prom
       cursor = -1
       break
     }
-    await dbPutItems(items.map(normalize))
+    await dbPutItems(items.map(normalizeItem))
     added += items.length
     cursor = items.length < FEED_WINDOW ? -1 : items.reduce((m, i) => Math.min(m, i.id), items[0].id)
     await dbSetCursor(feedId, cursor)
@@ -242,7 +242,7 @@ export async function ensureFeedWindow(settings: Settings, feedId: number): Prom
     if (probe.length === 0) {
       await dbSetCursor(feedId, -1) // truly drained — button hides
     } else {
-      await dbPutItems(probe.map(normalize)) // it exists — keep it
+      await dbPutItems(probe.map(normalizeItem)) // it exists — keep it
       added += probe.length
       const probeMin = probe.reduce((m, i) => Math.min(m, i.id), probe[0].id)
       await dbSetCursor(feedId, probeMin)
@@ -265,7 +265,7 @@ export async function loadFolders(): Promise<NewsFolder[]> {
 }
 
 /** API seconds → ms for the two timestamp fields. */
-function normalize(i: NewsItem): NewsItem {
+export function normalizeItem(i: NewsItem): NewsItem {
   return {
     ...i,
     pubDate: i.pubDate ? Math.round(i.pubDate * 1000) : null,

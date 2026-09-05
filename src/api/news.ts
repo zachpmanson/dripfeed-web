@@ -1,5 +1,5 @@
-import { apiGet, apiPost, apiDelete } from './client'
-import type { FeedsResponse, FoldersResponse, ItemsResponse, ListType } from './types'
+import { apiFetchRaw, apiGet, apiPost, apiDelete } from './client'
+import type { FeedsResponse, FoldersResponse, ItemsResponse, ListType, NewsItem } from './types'
 import type { Settings } from '../settings'
 
 export interface ItemsParams {
@@ -43,6 +43,27 @@ export function markUnread(settings: Settings, itemId: number): Promise<void> {
 
 export function setStar(settings: Settings, itemId: number): Promise<void> {
   return apiPost(settings, `/items/${itemId}/star`)
+}
+
+/**
+ * Server-side full-article extraction: GET /items/{id}/fulltext (root
+ * route, not under /api/v1-3). The News server fetches the item's URL,
+ * runs Readability on it, persists the extracted body, and returns the
+ * updated item. Resolves with the updated item, or null when the server
+ * couldn't extract anything (204 / empty body).
+ */
+export async function fetchFulltext(
+  settings: Settings,
+  itemId: number,
+): Promise<NewsItem | null> {
+  const res = await apiFetchRaw(settings, `/apps/news/items/${itemId}/fulltext`, {
+    // Server caps scraping at ~6s; be generous but don't spin forever.
+    signal: AbortSignal.timeout(30_000),
+  })
+  const text = await res.text()
+  if (!text) return null
+  const items = JSON.parse(text) as NewsItem[]
+  return items[0] ?? null
 }
 
 export function fetchFeeds(settings: Settings): Promise<FeedsResponse> {

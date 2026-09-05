@@ -5,7 +5,7 @@ import {
   unreadScopeKey, onStoreChange, getStatus, resetLocal,
   type LoadMoreProgress,
 } from './store'
-import { setRead, setStar } from './actions'
+import { setRead, setStar, extractFulltext } from './actions'
 import { dbGetCursor } from './db'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
 import type { Settings } from './settings'
@@ -26,6 +26,7 @@ export interface AppData {
   actions: {
     setRead: (item: NewsItem, unread: boolean) => Promise<void>
     setStar: (item: NewsItem, starred: boolean) => Promise<void>
+    extractFulltext: (item: NewsItem) => Promise<void>
     ensureFeed: (feedId: number) => Promise<void>
     ensureUnread: (type: 0 | 1, id: number) => Promise<number>
     refreshMeta: () => Promise<void>
@@ -159,6 +160,7 @@ export function useStore(
     () => ({
       setRead: (item: NewsItem, unread: boolean) => setRead(settingsRef.current!, item, unread),
       setStar: (item: NewsItem, starred: boolean) => setStar(settingsRef.current!, item, starred),
+      extractFulltext: (item: NewsItem) => extractFulltext(settingsRef.current!, item),
       ensureFeed: async (feedId: number) => {
         const s = settingsRef.current
         if (!s) return

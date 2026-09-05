@@ -11,15 +11,15 @@ export class ApiError extends Error {
   }
 }
 
-export function apiUrl(settings: Settings, path: string): string {
+export function apiUrl(settings: Settings, path: string, prefixed = true): string {
   // Empty baseUrl = same origin (deployed behind the caddy /apps proxy).
   const base = settings.baseUrl.trim().replace(/\/+$/, '')
-  return `${base}${NEWS_API_PREFIX}${path}`
+  return `${base}${prefixed ? NEWS_API_PREFIX : ''}${path}`
 }
 
-export async function apiFetch(
+async function authedFetch(
   settings: Settings,
-  path: string,
+  url: string,
   init: RequestInit = {},
 ): Promise<Response> {
   const headers = new Headers(init.headers)
@@ -31,15 +31,36 @@ export async function apiFetch(
     headers.set('Content-Type', 'application/json')
   }
 
-  const res = await fetch(apiUrl(settings, path), { ...init, headers })
+  const res = await fetch(url, { ...init, headers })
 
   if (res.status === 401) {
     throw new ApiError('Not authorized — check your username and app password', 401)
   }
   if (!res.ok) {
-    throw new ApiError(`Server error ${res.status} on ${path}`, res.status)
+    throw new ApiError(`Server error ${res.status} on ${url}`, res.status)
   }
   return res
+}
+
+export async function apiFetch(
+  settings: Settings,
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  return authedFetch(settings, apiUrl(settings, path), init)
+}
+
+/**
+ * Fetch a route OUTSIDE the /api/v1-3 prefix — the legacy scraper
+ * endpoints (e.g. /apps/news/items/{id}/fulltext) live at the app root,
+ * not under the versioned API.
+ */
+export async function apiFetchRaw(
+  settings: Settings,
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  return authedFetch(settings, apiUrl(settings, path, false), init)
 }
 
 export async function apiGet<T>(settings: Settings, path: string): Promise<T> {

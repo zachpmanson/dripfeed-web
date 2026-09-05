@@ -1,6 +1,6 @@
 import { dbPutItem, dbGetFeedItems } from './db'
-import { markRead, markUnread, setStar as setStarApi, markFeedRead } from './api/news'
-import { notifyLocalChange } from './store'
+import { markRead, markUnread, setStar as setStarApi, markFeedRead, fetchFulltext } from './api/news'
+import { notifyLocalChange, normalizeItem } from './store'
 import type { NewsItem } from './api/types'
 import type { Settings } from './settings'
 
@@ -35,6 +35,21 @@ export async function setStar(settings: Settings, item: NewsItem, starred: boole
     notifyLocalChange()
     throw e
   }
+}
+
+/**
+ * Fetch the full extracted article for an item's URL. The News server runs
+ * Readability on the link and persists the extracted body, so this both
+ * swaps the local body and keeps the server copy consistent for other
+ * clients. Throws a friendly error when nothing could be extracted.
+ */
+export async function extractFulltext(settings: Settings, item: NewsItem): Promise<void> {
+  const extracted = await fetchFulltext(settings, item.id)
+  if (!extracted) {
+    throw new Error('Could not extract an article from this URL')
+  }
+  await dbPutItem(normalizeItem(extracted))
+  notifyLocalChange()
 }
 
 /**

@@ -144,6 +144,41 @@ body {
   background: var(--border);
 }
 
+.icon-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.icon-btn:disabled:hover {
+  color: var(--muted);
+  background: transparent;
+}
+
+/* Full-article extraction: inline spinner while the server scrapes. */
+.reader-head .spinner {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid var(--border);
+  border-top-color: var(--text);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* One-line failure note under the reader header when extraction fails. */
+.reader .extract-error {
+  color: #ff8d8d;
+  font-size: 0.75rem;
+  margin: 0 0 0.9rem;
+}
+
 .sidebar-scroll {
   overflow-y: auto;
   padding: 0.5rem;
