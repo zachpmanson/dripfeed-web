@@ -37,16 +37,45 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
     }
   })
 
+  const fold = (ids: Iterable<number>, into: Set<number>) => {
+    for (const id of ids) into.add(id)
+    return into
+  }
+  const applyCollapsed = (next: Set<number>) => {
+    setCollapsed(next)
+    localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...next]))
+  }
   const toggle = (id: number) => {
     const next = new Set(collapsed)
     if (next.has(id)) next.delete(id)
     else next.add(id)
-    setCollapsed(next)
-    localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...next]))
+    applyCollapsed(next)
   }
+  const folderIds = sortedFolders.map((f) => f.id)
 
   return (
     <nav className="sidebar">
+      <div className="sidebar-toolbar">
+        <span className="muted">folders</span>
+        <div className="sidebar-actions">
+          <button
+            className="icon-btn"
+            title="Expand all folders"
+            onClick={() => applyCollapsed(new Set())}
+            aria-label="expand all"
+          >
+            ▸▸
+          </button>
+          <button
+            className="icon-btn"
+            title="Collapse all folders"
+            onClick={() => applyCollapsed(fold(folderIds, new Set()))}
+            aria-label="collapse all"
+          >
+            ▾▾
+          </button>
+        </div>
+      </div>
       <div className="sidebar-scroll">
         <button
           className={view.kind === 'all' ? 'active' : ''}
@@ -66,6 +95,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
         {sortedFolders.map((folder) => {
           const inFolder = feedEntries.filter((f) => f.folderId === folder.id)
           const isCollapsed = collapsed.has(folder.id)
+          const folderUnread = inFolder.reduce((s, f) => s + unreadCount(items, f.id), 0)
           return (
             <div key={folder.id} className="folder">
               <button
@@ -74,7 +104,10 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
                 aria-expanded={!isCollapsed}
               >
                 <span className="folder-name">{folder.name}</span>
-                <span className={`caret${isCollapsed ? ' collapsed' : ''}`}>▾</span>
+                <span className="folder-right">
+                  {folderUnread > 0 && <span className="count">{folderUnread}</span>}
+                  <span className={`caret${isCollapsed ? ' collapsed' : ''}`}>▾</span>
+                </span>
               </button>
               {!isCollapsed &&
                 inFolder.map((f) => (

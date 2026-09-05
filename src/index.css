@@ -101,6 +101,37 @@ body {
   min-height: 0;
 }
 
+.sidebar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.sidebar-actions {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 0.65rem;
+  padding: 0.15rem 0.3rem;
+  border-radius: 4px;
+}
+
+.icon-btn:hover {
+  color: var(--text);
+  background: var(--border);
+}
+
 .sidebar-scroll {
   overflow-y: auto;
   padding: 0.5rem;
@@ -159,6 +190,17 @@ body {
 
 .folder-head .folder-name {
   padding: 0;
+}
+
+.folder-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.folder-right .count {
+  background: var(--bg);
 }
 
 .caret {
