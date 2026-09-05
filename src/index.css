@@ -251,7 +251,7 @@ body {
 }
 
 .caret.collapsed {
-  transform: rotate(-45deg); /* points right */
+  transform: rotate(135deg); /* points left (collapsed content is below) */
 }
 
 .modal-backdrop,
