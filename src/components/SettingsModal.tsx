@@ -1,4 +1,5 @@
 import type { ThemeSetting } from '../theme'
+import { GIT_SHA, REPO_URL } from '../version'
 
 interface Props {
   uiTheme: ThemeSetting
@@ -71,6 +72,17 @@ export function SettingsModal({
               />
               show favicons
             </label>
+          </div>
+          <div className="setting-row">
+            <a
+              className="setting-label repo-link"
+              href={REPO_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              dripfeed-web ↗
+            </a>
+            <span className="muted commit-ref">{GIT_SHA}</span>
           </div>
           <div className="setting-row">
             <button className="danger-btn" onClick={onLogout}>

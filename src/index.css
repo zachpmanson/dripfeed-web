@@ -359,6 +359,21 @@ body {
   letter-spacing: normal;
 }
 
+.repo-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.repo-link:hover {
+  text-decoration: underline;
+}
+
+.commit-ref {
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+}
+
 .setting-row .danger-btn {
   background: rgba(255, 141, 141, 0.12);
   border-color: rgba(255, 141, 141, 0.35);
