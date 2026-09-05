@@ -62,6 +62,47 @@ export function ItemList({
   const activeRef = useRef(more && !loadingMore)
   activeRef.current = more && !loadingMore
 
+  // Chained auto-load: after a page lands, WAIT for the list to re-render
+  // (two rAFs) before re-checking whether the sentinel is still near the
+  // viewport. The previous attempt re-checked synchronously before React
+  // had inserted the new rows, so getBoundingClientRect kept reporting the
+  // sentinel in-range and the loop never terminated.
+  const chain = useRef(false)
+  useEffect(() => {
+    if (!chain.current) return
+    chain.current = false
+    let alive = true
+    const raf1 = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!alive) return
+        const el = sentinelRef.current
+        if (!el) return
+        const rect = el.getBoundingClientRect()
+        // New items pushed the sentinel below the fill line already?
+        if (rect.top <= window.innerHeight + 400) {
+          // Still on/near screen: load the next page too.
+          onLoadMoreRef.current?.()
+          chain.current = true // re-arm for the next completion
+        }
+      })
+    })
+    return () => {
+      alive = false
+      cancelAnimationFrame(raf1)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length])
+
+  // One-shot trigger (per-entry): sets the chain flag so the rAF effect
+  // above walks pages one at a time, each after a real render.
+  let started = false
+  const start = (fn: () => void) => {
+    if (started) return
+    started = true
+    fn()
+    chain.current = true
+  }
+
   useEffect(() => {
     const el = sentinelRef.current
     if (!el || !onLoadMoreRef.current) return
@@ -70,13 +111,14 @@ export function ItemList({
         // Only auto-page when this view can still pull more and isn't
         // mid-fetch; otherwise (drained/loading) do nothing.
         if (entries[0]?.isIntersecting && activeRef.current) {
-          onLoadMoreRef.current?.()
+          start(() => onLoadMoreRef.current?.())
         }
       },
       { rootMargin: '400px 0px' },
     )
     io.observe(el)
     return () => io.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Order is owned by the caller (App applies newest or rarity); never
