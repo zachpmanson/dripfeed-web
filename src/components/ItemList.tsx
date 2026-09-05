@@ -9,6 +9,7 @@ interface Props {
   onRead: (item: NewsItem) => void // optimistic removal hook once read
   rarityMode?: boolean
   rarityStats?: Map<number, RarityInfo>
+  emptyText?: string
 }
 
 export function ItemList({
@@ -19,6 +20,7 @@ export function ItemList({
   onRead,
   rarityMode = false,
   rarityStats,
+  emptyText = 'No unread items. Nothing dripping?',
 }: Props) {
   // Order is owned by the caller (App applies newest or rarity); never
   // re-sort here or the toggle silently no-ops.
@@ -48,9 +50,7 @@ export function ItemList({
           </div>
         </li>
       ))}
-      {items.length === 0 && (
-        <li className="muted">No unread items. Nothing dripping?</li>
-      )}
+      {items.length === 0 && <li className="muted">{emptyText}</li>}
     </ul>
   )
 }

@@ -12,6 +12,7 @@ import type { NewsItem } from './api/types'
 type SortMode = 'newest' | 'rarity'
 
 const SORT_KEY = 'dripfeed.sort'
+const SHOW_ALL_KEY = 'dripfeed.showAll'
 
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(loadSettings)
@@ -21,10 +22,15 @@ export default function App() {
     const stored = localStorage.getItem(SORT_KEY)
     return stored === 'newest' ? 'newest' : 'rarity'
   })
+  const [showAll, setShowAll] = useState<boolean>(() => localStorage.getItem(SHOW_ALL_KEY) === '1')
 
   useEffect(() => {
     localStorage.setItem(SORT_KEY, sortMode)
   }, [sortMode])
+
+  useEffect(() => {
+    localStorage.setItem(SHOW_ALL_KEY, showAll ? '1' : '0')
+  }, [showAll])
 
   const newsQuery = useNews(settings)
   const actions = useNewsActions(settings)
@@ -42,7 +48,7 @@ export default function App() {
 
   const { items, feeds, folders } = newsQuery.data
 
-  const visibleItems = filterView(items, view, sortMode)
+  const visibleItems = filterView(items, view, sortMode, showAll)
   const rarStats = sortMode === 'rarity' ? rarityStats(items.values()) : undefined
 
   const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
@@ -54,6 +60,20 @@ export default function App() {
       <header className="app-header">
         <h1>dripfeed</h1>
         <div className="header-right">
+          <div className="seg" title="items shown: all, or only unread">
+            <button
+              className={!showAll ? 'active' : ''}
+              onClick={() => setShowAll(false)}
+            >
+              only unread
+            </button>
+            <button
+              className={showAll ? 'active' : ''}
+              onClick={() => setShowAll(true)}
+            >
+              all
+            </button>
+          </div>
           <div className="seg">
             <button
               className={sortMode === 'newest' ? 'active' : ''}
@@ -107,6 +127,7 @@ export default function App() {
           }}
           rarityMode={sortMode === 'rarity'}
           rarityStats={rarStats}
+          emptyText={showAll ? 'No items here.' : 'No unread items. Nothing dripping?'}
         />
         <ItemView item={selected} feedTitle={feedTitle} actions={actions} />
       </main>
@@ -114,17 +135,24 @@ export default function App() {
   )
 }
 
-function filterView(items: Map<number, NewsItem>, view: View, sortMode: SortMode): NewsItem[] {
+function filterView(
+  items: Map<number, NewsItem>,
+  view: View,
+  sortMode: SortMode,
+  showAll: boolean,
+): NewsItem[] {
   let list: NewsItem[]
   switch (view.kind) {
     case 'unread':
-      list = [...items.values()].filter((i) => i.unread)
+      list = showAll
+        ? [...items.values()]
+        : [...items.values()].filter((i) => i.unread)
       break
     case 'starred':
-      list = [...items.values()].filter((i) => i.starred)
+      list = [...items.values()].filter((i) => i.starred && (showAll || i.unread))
       break
     case 'feed':
-      list = [...items.values()].filter((i) => i.feedId === view.id)
+      list = [...items.values()].filter((i) => i.feedId === view.id && (showAll || i.unread))
       break
   }
   // A single feed is always newest-first — rarity is cross-feed by design.
