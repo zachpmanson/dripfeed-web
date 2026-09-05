@@ -237,6 +237,7 @@ body {
 
 .folder-right .count {
   background: var(--bg);
+  margin-left: 0; /* gap: 0.4rem on .folder-right is the only spacing */
 }
 
 .caret {
