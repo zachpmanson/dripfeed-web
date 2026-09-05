@@ -1,42 +1,28 @@
-{ lib, stdenv, nodejs, pnpm, fetchFromGitHub, ... }:
+{ lib, stdenv, nodejs, pnpm, pnpmConfigHook, pnpmBuildHook }:
 
 # dripfeed-web — static Vite SPA built with pnpm. Served by caddy on naboo
-# at dripfeed.zachmanson.com; the /apps/* path is proxied to Nextcloud
-# News' API (see hosts/naboo/services/caddy.nix).
+# at dripfeed.zachmanson.com; the /apps/* path is proxied to the Nextcloud
+# News API (see hosts/naboo/services/caddy.nix in zpm/nix).
+#
+# Uses nixpkgs' pnpm support: pnpm.fetchDeps prefetches the dependency store
+# (fetcherVersion 3 bundles it as a zstd tarball), pnpmConfigHook extracts it
+# to a writable tmpdir + offline-installs, pnpmBuildHook runs `pnpm build`.
 let
   pname = "dripfeed-web";
   version = "0.1.0";
-
-  # pnpm.fetchDeps prefetches the whole dependency store (mirroring
-  # pnpm-lock.yaml) so the offline `pnpm install --frozen-lockfile` in
-  # configurePhase needs no registry access.
-  pnpmDeps = pnpm.fetchDeps {
-    inherit pname version;
-    src = lib.cleanSource ../.;
-    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # filled after first build
-  };
 in
 stdenv.mkDerivation {
   inherit pname version;
   src = lib.cleanSource ../.;
 
-  pnpmDeps = pnpmDeps;
+  pnpmDeps = pnpm.fetchDeps {
+    inherit pname version;
+    src = lib.cleanSource ../.;
+    fetcherVersion = 3;
+    hash = "sha256-PLLk5bb99IyXH1ykdy+VhU+XiRvQNQBzSHndJt7Em8U=";
+  };
 
-  nativeBuildInputs = [ nodejs pnpm ];
-
-  configurePhase = ''
-    runHook preConfigure
-    pnpm config --location project set node-linker hoisted
-    pnpm config --location project set store-dir "$pnpmDeps"
-    pnpm install --frozen-lockfile --offline
-    runHook postConfigure
-  '';
-
-  buildPhase = ''
-    runHook preBuild
-    pnpm build
-    runHook postBuild
-  '';
+  nativeBuildInputs = [ nodejs pnpm pnpmConfigHook pnpmBuildHook ];
 
   installPhase = ''
     runHook preInstall
