@@ -108,12 +108,14 @@ export default function App() {
           </div>
           <span className="muted sync">{pool.length} local</span>
           <button
+            className="logout"
+            title="forget these credentials and return to the connection screen"
             onClick={() => {
               void store.actions.reset()
               setSettings(null)
             }}
           >
-            settings
+            logout
           </button>
         </div>
       </header>
