@@ -182,14 +182,17 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted);
+  text-align: left; /* <button> text centers by default — wraps would center */
 }
 
 .folder-head:hover {
   background: var(--border);
 }
 
-.folder-head .folder-name {
+.folder-head .folder-name,
+.folder-head-static .folder-name {
   padding: 0;
+  text-align: left;
 }
 
 .folder-right {
