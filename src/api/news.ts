@@ -86,3 +86,12 @@ export function moveFeed(
 ): Promise<void> {
   return apiPost(settings, `/feeds/${feedId}/move`, { folderId: folderId ?? 0 })
 }
+
+/** Rename a feed. POST /feeds/{feedId}/rename { feedTitle } */
+export function renameFeed(
+  settings: Settings,
+  feedId: number,
+  feedTitle: string,
+): Promise<void> {
+  return apiPost(settings, `/feeds/${feedId}/rename`, { feedTitle })
+}

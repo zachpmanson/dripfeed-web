@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { NewsFeed, NewsFolder } from '../api/types'
 import type { Settings } from '../settings'
-import { deleteFeed, moveFeed } from '../api/news'
+import { deleteFeed, moveFeed, renameFeed } from '../api/news'
 import { markFeedAllRead } from '../actions'
 
 interface Props {
@@ -39,6 +39,22 @@ export function FeedContextMenu({
     setError(null)
     try {
       await markFeedAllRead(settings, feed.id)
+      onChanged()
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setBusy(false)
+    }
+  }
+
+  const doRename = async () => {
+    if (busy) return
+    const name = prompt(`Rename feed "${feed.title}":`, feed.title)
+    if (name === null || name.trim() === '' || name.trim() === feed.title) return
+    setBusy(true)
+    setError(null)
+    try {
+      await renameFeed(settings, feed.id, name.trim())
       onChanged()
       onClose()
     } catch (e) {
@@ -121,6 +137,9 @@ export function FeedContextMenu({
             </div>
           )}
         </div>
+        <button className="ctx-item" onClick={doRename}>
+          rename
+        </button>
         <button className="ctx-item danger" onClick={doDelete}>
           delete
         </button>
