@@ -574,7 +574,7 @@ body {
 }
 
 .item-meta .feed {
-  color: var(--accent);
+  color: var(--muted);
 }
 
 .reader {
