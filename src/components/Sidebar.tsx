@@ -2,7 +2,7 @@ import type { NewsFolder, NewsFeed, NewsItem } from '../api/types'
 import { unreadCount, starredCount } from '../selectors'
 
 export type View =
-  | { kind: 'unread' }
+  | { kind: 'all' }
   | { kind: 'starred' }
   | { kind: 'feed'; id: number }
 
@@ -24,10 +24,10 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
     <nav className="sidebar">
       <div className="sidebar-scroll">
         <button
-          className={view.kind === 'unread' ? 'active' : ''}
-          onClick={() => onSelect({ kind: 'unread' })}
+          className={view.kind === 'all' ? 'active' : ''}
+          onClick={() => onSelect({ kind: 'all' })}
         >
-          <span>Unread</span>
+          <span>All items</span>
           <span className="count">{totalUnread}</span>
         </button>
         <button

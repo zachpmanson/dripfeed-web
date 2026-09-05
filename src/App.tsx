@@ -16,7 +16,7 @@ const SHOW_ALL_KEY = 'dripfeed.showAll'
 
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(loadSettings)
-  const [view, setView] = useState<View>({ kind: 'unread' })
+  const [view, setView] = useState<View>({ kind: 'all' })
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     const stored = localStorage.getItem(SORT_KEY)
@@ -162,7 +162,7 @@ function filterView(
 ): NewsItem[] {
   let list: NewsItem[]
   switch (view.kind) {
-    case 'unread':
+    case 'all':
       list = showAll ? items : items.filter((i) => i.unread)
       break
     case 'starred':
