@@ -6,6 +6,7 @@ export type View =
   | { kind: 'all' } // ALL items, ignores the only-unread/all toggle
   | { kind: 'allUnread' } // unread only, ignores the only-unread/all toggle
   | { kind: 'starred' }
+  | { kind: 'folder'; id: number } // combined feed of a folder's feeds
   | { kind: 'feed'; id: number }
 
 interface Props {
@@ -102,17 +103,25 @@ export function Sidebar({ feeds, folders, items, view, onSelect }: Props) {
           const folderUnread = inFolder.reduce((s, f) => s + unreadCount(items, f.id), 0)
           return (
             <div key={folder.id} className="folder">
-              <button
-                className="folder-head"
-                onClick={() => toggle(folder.id)}
-                aria-expanded={!isCollapsed}
-              >
-                <span className="folder-name">{folder.name}</span>
+              <div className="folder-head">
+                <button
+                  className={`folder-name-btn${view.kind === 'folder' && view.id === folder.id ? ' active' : ''}`}
+                  onClick={() => onSelect({ kind: 'folder', id: folder.id })}
+                >
+                  <span className="folder-name">{folder.name}</span>
+                </button>
                 <span className="folder-right">
                   {folderUnread > 0 && <span className="count">{folderUnread}</span>}
-                  <span className={`caret${isCollapsed ? ' collapsed' : ''}`}>▾</span>
+                  <button
+                    className="icon-btn caret-btn"
+                    title={isCollapsed ? 'Expand folder' : 'Collapse folder'}
+                    onClick={() => toggle(folder.id)}
+                    aria-expanded={!isCollapsed}
+                  >
+                    <span className={`caret${isCollapsed ? ' collapsed' : ''}`}>▾</span>
+                  </button>
                 </span>
-              </button>
+              </div>
               {!isCollapsed &&
                 inFolder.map((f) => (
                   <FeedRow key={f.id} feed={f} items={items} view={view} onSelect={onSelect} />

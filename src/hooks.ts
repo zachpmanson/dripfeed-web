@@ -120,7 +120,13 @@ export function useStore(settings: Settings | null, view: View): AppData {
     if (!s || loadingMore) return
     setLoadingMore(true)
     try {
-      const feedId = viewRef.current.kind === 'feed' ? (viewRef.current.id as number) : undefined
+      const v = viewRef.current
+      const feedId =
+        v.kind === 'feed'
+          ? (v.id as number)
+          : v.kind === 'folder'
+            ? undefined /* load all feeds of the folder */
+            : undefined
       await loadMoreInto(s, feedId)
       await refreshPool()
       setRendered((r) => r + RENDER_STEP)

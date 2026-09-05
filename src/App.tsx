@@ -72,13 +72,23 @@ export default function App() {
 
   const { pool, feeds, folders, rendered, loadingMore, cursors } = store
 
-  // Cursor-aware "server has more" derived PER VIEW (not a stale boolean
-  // from the last refresh): in a feed view, that feed's cursor live; in
-  // all/unread/starred views, any feed with a live cursor.
-  const moreServer =
-    view.kind === 'feed'
-      ? (cursors.get(view.id) ?? -1) >= 0
-      : [...cursors.values()].some((c) => c >= 0)
+  // folder id -> set of member feed ids (items only know feedId)
+  const feedOfFolder = new Map<number, Set<number>>()
+  for (const f of feeds.values()) {
+    if (f.folderId === null) continue
+    let s = feedOfFolder.get(f.folderId)
+    if (!s) feedOfFolder.set(f.folderId, (s = new Set()))
+    s.add(f.id)
+  }
+
+  // Cursor-aware "server has more" derived PER VIEW: feed view → that
+  // feed's cursor; folder view → any member feed's cursor; all/unread/
+  // starred → any feed with a live cursor.
+  let serverFeeds: Iterable<number>
+  if (view.kind === 'feed') serverFeeds = [view.id]
+  else if (view.kind === 'folder') serverFeeds = feedOfFolder.get(view.id) ?? []
+  else serverFeeds = cursors.keys()
+  const moreServer = [...serverFeeds].some((fid) => (cursors.get(fid) ?? -1) >= 0)
 
   // Filter + rank the WHOLE pool first, then window the result. Slicing the
   // pool before filtering/sorting hid any feed whose items fell past the
@@ -86,7 +96,7 @@ export default function App() {
   // load-more grew the pool but the same items stayed beyond the cut.
   const rarMult = sortMode === 'rarity' ? rarityMultipliers(pool) : undefined
   const rarStats = sortMode === 'rarity' ? rarityStats(pool) : undefined
-  const visibleItems = filterView(pool, view, sortMode, showAll, rarMult)
+  const visibleItems = filterView(pool, view, sortMode, showAll, rarMult, feedOfFolder)
   const slice = visibleItems.slice(0, rendered)
   const moreAvailable = visibleItems.length > rendered
 
@@ -175,6 +185,7 @@ function filterView(
   sortMode: SortMode,
   showAll: boolean,
   rarMult?: Map<number, number>,
+  feedOfFolder?: Map<number, Set<number>>,
 ): NewsItem[] {
   let list: NewsItem[]
   switch (view.kind) {
@@ -190,12 +201,22 @@ function filterView(
       list = items.filter((i) => i.starred && (showAll || i.unread))
       break
     case 'feed':
-      // B: browsing a feed is about reading old posts — always show all
-      // items (read grayed) regardless of the global only-unread toggle.
-      list = items.filter((i) => i.feedId === view.id)
+    case 'folder':
+      // B: browsing a feed (or a folder's combined feed) is about reading
+      // old posts — always show all items, ignore the global toggle.
+      list = items.filter((i) => {
+        if (view.kind === 'feed') return i.feedId === view.id
+        // folder: item belongs if its feed is a member of the folder
+        const memberFeeds = feedOfFolder?.get(view.id)
+        return !!memberFeeds && memberFeeds.has(i.feedId)
+      })
       break
   }
-  if (view.kind !== 'feed' && sortMode === 'rarity') {
+  // Feed/folder views stay newest-first (rarity is a cross-feed view).
+  if (view.kind === 'feed' || view.kind === 'folder') {
+    return list.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
+  }
+  if (sortMode === 'rarity') {
     // Multipliers over the full pool, not the visible slice.
     return sortByRarity(list, rarMult)
   }

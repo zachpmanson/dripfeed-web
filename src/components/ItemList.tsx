@@ -58,7 +58,7 @@ export function ItemList({
           </div>
         </li>
       ))}
-      {items.length === 0 && <li className="muted">{emptyText}</li>}
+      {items.length === 0 && <li className="empty muted">{emptyText}</li>}
       {onLoadMore && (moreAvailable || moreServer) && (
         <li className="load-more-row">
           <button className="load-more" onClick={onLoadMore} disabled={loadingMore}>
