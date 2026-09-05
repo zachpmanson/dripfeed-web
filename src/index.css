@@ -385,11 +385,14 @@ body {
   position: relative;
 }
 
+/* Flush against the parent menu (no hover gap): overlap the parent's
+   right border by 1px so there's no visible seam and no dead zone. */
 .ctx-submenu {
   position: absolute;
-  left: calc(100% + 2px);
+  left: calc(100% - 1px);
   top: -0.35rem;
   min-width: 11rem;
+  z-index: 1;
 }
 
 .ctx-title {

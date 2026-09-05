@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { NewsFeed, NewsFolder } from '../api/types'
 import type { Settings } from '../settings'
 import { deleteFeed, moveFeed, renameFeed } from '../api/news'
@@ -32,6 +32,29 @@ export function FeedContextMenu({
   const [moveOpen, setMoveOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Hover-intent close: give the cursor time to cross any remaining gap or
+  // take a diagonal path into the flyout; cancels on re-enter.
+  const closeTimer = useRef<number | null>(null)
+  const clearCloseTimer = () => {
+    if (closeTimer.current !== null) {
+      clearTimeout(closeTimer.current)
+      closeTimer.current = null
+    }
+  }
+  useEffect(() => clearCloseTimer, [])
+
+  const openMove = () => {
+    clearCloseTimer()
+    setMoveOpen(true)
+  }
+  const scheduleClose = () => {
+    if (closeTimer.current !== null) clearTimeout(closeTimer.current)
+    closeTimer.current = window.setTimeout(() => {
+      setMoveOpen(false)
+      closeTimer.current = null
+    }, 150)
+  }
 
   const doMarkAllRead = async () => {
     if (busy) return
@@ -113,8 +136,8 @@ export function FeedContextMenu({
         )}
         <div
           className="ctx-sub"
-          onMouseEnter={() => setMoveOpen(true)}
-          onMouseLeave={() => setMoveOpen(false)}
+          onMouseEnter={openMove}
+          onMouseLeave={scheduleClose}
         >
           <button
             className="ctx-item"
