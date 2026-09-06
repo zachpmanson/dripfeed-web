@@ -6,7 +6,7 @@ Live at [dripfeed.zachmanson.com](https://dripfeed.zachmanson.com).
 
 ## Features
 
-- **Rarity sorting** — cross-feed views rank by rarity (real age / effective age ratio), computed over each feed's newest 20 items. Feed/folder views stay newest-first.
+- **Rarity sorting** — cross-feed views rank by rarity (scaling real post age by inverse power law of feed posting frequency), computed over each feed's newest 20 items. Feed/folder views stay newest-first.
 - **Unread-only browsing** — per-feed/folder native unread queries; all unread items arrive in one request.
 - **Full-article extraction** — a button in the reader header fetches the original URL via the News server's built-in scraper (`GET /apps/news/items/{id}/fulltext`) and swaps in the extracted body.
 - **Custom article CSS** — replace or extend the reader's default stylesheet from Settings (live preview, `url()`/`@import` stripped).
