@@ -130,7 +130,7 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
             title={item.unread ? 'Mark read' : 'Mark unread'}
             onClick={() => actions.setRead(item, !item.unread)}
           >
-            {item.unread ? '○' : '●'}
+            {item.unread ? '●' : '○'}
           </IconButton>
           <IconButton
             title={item.starred ? 'Unstar' : 'Star'}
