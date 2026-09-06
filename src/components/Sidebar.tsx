@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { NewsFolder, NewsFeed, NewsItem } from '../api/types'
 import { unreadCount, starredCount } from '../selectors'
+import type { RarityInfo } from '../rarity'
 import { FeedContextMenu } from './FeedContextMenu'
 import { FeedIcon } from './FeedIcon'
 import type { Settings } from '../settings'
@@ -19,21 +20,54 @@ interface Props {
   view: View
   onSelect: (v: View) => void
   settings: Settings
+  sortMode: 'newest' | 'rarity'
+  rarStats: Map<number, RarityInfo> | undefined
   showFavicons: boolean
   onMetaChanged: () => void
 }
 
 const COLLAPSE_KEY = 'dripfeed.folders.collapsed'
 
-export function Sidebar({ feeds, folders, items, view, onSelect, settings, showFavicons, onMetaChanged }: Props) {
+export function Sidebar({ feeds, folders, items, view, onSelect, settings, sortMode, rarStats, showFavicons, onMetaChanged }: Props) {
   const totalUnread = unreadCount(items)
   const totalStarred = starredCount(items)
-  const feedEntries = [...feeds.values()].sort((a, b) => a.title.localeCompare(b.title))
 
-  // Sorted by folder NAME, then ungrouped ("Feeds") always last.
+  // One pass over the pool: newest pubDate per feed, for activity ordering.
+  const newestPerFeed = new Map<number, number>()
+  for (const it of items) {
+    if (!it.pubDate) continue
+    const prev = newestPerFeed.get(it.feedId)
+    if (!prev || it.pubDate > prev) newestPerFeed.set(it.feedId, it.pubDate)
+  }
+
+  // Rank a feed for sidebar ordering. Rarity mode: its rarity score — rarest
+  // (highest gap/(gap+72)) first, ascending. Newest mode: newest item date —
+  // freshest first, descending (via negation). Ties fall back to title.
+  const rankOf = (feedId: number): number =>
+    sortMode === 'rarity' ? (rarStats?.get(feedId)?.rarity ?? 1) : -(newestPerFeed.get(feedId) ?? 0)
+  const byRank = (a: NewsFeed, b: NewsFeed): number => {
+    const ra = rankOf(a.id)
+    const rb = rankOf(b.id)
+    return ra !== rb ? ra - rb : a.title.localeCompare(b.title)
+  }
+
+  const feedEntries = [...feeds.values()].sort(byRank)
+
+  // Folders order by their best (lowest-rank) member feed — a folder with a
+  // rare feed floats up in rarity mode, a freshly-updated one in newest mode.
+  // Ungrouped ("Feeds") stays last, its rows in the same rank order.
+  const rankFolder = (f: NewsFolder): number => {
+    let r = Infinity
+    for (const fe of feedEntries) if (fe.folderId === f.id) r = Math.min(r, rankOf(fe.id))
+    return r
+  }
   const sortedFolders = [...folders]
     .filter((f) => feedEntries.some((fe) => fe.folderId === f.id))
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => {
+      const ra = rankFolder(a)
+      const rb = rankFolder(b)
+      return ra !== rb ? ra - rb : a.name.localeCompare(b.name)
+    })
   const ungrouped = feedEntries.filter((f) => f.folderId === null)
 
   const [collapsed, setCollapsed] = useState<Set<number>>(() => {
