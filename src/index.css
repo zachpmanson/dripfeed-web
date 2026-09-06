@@ -798,6 +798,26 @@ button:hover {
   padding: 0 1rem;
 }
 
+/* Honest credentials disclaimer on the login screen. */
+.trust-panel {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  background: var(--panel);
+  border-radius: 6px;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.trust-panel p {
+  margin: 0;
+}
+
+.trust-panel strong {
+  color: var(--accent);
+}
+
 .settings form {
   display: flex;
   flex-direction: column;
