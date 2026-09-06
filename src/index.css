@@ -263,6 +263,7 @@ body {
 
 .folder-name-btn {
   display: flex;
+  justify-content: space-between; /* name left, unread badge right */
   flex: 1;
   min-width: 0;
   padding: 0.35rem 0.6rem;
@@ -285,24 +286,17 @@ body {
   text-align: left;
 }
 
+.folder-head .folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .folder-right {
   display: flex;
   align-items: center;
   gap: 0.4rem;
   margin-left: auto;
-}
-
-.folder-right .count {
-  background: var(--bg);
-  margin-left: 0; /* gap: 0.4rem on .folder-right is the only spacing */
-  border: none;
-  cursor: pointer;
-  padding: 0.05rem 0.45rem; /* .count padding, restated to beat button default */
-}
-
-.folder-right .count:hover {
-  background: var(--border);
-  color: var(--fg);
 }
 
 .caret {

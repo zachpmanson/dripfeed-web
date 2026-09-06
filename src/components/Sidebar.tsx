@@ -121,18 +121,9 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
                   onClick={() => onSelect({ kind: 'folder', id: folder.id })}
                 >
                   <span className="folder-name">{folder.name}</span>
+                  {folderUnread > 0 && <span className="count">{folderUnread}</span>}
                 </button>
                 <span className="folder-right">
-                  {folderUnread > 0 && (
-                    <button
-                      className="count"
-                      title={`Open ${folder.name}`}
-                      aria-label={`Open ${folder.name}, ${folderUnread} unread`}
-                      onClick={() => onSelect({ kind: 'folder', id: folder.id })}
-                    >
-                      {folderUnread}
-                    </button>
-                  )}
                   <button
                     className="icon-btn caret-btn"
                     title={isCollapsed ? 'Expand folder' : 'Collapse folder'}
