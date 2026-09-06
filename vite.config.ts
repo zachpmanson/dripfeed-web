@@ -7,7 +7,10 @@ import react from '@vitejs/plugin-react'
 // `src = lib.cleanSource` strips .git, so execSync would fail there); fall
 // back to a live git query for local dev.
 function gitSha(): string {
-  if (process.env.VITE_GIT_SHA) return process.env.VITE_GIT_SHA
+  if (process.env.VITE_GIT_SHA) {
+    // Prefer a short form (the flake passes the full 40-char locked rev).
+    return process.env.VITE_GIT_SHA.slice(0, 7)
+  }
   try {
     return execSync('git rev-parse --short HEAD').toString().trim()
   } catch {
