@@ -225,6 +225,7 @@ export function useStore(
         setPool([])
         setUnreadDrained(new Set())
         setAuthFailed(false)
+        setError(null)
       },
     }),
     [refreshPool],

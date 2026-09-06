@@ -159,7 +159,17 @@ export default function App() {
           ) : (
             <p className="muted">connecting…</p>
           )}
-          <button onClick={() => store.actions.reset()}>start over</button>
+          <button
+            onClick={() => {
+              void store.actions.reset()
+              // reset() wipes stored creds + local mirror; drop App state too,
+              // or the sync-gate stays stuck (ready=false, settings unchanged
+              // → the sync effect never re-runs) until a hard refresh.
+              setSettings(null)
+            }}
+          >
+            start over
+          </button>
         </div>
       </div>
     )
