@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { titleFor } from './ItemList'
+import { titleFor } from '../utils'
 import type { NewsItem } from '../api/types'
 import type { useStore } from '../hooks'
 import { effectiveTheme, type ThemeSetting } from '../theme'
+import { IconButton } from './IconButton'
 
 interface Props {
   item: NewsItem | null
@@ -86,30 +87,24 @@ export function ItemView({ item, feedTitle, actions, articleTheme }: Props) {
           </a>
         </h2>
         <div className="reader-actions">
-          <button
-            className="icon-btn"
+          <IconButton
             title={item.unread ? 'mark read' : 'mark unread'}
-            aria-label={item.unread ? 'mark read' : 'mark unread'}
             onClick={() => actions.setRead(item, !item.unread)}
           >
             {item.unread ? '○' : '●'}
-          </button>
-          <button
-            className="icon-btn"
+          </IconButton>
+          <IconButton
             title={item.starred ? 'unstar' : 'star'}
-            aria-label={item.starred ? 'unstar' : 'star'}
             onClick={() => actions.setStar(item, !item.starred)}
           >
             {item.starred ? '★' : '☆'}
-          </button>
-          <button
-            className="icon-btn"
+          </IconButton>
+          <IconButton
             title={
               extractError
                 ? `extract full article — ${extractError}`
                 : 'extract full article from the original URL'
             }
-            aria-label="extract full article"
             disabled={extracting}
             onClick={() => void handleExtract()}
           >
@@ -131,7 +126,7 @@ export function ItemView({ item, feedTitle, actions, articleTheme }: Props) {
                 <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
               </svg>
             )}
-          </button>
+          </IconButton>
         </div>
       </div>
       <div className="item-meta">

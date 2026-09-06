@@ -9,6 +9,8 @@ import { ItemList } from './components/ItemList'
 import { ItemView } from './components/ItemView'
 import { AddModal } from './components/AddModal'
 import { SettingsModal } from './components/SettingsModal'
+import { Seg } from './components/Seg'
+import { IconButton } from './components/IconButton'
 import {
   applyUiTheme,
   articleThemeKey,
@@ -232,42 +234,38 @@ export default function App() {
       <header className="app-header">
         <h1>Dripfeed</h1>
         <div className="header-right">
-          <div className="seg" title="items shown: all, or only unread">
-            <button className={!showAll ? 'active' : ''} onClick={() => setShowAll(false)}>
-              only unread
-            </button>
-            <button className={showAll ? 'active' : ''} onClick={() => setShowAll(true)}>
-              all
-            </button>
-          </div>
-          <div className="seg">
-            <button className={sortMode === 'newest' ? 'active' : ''} onClick={() => setSortMode('newest')}>
-              newest
-            </button>
-            <button
-              className={sortMode === 'rarity' ? 'active' : ''}
-              onClick={() => setSortMode('rarity')}
-              title="weighted rarity: rare feeds first"
-            >
-              rarity
-            </button>
-          </div>
+          <Seg<boolean>
+            title="items shown: all, or only unread"
+            value={showAll}
+            onChange={setShowAll}
+            options={[
+              { value: false, label: 'only unread' },
+              { value: true, label: 'all' },
+            ]}
+          />
+          <Seg<SortMode>
+            value={sortMode}
+            onChange={setSortMode}
+            options={[
+              { value: 'newest', label: 'newest' },
+              { value: 'rarity', label: 'rarity', title: 'weighted rarity: rare feeds first' },
+            ]}
+          />
           <span className="muted sync">{pool.length} local</span>
-          <button
+          <IconButton
             className="add-btn"
             title="add feed or folder"
             onClick={() => setShowAdd(true)}
           >
             +
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             className="add-btn"
             title="settings"
-            aria-label="settings"
             onClick={() => setShowSettings(true)}
           >
             ⚙
-          </button>
+          </IconButton>
         </div>
       </header>
 
