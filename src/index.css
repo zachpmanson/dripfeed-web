@@ -295,6 +295,14 @@ body {
 .folder-right .count {
   background: var(--bg);
   margin-left: 0; /* gap: 0.4rem on .folder-right is the only spacing */
+  border: none;
+  cursor: pointer;
+  padding: 0.05rem 0.45rem; /* .count padding, restated to beat button default */
+}
+
+.folder-right .count:hover {
+  background: var(--border);
+  color: var(--fg);
 }
 
 .caret {
