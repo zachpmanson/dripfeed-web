@@ -47,24 +47,22 @@ export default function App() {
 
   // Keep the URL in sync as the user navigates so a refresh returns to the
   // same place AND back/forward walks their item history. Each view/item
-  // change pushes a history entry; popstate (back/forward) pops the URL back
-  // into state. A ref suppresses the round-trip when we're the one who pushed.
-  const navRef = useRef(false)
+  // change pushes a history entry; popstate (back/forward) reads the URL
+  // back into state. pushState never fires popstate, so there's no round-
+  // trip to suppress — writeUrl() already skips pushing when the URL is
+  // unchanged, which is exactly what happens after a pop restores state.
   useEffect(() => {
-    writeViewToUrl(view, navRef)
+    writeViewToUrl(view)
   }, [view])
   useEffect(() => {
-    writeItemIdToUrl(selectedId, navRef)
+    writeItemIdToUrl(selectedId)
   }, [selectedId])
 
-  // Back/forward: the URL changed (or was replaced with no state change on
-  // pop) — read view + item back out of the query string.
+  // Back/forward: the URL changed — read view + item back out of the query
+  // string. The subsequent writeViewToUrl/writeItemIdToUrl effects see the
+  // URL already matching and skip pushing, so no duplicate history entries.
   useEffect(() => {
     const onPop = () => {
-      if (navRef.current) {
-        navRef.current = false
-        return
-      }
       setView(viewFromUrl())
       setSelectedId(itemIdFromUrl())
     }
@@ -459,7 +457,7 @@ function viewFromUrl(): View {
   }
 }
 
-function writeViewToUrl(view: View, navRef: React.MutableRefObject<boolean>): void {
+function writeViewToUrl(view: View): void {
   const p = new URLSearchParams(window.location.search)
   if (view.kind === 'feed' || view.kind === 'folder') {
     p.set('view', view.kind)
@@ -468,7 +466,7 @@ function writeViewToUrl(view: View, navRef: React.MutableRefObject<boolean>): vo
     p.set('view', view.kind)
     p.delete('id')
   }
-  writeUrl(p, navRef)
+  writeUrl(p)
 }
 
 function itemIdFromUrl(): number | null {
@@ -478,21 +476,20 @@ function itemIdFromUrl(): number | null {
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
-function writeItemIdToUrl(id: number | null, navRef: React.MutableRefObject<boolean>): void {
+function writeItemIdToUrl(id: number | null): void {
   const p = new URLSearchParams(window.location.search)
   if (id === null) p.delete('item')
   else p.set('item', String(id))
-  writeUrl(p, navRef)
+  writeUrl(p)
 }
 
 /** pushState (not replace) so each navigation is a history entry and
- *  back/forward walk the view/item trail. navRef suppresses the popstate
- *  round-trip for entries we just pushed. */
-function writeUrl(p: URLSearchParams, navRef: React.MutableRefObject<boolean>): void {
+ *  back/forward walk the view/item trail. Skips pushing when the URL is
+ *  unchanged — which also prevents re-pushing after a pop restores state. */
+function writeUrl(p: URLSearchParams): void {
   const qs = p.toString()
   const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname
   if (window.location.search !== `?${qs}`) {
-    navRef.current = true
     window.history.pushState(null, '', url)
   }
 }
