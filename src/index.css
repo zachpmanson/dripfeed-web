@@ -78,6 +78,28 @@ body {
   background: transparent;
 }
 
+/* Header icon buttons (+ add, ⚙ settings). Glyph-based; give them a
+   proper target size instead of inheriting tiny base font. */
+.header-right .add-btn {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.05rem;
+  line-height: 1;
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.header-right .add-btn:hover {
+  background: var(--border);
+}
+
 /* Active needs to read clearly in dark mode: accent background isn't
    enough — push the text to the accent and fill the button. */
 .seg button.active {
