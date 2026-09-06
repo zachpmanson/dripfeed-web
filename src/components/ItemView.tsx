@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { titleFor } from '../utils'
 import type { NewsItem } from '../api/types'
 import type { useStore } from '../hooks'
@@ -16,6 +16,36 @@ interface Props {
 }
 
 export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMode, articleCss }: Props) {
+  // Ref to the sandboxed article iframe so we can reach its document.
+  const frameRef = useRef<HTMLIFrameElement | null>(null)
+
+  // Same-document anchors (e.g. footnotes: href="#fn:1") are blocked by the
+  // sandbox — fragment-only navigation is suppressed. Since the frame is
+  // allow-same-origin, the PARENT can read its document and scroll instead.
+  // Attached on every iframe load (a new srcdoc swaps the whole document).
+  const attachFrameNav = () => {
+    const doc = frameRef.current?.contentDocument
+    if (!doc) return
+    const onClick = (e: MouseEvent) => {
+      // Walk up from the click target to the enclosing anchor, if any.
+      let node: Element | null = e.target instanceof Element ? e.target : null
+      while (node && !(node instanceof HTMLAnchorElement)) node = node.parentElement
+      const a = node as HTMLAnchorElement | null
+      if (!a) return
+      const href = a.getAttribute('href') ?? ''
+      if (!href.startsWith('#')) return // external links already target=_blank
+      e.preventDefault()
+      const target = doc.getElementById(href.slice(1))
+      if (!target) return
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      target.classList.add('footnote-flash')
+      window.setTimeout(() => target.classList.remove('footnote-flash'), 1200)
+    }
+    // A reload swaps the document; remove-then-add keeps one listener per doc.
+    doc.removeEventListener('click', onClick)
+    doc.addEventListener('click', onClick)
+  }
+
   // Full-article extraction state: per selected item, reset on change.
   const [extracting, setExtracting] = useState(false)
   const [extractError, setExtractError] = useState<string | null>(null)
@@ -61,6 +91,7 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
       table, th, td { border: 1px solid #000; border-collapse: collapse; }
       th, td { padding: 0.3rem 0.5rem; }
       a { color: var(--link); overflow-wrap: anywhere; word-break: break-word; }
+      .footnote-flash { outline: 2px solid var(--link); outline-offset: 2px; }
     </style>
     ${articleCssMode === 'custom' && articleCss ? `<style>${sanitizeArticleCss(articleCss)}</style>` : ''}</head><body>${item.body}</body></html>`
   }, [item, articleTheme, articleCssMode, articleCss])
@@ -145,10 +176,12 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
       )}
 
       <iframe
+        ref={frameRef}
         className={`reader-frame${articleDark ? ' dark' : ''}`}
         sandbox="allow-same-origin"
         srcDoc={srcdoc}
         title={item.title}
+        onLoad={attachFrameNav}
       />
     </article>
   )
