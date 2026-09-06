@@ -31,13 +31,22 @@ const SHOW_ALL_KEY = 'dripfeed.showAll'
 
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(loadSettings)
-  const [view, setView] = useState<View>({ kind: 'all' })
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [view, setView] = useState<View>(() => viewFromUrl())
+  const [selectedId, setSelectedId] = useState<number | null>(() => itemIdFromUrl())
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     const stored = localStorage.getItem(SORT_KEY)
     return stored === 'newest' ? 'newest' : 'rarity'
   })
   const [showAll, setShowAll] = useState<boolean>(() => localStorage.getItem(SHOW_ALL_KEY) === '1')
+
+  // Restore the open view + selected item on reload: keep the URL in sync as
+  // the user navigates so a refresh returns to the same place.
+  useEffect(() => {
+    writeViewToUrl(view)
+  }, [view])
+  useEffect(() => {
+    writeItemIdToUrl(selectedId)
+  }, [selectedId])
 
   useEffect(() => {
     localStorage.setItem(SORT_KEY, sortMode)
@@ -386,4 +395,59 @@ function filterView(
     return sortByRarity(list, rarMult)
   }
   return list.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
+}
+
+// --- URL state (restore open view + selected item on reload) ---
+// Scheme: ?view=all|allUnread|starred|feed|folder&id=<n>&item=<n>
+
+function viewFromUrl(): View {
+  const p = new URLSearchParams(window.location.search)
+  const kind = p.get('view')
+  const id = p.get('id')
+  switch (kind) {
+    case 'allUnread':
+      return { kind: 'allUnread' }
+    case 'starred':
+      return { kind: 'starred' }
+    case 'feed':
+      return id ? { kind: 'feed', id: Number(id) } : { kind: 'all' }
+    case 'folder':
+      return id ? { kind: 'folder', id: Number(id) } : { kind: 'all' }
+    default:
+      return { kind: 'all' }
+  }
+}
+
+function writeViewToUrl(view: View): void {
+  const p = new URLSearchParams(window.location.search)
+  if (view.kind === 'feed' || view.kind === 'folder') {
+    p.set('view', view.kind)
+    p.set('id', String(view.id))
+  } else {
+    p.set('view', view.kind)
+    p.delete('id')
+  }
+  writeUrl(p)
+}
+
+function itemIdFromUrl(): number | null {
+  const p = new URLSearchParams(window.location.search)
+  const v = p.get('item')
+  const n = v ? Number(v) : NaN
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+function writeItemIdToUrl(id: number | null): void {
+  const p = new URLSearchParams(window.location.search)
+  if (id === null) p.delete('item')
+  else p.set('item', String(id))
+  writeUrl(p)
+}
+
+/** replaceState (not push) — the URL is a bookmarkable snapshot of the
+ *  current view, not navigation history. */
+function writeUrl(p: URLSearchParams): void {
+  const qs = p.toString()
+  const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname
+  window.history.replaceState(null, '', url)
 }
