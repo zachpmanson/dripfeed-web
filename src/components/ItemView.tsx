@@ -2,17 +2,20 @@ import { useEffect, useMemo, useState } from 'react'
 import { titleFor } from '../utils'
 import type { NewsItem } from '../api/types'
 import type { useStore } from '../hooks'
-import { effectiveTheme, type ThemeSetting } from '../theme'
+import { effectiveTheme, sanitizeArticleCss, type ThemeSetting } from '../theme'
 import { IconButton } from './IconButton'
+import type { ArticleCssMode } from '../theme'
 
 interface Props {
   item: NewsItem | null
   feedTitle: (feedId: number) => string
   actions: ReturnType<typeof useStore>['actions']
   articleTheme: ThemeSetting
+  articleCssMode: ArticleCssMode
+  articleCss: string
 }
 
-export function ItemView({ item, feedTitle, actions, articleTheme }: Props) {
+export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMode, articleCss }: Props) {
   // Full-article extraction state: per selected item, reset on change.
   const [extracting, setExtracting] = useState(false)
   const [extractError, setExtractError] = useState<string | null>(null)
@@ -58,8 +61,9 @@ export function ItemView({ item, feedTitle, actions, articleTheme }: Props) {
       table, th, td { border: 1px solid #000; border-collapse: collapse; }
       th, td { padding: 0.3rem 0.5rem; }
       a { color: var(--link); overflow-wrap: anywhere; word-break: break-word; }
-    </style></head><body>${item.body}</body></html>`
-  }, [item, articleTheme])
+    </style>
+    ${articleCssMode === 'custom' && articleCss ? `<style>${sanitizeArticleCss(articleCss)}</style>` : ''}</head><body>${item.body}</body></html>`
+  }, [item, articleTheme, articleCssMode, articleCss])
 
   if (!item) {
     return <div className="reader empty muted">Select an item</div>

@@ -14,11 +14,17 @@ import { IconButton } from './components/IconButton'
 import {
   applyUiTheme,
   articleThemeKey,
+  loadArticleCss,
+  loadArticleCssMode,
   loadShowFavicons,
   loadThemeSetting,
+  sanitizeArticleCss,
+  saveArticleCss,
+  saveArticleCssMode,
   saveShowFavicons,
   saveThemeSetting,
   uiThemeKey,
+  type ArticleCssMode,
   type ThemeSetting,
 } from './theme'
 import { rarityMultipliers, rarityStats, sortByRarity } from './rarity'
@@ -73,6 +79,8 @@ export default function App() {
   const [articleTheme, setArticleThemeState] = useState<ThemeSetting>(() =>
     loadThemeSetting(articleThemeKey),
   )
+  const [articleCssMode, setArticleCssModeState] = useState<ArticleCssMode>(loadArticleCssMode)
+  const [articleCss, setArticleCssState] = useState<string>(loadArticleCss)
   const [showFavicons, setShowFaviconsState] = useState<boolean>(loadShowFavicons)
 
   useEffect(() => {
@@ -91,6 +99,15 @@ export default function App() {
   const setArticleTheme = (v: ThemeSetting) => {
     setArticleThemeState(v)
     saveThemeSetting(articleThemeKey, v)
+  }
+  const setArticleCssMode = (v: ArticleCssMode) => {
+    setArticleCssModeState(v)
+    saveArticleCssMode(v)
+  }
+  const setArticleCss = (v: string) => {
+    // Sanitize on save so hostile url()/@import never reaches the frame.
+    setArticleCssState(v)
+    saveArticleCss(sanitizeArticleCss(v))
   }
   const setShowFavicons = (v: boolean) => {
     setShowFaviconsState(v)
@@ -319,6 +336,8 @@ export default function App() {
           feedTitle={feedTitle}
           actions={store.actions}
           articleTheme={articleTheme}
+          articleCssMode={articleCssMode}
+          articleCss={articleCss}
         />
       </main>
       {showAdd && settings && (
@@ -336,9 +355,13 @@ export default function App() {
         <SettingsModal
           uiTheme={uiTheme}
           articleTheme={articleTheme}
+          articleCssMode={articleCssMode}
+          articleCss={articleCss}
           showFavicons={showFavicons}
           onUiTheme={setUiTheme}
           onArticleTheme={setArticleTheme}
+          onArticleCssMode={setArticleCssMode}
+          onArticleCss={setArticleCss}
           onShowFavicons={setShowFavicons}
           onLogout={() => {
             void store.actions.reset()

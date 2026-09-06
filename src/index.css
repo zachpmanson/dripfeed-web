@@ -454,6 +454,46 @@ body {
   color: #ff8d8d;
 }
 
+.css-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.css-input {
+  width: 100%;
+  min-height: 9rem;
+  resize: vertical;
+  font-family: ui-monospace, monospace;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  box-sizing: border-box;
+}
+
+.css-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.css-actions .danger-btn {
+  background: rgba(255, 141, 141, 0.12);
+  border-color: rgba(255, 141, 141, 0.35);
+  color: #ff8d8d;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  border-width: 1px;
+  border-style: solid;
+  cursor: pointer;
+}
+
 .ok {
   color: var(--accent);
   font-size: 0.85rem;

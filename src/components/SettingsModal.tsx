@@ -1,50 +1,37 @@
-import type { ThemeSetting } from '../theme'
+import type { ThemeSetting, ArticleCssMode } from '../theme'
 import { GIT_SHA, BUILD_TIME, REPO_URL } from '../version'
+import { Seg } from './Seg'
 
 interface Props {
   uiTheme: ThemeSetting
   articleTheme: ThemeSetting
+  articleCssMode: ArticleCssMode
+  articleCss: string
   showFavicons: boolean
   onUiTheme: (v: ThemeSetting) => void
   onArticleTheme: (v: ThemeSetting) => void
+  onArticleCssMode: (v: ArticleCssMode) => void
+  onArticleCss: (v: string) => void
   onShowFavicons: (v: boolean) => void
   onLogout: () => void
   onClose: () => void
 }
 
-function Seg({
-  value,
-  onChange,
-}: {
-  value: ThemeSetting
-  onChange: (v: ThemeSetting) => void
-}) {
-  const opts: ThemeSetting[] = ['light', 'dark', 'system']
-  return (
-    <div className="seg">
-      {opts.map((o) => (
-        <button
-          key={o}
-          className={value === o ? 'active' : ''}
-          onClick={() => onChange(o)}
-        >
-          {o}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 export function SettingsModal({
   uiTheme,
   articleTheme,
+  articleCssMode,
+  articleCss,
   showFavicons,
   onUiTheme,
   onArticleTheme,
+  onArticleCssMode,
+  onArticleCss,
   onShowFavicons,
   onLogout,
   onClose,
 }: Props) {
+  const customOpen = articleCssMode === 'custom'
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -57,12 +44,62 @@ export function SettingsModal({
         <div className="settings-form">
           <div className="setting-row">
             <span className="setting-label">UI dark mode</span>
-            <Seg value={uiTheme} onChange={onUiTheme} />
+            <Seg<ThemeSetting>
+              value={uiTheme}
+              onChange={onUiTheme}
+              options={[
+                { value: 'light', label: 'light' },
+                { value: 'dark', label: 'dark' },
+                { value: 'system', label: 'system' },
+              ]}
+            />
           </div>
           <div className="setting-row">
             <span className="setting-label">Article dark mode</span>
-            <Seg value={articleTheme} onChange={onArticleTheme} />
+            <Seg<ThemeSetting>
+              value={articleTheme}
+              onChange={onArticleTheme}
+              options={[
+                { value: 'light', label: 'light' },
+                { value: 'dark', label: 'dark' },
+                { value: 'system', label: 'system' },
+              ]}
+            />
           </div>
+          <div className="setting-row">
+            <span className="setting-label">Article CSS</span>
+            <Seg<ArticleCssMode>
+              value={articleCssMode}
+              onChange={onArticleCssMode}
+              options={[
+                { value: 'default', label: 'default' },
+                { value: 'custom', label: 'custom' },
+              ]}
+            />
+          </div>
+          {customOpen && (
+            <div className="css-editor">
+              <textarea
+                className="css-input"
+                value={articleCss}
+                onChange={(e) => onArticleCss(e.target.value)}
+                placeholder={"/* Custom CSS, applied on top of the default.\n   url() and @import are stripped. */"}
+                spellCheck={false}
+              />
+              <div className="css-actions">
+                <span className="muted hint">applied live to the open article</span>
+                <button
+                  className="danger-btn"
+                  onClick={() => {
+                    onArticleCss('')
+                    onArticleCssMode('default')
+                  }}
+                >
+                  reset to default
+                </button>
+              </div>
+            </div>
+          )}
           <div className="setting-row">
             <label className="setting-label checkbox">
               <input
