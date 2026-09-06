@@ -711,6 +711,30 @@ body {
   color: var(--muted);
 }
 
+/* Reader header: "feed by author" sits on the left beside the feed name;
+   the date stays right-aligned against the pane edge. */
+.reader .item-meta .author {
+  margin-right: auto;
+}
+
+/* The reader's feed name is a button — clicking it switches the item list
+   to that feed. */
+.reader .item-meta .feed-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: 0.75rem;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader .item-meta .feed-btn:hover {
+  text-decoration: underline;
+}
+
 .reader {
   display: flex;
   flex-direction: column;

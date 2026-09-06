@@ -13,9 +13,12 @@ interface Props {
   articleTheme: ThemeSetting
   articleCssMode: ArticleCssMode
   articleCss: string
+  /** Called when the reader header's feed name is clicked — switch the
+   *  item list to that feed. */
+  onFeedClick: (feedId: number) => void
 }
 
-export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMode, articleCss }: Props) {
+export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMode, articleCss, onFeedClick }: Props) {
   // Ref to the sandboxed article iframe so we can reach its document.
   const frameRef = useRef<HTMLIFrameElement | null>(null)
 
@@ -166,8 +169,16 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
         </div>
       </div>
       <div className="item-meta">
-        <span className="feed">{feedTitle(item.feedId)}</span>
-        {item.author && <span className="muted">by {item.author}</span>}
+        <button
+          className="feed-btn"
+          title={`${feedTitle(item.feedId)} — show this feed`}
+          onClick={() => onFeedClick(item.feedId)}
+        >
+          {feedTitle(item.feedId)}
+        </button>
+        {item.author && (
+          <span className="muted author">by {item.author}</span>
+        )}
         <span className="muted">{item.pubDate ? new Date(item.pubDate).toLocaleString() : ''}</span>
       </div>
       {extractError && (

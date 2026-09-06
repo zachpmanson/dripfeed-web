@@ -353,6 +353,10 @@ export default function App() {
           articleTheme={articleTheme}
           articleCssMode={articleCssMode}
           articleCss={articleCss}
+          onFeedClick={(feedId) => {
+            setView({ kind: 'feed', id: feedId })
+            setSelectedId(null)
+          }}
         />
       </main>
       {showAdd && settings && (
