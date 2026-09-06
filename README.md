@@ -11,9 +11,7 @@ Live at [dripfeed.zachmanson.com](https://dripfeed.zachmanson.com).
 - **Full-article extraction** — a button in the reader header fetches the original URL via the News server's built-in scraper (`GET /apps/news/items/{id}/fulltext`) and swaps in the extracted body.
 - **Custom article CSS** — replace or extend the reader's default stylesheet from Settings (live preview, `url()`/`@import` stripped).
 - **Offline-ish local mirror** — newest-20-per-feed + full starred set in IndexedDB; 3-minute background poll; optimistic read/star toggles.
-- **URL state** — the open view + article live in query params (`?view=feed&id=3&item=42`), so reloads and back/forward restore your place.
 - **Themes** — independent UI and article light/dark/system modes; show/hide favicons.
-- **Trust note** — the login screen honestly reminds you the app password lives in localStorage and you can self-host.
 
 ## How it works
 
