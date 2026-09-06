@@ -11,10 +11,10 @@ export class ApiError extends Error {
   }
 }
 
-export function apiUrl(settings: Settings, path: string, prefixed = true): string {
+export function apiUrl(settings: Settings, path: string): string {
   // Empty baseUrl = same origin (deployed behind the caddy /apps proxy).
   const base = settings.baseUrl.trim().replace(/\/+$/, '')
-  return `${base}${prefixed ? NEWS_API_PREFIX : ''}${path}`
+  return `${base}${NEWS_API_PREFIX}${path}`
 }
 
 async function authedFetch(
@@ -51,16 +51,20 @@ export async function apiFetch(
 }
 
 /**
- * Fetch a route OUTSIDE the /api/v1-3 prefix — the legacy scraper
- * endpoints (e.g. /apps/news/items/{id}/fulltext) live at the app root,
- * not under the versioned API.
+ * Fetch a route SAME-ORIGIN, ignoring settings.baseUrl. The legacy scraper
+ * routes (e.g. /apps/news/items/{id}/fulltext) live outside /api/v1-3 and
+ * carry no CORS/CSRF exemption (@NoCSRFRequired), so cross-origin calls are
+ * blocked (preflight 405 + CSRF 412). Both the dev vite proxy and the prod
+ * caddy vhost proxy /apps/* same-origin, so a relative fetch works there
+ * and only needs the OCS-APIREQUEST header to satisfy Nextcloud's CSRF
+ * check.
  */
-export async function apiFetchRaw(
+export async function apiFetchSameOrigin(
   settings: Settings,
   path: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  return authedFetch(settings, apiUrl(settings, path, false), init)
+  return authedFetch(settings, path, init)
 }
 
 export async function apiGet<T>(settings: Settings, path: string): Promise<T> {

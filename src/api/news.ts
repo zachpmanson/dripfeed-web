@@ -1,4 +1,4 @@
-import { apiFetchRaw, apiGet, apiPost, apiDelete } from './client'
+import { apiFetchSameOrigin, apiGet, apiPost, apiDelete } from './client'
 import type { FeedsResponse, FoldersResponse, ItemsResponse, ListType, NewsItem } from './types'
 import type { Settings } from '../settings'
 
@@ -49,14 +49,23 @@ export function setStar(settings: Settings, itemId: number): Promise<void> {
  * Server-side full-article extraction: GET /items/{id}/fulltext (root
  * route, not under /api/v1-3). The News server fetches the item's URL,
  * runs Readability on it, persists the extracted body, and returns the
- * updated item. Resolves with the updated item, or null when the server
- * couldn't extract anything (204 / empty body).
+ * updated item.
+ *
+ * This route has no CORS support and no CSRF exemption, so it is fetched
+ * SAME-ORIGIN (relative — both the vite dev proxy and the prod caddy
+ * vhost proxy /apps/*) with the OCS-APIREQUEST header that Nextcloud's
+ * CSRF check accepts. Resolves with the updated item, or null when the
+ * server couldn't extract anything (204 / empty body).
  */
 export async function fetchFulltext(
   settings: Settings,
   itemId: number,
 ): Promise<NewsItem | null> {
-  const res = await apiFetchRaw(settings, `/apps/news/items/${itemId}/fulltext`, {
+  const res = await apiFetchSameOrigin(settings, `/apps/news/items/${itemId}/fulltext`, {
+    headers: {
+      'OCS-APIREQUEST': 'true',
+      Accept: 'application/json',
+    },
     // Server caps scraping at ~6s; be generous but don't spin forever.
     signal: AbortSignal.timeout(30_000),
   })

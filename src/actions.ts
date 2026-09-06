@@ -44,7 +44,18 @@ export async function setStar(settings: Settings, item: NewsItem, starred: boole
  * clients. Throws a friendly error when nothing could be extracted.
  */
 export async function extractFulltext(settings: Settings, item: NewsItem): Promise<void> {
-  const extracted = await fetchFulltext(settings, item.id)
+  let extracted: NewsItem | null
+  try {
+    extracted = await fetchFulltext(settings, item.id)
+  } catch (e) {
+    if (
+      e instanceof TypeError ||
+      (e instanceof DOMException && (e.name === 'AbortError' || e.name === 'TimeoutError'))
+    ) {
+      throw new Error('network error — could not reach the server')
+    }
+    throw e
+  }
   if (!extracted) {
     throw new Error('Could not extract an article from this URL')
   }
