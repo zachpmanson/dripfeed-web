@@ -216,9 +216,22 @@ function rarityLine(item: NewsItem, stats?: Map<number, RarityInfo>, now = Date.
   return `${formatAge(ageH)} / ${formatAge(ageH * mult)} / ${Math.floor(rarity * 100)}%`
 }
 
-/** Dripfeed's formatAge: minutes under 1h, hours under 24h, days after. */
+/**
+ * Time-ago style age with short labels, no "ago": walks the same unit
+ * ladder as the reference time-ago function (seconds → minutes → hours →
+ * days → months → years), dropping the largest whole unit. E.g. 45m, 2h,
+ * 3d, 5mo, 1y. Input is in hours.
+ */
 function formatAge(hours: number): string {
-  if (hours < 1) return `${Math.trunc(hours * 60)}m`
-  if (hours < 24) return `${Math.trunc(hours)}h`
-  return `${Math.trunc(hours / 24)}d`
+  const s = Math.floor(hours * 3600)
+  if (s < 60) return `${Math.max(1, s)}s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h`
+  const d = Math.floor(h / 24)
+  if (d < 30) return `${d}d`
+  const mo = Math.floor(d / 30)
+  if (mo < 12) return `${mo}mo`
+  return `${Math.floor(mo / 12)}y`
 }

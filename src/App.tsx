@@ -45,14 +45,32 @@ export default function App() {
   })
   const [showAll, setShowAll] = useState<boolean>(() => localStorage.getItem(SHOW_ALL_KEY) === '1')
 
-  // Restore the open view + selected item on reload: keep the URL in sync as
-  // the user navigates so a refresh returns to the same place.
+  // Keep the URL in sync as the user navigates so a refresh returns to the
+  // same place AND back/forward walks their item history. Each view/item
+  // change pushes a history entry; popstate (back/forward) pops the URL back
+  // into state. A ref suppresses the round-trip when we're the one who pushed.
+  const navRef = useRef(false)
   useEffect(() => {
-    writeViewToUrl(view)
+    writeViewToUrl(view, navRef)
   }, [view])
   useEffect(() => {
-    writeItemIdToUrl(selectedId)
+    writeItemIdToUrl(selectedId, navRef)
   }, [selectedId])
+
+  // Back/forward: the URL changed (or was replaced with no state change on
+  // pop) — read view + item back out of the query string.
+  useEffect(() => {
+    const onPop = () => {
+      if (navRef.current) {
+        navRef.current = false
+        return
+      }
+      setView(viewFromUrl())
+      setSelectedId(itemIdFromUrl())
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 
   useEffect(() => {
     localStorage.setItem(SORT_KEY, sortMode)
@@ -441,7 +459,7 @@ function viewFromUrl(): View {
   }
 }
 
-function writeViewToUrl(view: View): void {
+function writeViewToUrl(view: View, navRef: React.MutableRefObject<boolean>): void {
   const p = new URLSearchParams(window.location.search)
   if (view.kind === 'feed' || view.kind === 'folder') {
     p.set('view', view.kind)
@@ -450,7 +468,7 @@ function writeViewToUrl(view: View): void {
     p.set('view', view.kind)
     p.delete('id')
   }
-  writeUrl(p)
+  writeUrl(p, navRef)
 }
 
 function itemIdFromUrl(): number | null {
@@ -460,17 +478,21 @@ function itemIdFromUrl(): number | null {
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
-function writeItemIdToUrl(id: number | null): void {
+function writeItemIdToUrl(id: number | null, navRef: React.MutableRefObject<boolean>): void {
   const p = new URLSearchParams(window.location.search)
   if (id === null) p.delete('item')
   else p.set('item', String(id))
-  writeUrl(p)
+  writeUrl(p, navRef)
 }
 
-/** replaceState (not push) — the URL is a bookmarkable snapshot of the
- *  current view, not navigation history. */
-function writeUrl(p: URLSearchParams): void {
+/** pushState (not replace) so each navigation is a history entry and
+ *  back/forward walk the view/item trail. navRef suppresses the popstate
+ *  round-trip for entries we just pushed. */
+function writeUrl(p: URLSearchParams, navRef: React.MutableRefObject<boolean>): void {
   const qs = p.toString()
   const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname
-  window.history.replaceState(null, '', url)
+  if (window.location.search !== `?${qs}`) {
+    navRef.current = true
+    window.history.pushState(null, '', url)
+  }
 }
