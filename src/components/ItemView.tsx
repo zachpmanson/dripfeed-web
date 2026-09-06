@@ -87,7 +87,7 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
       :root[data-theme="light"] { --bg: #fff; --fg: #111; --link: #1a4fb8; --border: #d9dce2; }
       :root[data-theme="dark"] { --bg: #16181d; --fg: #d8dce3; --link: #7cb2ff; --border: #2a2e37; }
       body { font-family: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif; font-weight: normal; line-height: 1.55; max-width: 46rem; margin: 0 auto; padding: 0.5rem 1rem; color: var(--fg); background: var(--bg); overflow-wrap: anywhere; word-break: break-word; }
-      img { max-width: 100%; height: auto; }
+      img, video { max-width: 100%; height: auto; }
       table, th, td { border: 1px solid #000; border-collapse: collapse; }
       th, td { padding: 0.3rem 0.5rem; }
       a { color: var(--link); overflow-wrap: anywhere; word-break: break-word; }
