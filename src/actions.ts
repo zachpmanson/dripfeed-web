@@ -1,6 +1,7 @@
 import { dbPutItem, dbGetFeedItems } from './db'
 import { markRead, markUnread, setStar as setStarApi, markFeedRead, fetchFulltext } from './api/news'
 import { notifyLocalChange, normalizeItem } from './store'
+import { isAuthError } from './api/client'
 import type { NewsItem } from './api/types'
 import type { Settings } from './settings'
 
@@ -35,6 +36,18 @@ export async function setStar(settings: Settings, item: NewsItem, starred: boole
     notifyLocalChange()
     throw e
   }
+}
+
+/**
+ * True when an action failure should bounce the user back to the login form:
+ * either a hard 401 (credentials rejected) or a 429 (rate-limit / bruteforce
+ * throttle, which Nextcloud returns for a few requests before it settles on
+ * 401 when the stored app password is stale). Treating 429 as auth-related
+ * here is what makes a changed password force a re-login instead of leaving
+ * the user silently stuck on failing POSTs.
+ */
+export function isAuthFailure(e: unknown): boolean {
+  return isAuthError(e) || (e instanceof Error && /\b429\b/.test(e.message))
 }
 
 /**

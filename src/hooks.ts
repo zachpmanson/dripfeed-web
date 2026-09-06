@@ -5,7 +5,7 @@ import {
   unreadScopeKey, onStoreChange, getStatus, resetLocal,
   type LoadMoreProgress,
 } from './store'
-import { setRead, setStar, extractFulltext } from './actions'
+import { setRead, setStar, extractFulltext, isAuthFailure } from './actions'
 import { isAuthError } from './api/client'
 import { dbGetCursor } from './db'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
@@ -186,11 +186,42 @@ export function useStore(
       setPaging(null)
     }
   }, [loadingMore, refreshPool, feeds, unreadDrained])
+
+  // Bounce to login when a user-triggered action (mark read/star/extract)
+  // hits a stale credential: 401 or a bruteforce 429. Keeps the store in sync
+  // with the resetToSettings path so the UI lands on the login form.
+  const failAuth = useCallback(async (e: unknown) => {
+    if (!isAuthFailure(e)) return false
+    await resetToSettings()
+    return true
+  }, [resetToSettings])
+
   const actions = useCallback(
     () => ({
-      setRead: (item: NewsItem, unread: boolean) => setRead(settingsRef.current!, item, unread),
-      setStar: (item: NewsItem, starred: boolean) => setStar(settingsRef.current!, item, starred),
-      extractFulltext: (item: NewsItem) => extractFulltext(settingsRef.current!, item),
+      setRead: async (item: NewsItem, unread: boolean) => {
+        try {
+          await setRead(settingsRef.current!, item, unread)
+        } catch (e) {
+          await failAuth(e)
+          throw e
+        }
+      },
+      setStar: async (item: NewsItem, starred: boolean) => {
+        try {
+          await setStar(settingsRef.current!, item, starred)
+        } catch (e) {
+          await failAuth(e)
+          throw e
+        }
+      },
+      extractFulltext: async (item: NewsItem) => {
+        try {
+          await extractFulltext(settingsRef.current!, item)
+        } catch (e) {
+          await failAuth(e)
+          throw e
+        }
+      },
       ensureFeed: async (feedId: number) => {
         const s = settingsRef.current
         if (!s) return
