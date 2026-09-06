@@ -11,6 +11,10 @@ export class ApiError extends Error {
   }
 }
 
+export function isAuthError(e: unknown): e is ApiError {
+  return e instanceof ApiError && e.status === 401
+}
+
 export function apiUrl(settings: Settings, path: string): string {
   // Empty baseUrl = same origin (deployed behind the caddy /apps proxy).
   const base = settings.baseUrl.trim().replace(/\/+$/, '')

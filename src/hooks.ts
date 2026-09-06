@@ -6,6 +6,7 @@ import {
   type LoadMoreProgress,
 } from './store'
 import { setRead, setStar, extractFulltext } from './actions'
+import { isAuthError } from './api/client'
 import { dbGetCursor } from './db'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
 import type { Settings } from './settings'
@@ -20,6 +21,9 @@ export interface AppData {
   paging: LoadMoreProgress | null // per-feed progress while paging
   progress: { done: number } | null
   error: string | null
+  /** Set when the server rejected our credentials (401) — the app should
+   *  drop back to the settings form. */
+  authFailed: boolean
   loadMore: () => Promise<void>
   cursors: Map<number, number> // per-feed paging cursors (-1 = drained)
   unreadDrained: Set<string> // scopes probed for unread via getRead=false
@@ -53,6 +57,7 @@ export function useStore(
   const [paging, setPaging] = useState<LoadMoreProgress | null>(null)
   const [progress, setProgress] = useState<{ done: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [authFailed, setAuthFailed] = useState(false)
   const viewRef = useRef<View>(view)
   viewRef.current = view
   const settingsRef = useRef(settings)
@@ -78,6 +83,16 @@ export function useStore(
     setCursors(cm)
   }, [])
 
+  // Invalidate credentials permanently: wipe local state AND stored
+  // settings, then flag authFailed so App drops back to the settings form.
+  const resetToSettings = useCallback(async () => {
+    await resetLocal()
+    setReady(false)
+    setPool([])
+    setUnreadDrained(new Set())
+    setAuthFailed(true)
+  }, [])
+
   // hydrate / poll
   useEffect(() => {
     if (!settings) return
@@ -95,6 +110,10 @@ export function useStore(
           await incrementalSync(settings)
           if (!cancelled) await refreshPool()
         } catch (e) {
+          if (isAuthError(e)) {
+            await resetToSettings()
+            return
+          }
           console.warn('incremental sync failed', e)
         }
       } else {
@@ -104,7 +123,12 @@ export function useStore(
           await refreshPool()
           setReady(true)
         } catch (e) {
-          if (!cancelled) setError(String(e))
+          if (cancelled) return
+          if (isAuthError(e)) {
+            await resetToSettings()
+            return
+          }
+          setError(String(e))
         }
       }
     })()
@@ -113,7 +137,13 @@ export function useStore(
       if (isDbReady() && settingsRef.current) {
         incrementalSync(settingsRef.current)
           .then(() => refreshPool())
-          .catch((e) => console.warn('poll sync failed', e))
+          .catch((e) => {
+            if (isAuthError(e)) {
+              void resetToSettings()
+              return
+            }
+            console.warn('poll sync failed', e)
+          })
       }
     }, 3 * 60_000)
 
@@ -194,6 +224,7 @@ export function useStore(
         setReady(false)
         setPool([])
         setUnreadDrained(new Set())
+        setAuthFailed(false)
       },
     }),
     [refreshPool],
@@ -221,6 +252,7 @@ export function useStore(
     paging,
     progress,
     error,
+    authFailed,
     loadMore,
     actions: actions(),
   }

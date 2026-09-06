@@ -49,6 +49,12 @@ export default function App() {
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
 
+  // Credentials rejected (401): the store already wiped localStorage/IDB;
+  // drop back to the settings form so the user can re-enter them.
+  useEffect(() => {
+    if (store.authFailed) setSettings(null)
+  }, [store.authFailed])
+
   // --- theme (UI + article, each light/dark/system) ---
   const [uiTheme, setUiThemeState] = useState<ThemeSetting>(() =>
     loadThemeSetting(uiThemeKey),
@@ -122,6 +128,11 @@ export default function App() {
     return (
       <SettingsForm
         initial={null}
+        notice={
+          store.authFailed
+            ? 'Your credentials were rejected by the server — please sign in again.'
+            : undefined
+        }
         onSave={(s) => {
           setSettings(s)
         }}

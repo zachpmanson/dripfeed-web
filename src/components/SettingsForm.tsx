@@ -4,10 +4,11 @@ import type { Settings } from '../settings'
 
 interface Props {
   initial: Settings | null
+  notice?: string
   onSave: (s: Settings) => void
 }
 
-export function SettingsForm({ initial, onSave }: Props) {
+export function SettingsForm({ initial, onSave, notice }: Props) {
   const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? '')
   const [user, setUser] = useState(initial?.user ?? '')
   const [appPassword, setAppPassword] = useState(initial?.appPassword ?? '')
@@ -19,6 +20,7 @@ export function SettingsForm({ initial, onSave }: Props) {
         Connect to your Nextcloud News instance. Use an <strong>app password</strong> (Profile
         → Security), not your main account password.
       </p>
+      {notice && <p className="error">{notice}</p>}
       <form
         onSubmit={(e) => {
           e.preventDefault()
