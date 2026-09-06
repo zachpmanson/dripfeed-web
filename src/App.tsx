@@ -424,12 +424,11 @@ function filterView(
       if (!showAll) list = list.filter((i) => i.unread)
       break
   }
-  // Feed/folder views stay newest-first (rarity is a cross-feed view).
-  if (view.kind === 'feed' || view.kind === 'folder') {
-    return list.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
-  }
+  // Rarity applies to feed/folder views too — the user picks the mode and
+  // expects a rare article to float up wherever they read. (Chronological
+  // sort stays available via the Newest toggle.) Multipliers cover the full
+  // pool, not the visible slice.
   if (sortMode === 'rarity') {
-    // Multipliers over the full pool, not the visible slice.
     return sortByRarity(list, rarMult)
   }
   return list.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
