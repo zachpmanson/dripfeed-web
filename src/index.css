@@ -711,10 +711,11 @@ body {
   color: var(--muted);
 }
 
-/* Reader header: "feed by author" sits on the left beside the feed name;
-   the date stays right-aligned against the pane edge. */
-.reader .item-meta .author {
-  margin-right: auto;
+/* Reader header: "feed by author" sits on the left; the date always
+   hugs the right edge of the pane (margin-left:auto on the date itself,
+   so it stays right-aligned even when the item has no author). */
+.reader .item-meta .date {
+  margin-left: auto;
 }
 
 /* The reader's feed name is a button — clicking it switches the item list

@@ -179,7 +179,7 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
         {item.author && (
           <span className="muted author">by {item.author}</span>
         )}
-        <span className="muted">{item.pubDate ? new Date(item.pubDate).toLocaleString() : ''}</span>
+        <span className="muted date">{item.pubDate ? new Date(item.pubDate).toLocaleString() : ''}</span>
       </div>
       {extractError && (
         <div className="extract-error" role="alert">
