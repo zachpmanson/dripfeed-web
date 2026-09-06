@@ -45,22 +45,21 @@ export default function App() {
   })
   const [showAll, setShowAll] = useState<boolean>(() => localStorage.getItem(SHOW_ALL_KEY) === '1')
 
-  // Keep the URL in sync as the user navigates so a refresh returns to the
-  // same place AND back/forward walks their item history. Each view/item
-  // change pushes a history entry; popstate (back/forward) reads the URL
-  // back into state. pushState never fires popstate, so there's no round-
-  // trip to suppress — writeUrl() already skips pushing when the URL is
-  // unchanged, which is exactly what happens after a pop restores state.
+  // Keep the URL in sync with the open view + selected item: each
+  // navigation pushes exactly one history entry (so Back/Forward walk the
+  // view/item trail) and a refresh restores the same place. Values are
+  // written together so a feed/folder switch (view + item reset in one
+  // event) can't leave a ghost item behind. pushState never fires
+  // popstate, so there's no round-trip to suppress — writeUrl's
+  // unchanged-URL check is what skips re-pushing after a pop restores
+  // state.
   useEffect(() => {
-    writeViewToUrl(view)
-  }, [view])
-  useEffect(() => {
-    writeItemIdToUrl(selectedId)
-  }, [selectedId])
+    writeUrl(view, selectedId)
+  }, [view, selectedId])
 
   // Back/forward: the URL changed — read view + item back out of the query
-  // string. The subsequent writeViewToUrl/writeItemIdToUrl effects see the
-  // URL already matching and skip pushing, so no duplicate history entries.
+  // string. The effect above then sees the URL already matching and skips
+  // pushing, so no duplicate history entries.
   useEffect(() => {
     const onPop = () => {
       setView(viewFromUrl())
@@ -457,7 +456,19 @@ function viewFromUrl(): View {
   }
 }
 
-function writeViewToUrl(view: View): void {
+function itemIdFromUrl(): number | null {
+  const p = new URLSearchParams(window.location.search)
+  const v = p.get('item')
+  const n = v ? Number(v) : NaN
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+/** pushState (not replace) so each navigation is a history entry and
+ *  back/forward walk the view/item trail. View + item are written together
+ *  so a view switch clears a stale item in the SAME entry. Skips pushing
+ *  when the URL is unchanged — which also prevents re-pushing after a pop
+ *  restores state. */
+function writeUrl(view: View, selectedId: number | null): void {
   const p = new URLSearchParams(window.location.search)
   if (view.kind === 'feed' || view.kind === 'folder') {
     p.set('view', view.kind)
@@ -466,27 +477,8 @@ function writeViewToUrl(view: View): void {
     p.set('view', view.kind)
     p.delete('id')
   }
-  writeUrl(p)
-}
-
-function itemIdFromUrl(): number | null {
-  const p = new URLSearchParams(window.location.search)
-  const v = p.get('item')
-  const n = v ? Number(v) : NaN
-  return Number.isFinite(n) && n > 0 ? n : null
-}
-
-function writeItemIdToUrl(id: number | null): void {
-  const p = new URLSearchParams(window.location.search)
-  if (id === null) p.delete('item')
-  else p.set('item', String(id))
-  writeUrl(p)
-}
-
-/** pushState (not replace) so each navigation is a history entry and
- *  back/forward walk the view/item trail. Skips pushing when the URL is
- *  unchanged — which also prevents re-pushing after a pop restores state. */
-function writeUrl(p: URLSearchParams): void {
+  if (selectedId === null) p.delete('item')
+  else p.set('item', String(selectedId))
   const qs = p.toString()
   const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname
   if (window.location.search !== `?${qs}`) {
