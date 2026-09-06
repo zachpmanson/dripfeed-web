@@ -318,8 +318,6 @@ export default function App() {
           items={pool}
           view={view}
           settings={settings}
-          sortMode={sortMode}
-          rarStats={rarStats}
           showFavicons={showFavicons}
           onMetaChanged={() => void store.actions.refreshMeta()}
           onSelect={(v) => {
