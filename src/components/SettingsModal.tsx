@@ -36,7 +36,7 @@ export function SettingsModal({
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <span className="muted">settings</span>
+          <span className="muted">Settings</span>
           <button className="icon-btn" onClick={onClose} aria-label="close">
             ✕
           </button>
@@ -48,9 +48,9 @@ export function SettingsModal({
               value={uiTheme}
               onChange={onUiTheme}
               options={[
-                { value: 'light', label: 'light' },
-                { value: 'dark', label: 'dark' },
-                { value: 'system', label: 'system' },
+                { value: 'light', label: 'Light' },
+                { value: 'dark', label: 'Dark' },
+                { value: 'system', label: 'System' },
               ]}
             />
           </div>
@@ -60,9 +60,9 @@ export function SettingsModal({
               value={articleTheme}
               onChange={onArticleTheme}
               options={[
-                { value: 'light', label: 'light' },
-                { value: 'dark', label: 'dark' },
-                { value: 'system', label: 'system' },
+                { value: 'light', label: 'Light' },
+                { value: 'dark', label: 'Dark' },
+                { value: 'system', label: 'System' },
               ]}
             />
           </div>
@@ -72,8 +72,8 @@ export function SettingsModal({
               value={articleCssMode}
               onChange={onArticleCssMode}
               options={[
-                { value: 'default', label: 'default' },
-                { value: 'custom', label: 'custom' },
+                { value: 'default', label: 'Default' },
+                { value: 'custom', label: 'Custom' },
               ]}
             />
           </div>
@@ -87,7 +87,7 @@ export function SettingsModal({
                 spellCheck={false}
               />
               <div className="css-actions">
-                <span className="muted hint">applied live to the open article</span>
+                <span className="muted hint">Applied live to the open article</span>
                 <button
                   className="danger-btn"
                   onClick={() => {
@@ -95,7 +95,7 @@ export function SettingsModal({
                     onArticleCssMode('default')
                   }}
                 >
-                  reset to default
+                  Reset to default
                 </button>
               </div>
             </div>
@@ -107,7 +107,7 @@ export function SettingsModal({
                 checked={showFavicons}
                 onChange={(e) => onShowFavicons(e.target.checked)}
               />
-              show favicons
+              Show favicons
             </label>
           </div>
           <div className="setting-row">
@@ -133,7 +133,7 @@ export function SettingsModal({
           </div>
           <div className="setting-row">
             <button className="danger-btn" onClick={onLogout}>
-              log out
+              Log out
             </button>
           </div>
         </div>

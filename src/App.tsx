@@ -261,33 +261,33 @@ export default function App() {
         <h1>Dripfeed</h1>
         <div className="header-right">
           <Seg<boolean>
-            title="items shown: all, or only unread"
+            title="Items shown: all, or only unread"
             value={showAll}
             onChange={setShowAll}
             options={[
-              { value: false, label: 'only unread' },
-              { value: true, label: 'all' },
+              { value: false, label: 'Only unread' },
+              { value: true, label: 'All' },
             ]}
           />
           <Seg<SortMode>
             value={sortMode}
             onChange={setSortMode}
             options={[
-              { value: 'newest', label: 'newest' },
-              { value: 'rarity', label: 'rarity', title: 'weighted rarity: rare feeds first' },
+              { value: 'newest', label: 'Newest' },
+              { value: 'rarity', label: 'Rarity', title: 'Weighted rarity: rare feeds first' },
             ]}
           />
           <span className="muted sync">{pool.length} local</span>
           <IconButton
             className="add-btn"
-            title="add feed or folder"
+            title="Add feed or folder"
             onClick={() => setShowAdd(true)}
           >
             +
           </IconButton>
           <IconButton
             className="add-btn"
-            title="settings"
+            title="Settings"
             onClick={() => setShowSettings(true)}
           >
             ⚙

@@ -171,7 +171,7 @@ function TrailingRow({
   const more = moreServer && !drained
   const progress =
     paging && paging.totalFeeds > 0
-      ? `paging feed ${Math.min(paging.feedsPaged, paging.totalFeeds)} of ${paging.totalFeeds}…`
+      ? `Paging feed ${Math.min(paging.feedsPaged, paging.totalFeeds)} of ${paging.totalFeeds}…`
       : null
 
   if (!more) {
@@ -185,10 +185,10 @@ function TrailingRow({
   return (
     <li ref={sentinelRef} className="load-more-row">
       {loadingMore || progress ? (
-        <span className="muted">{progress ?? 'loading…'}</span>
+        <span className="muted">{progress ?? 'Loading…'}</span>
       ) : (
         <button className="load-more" onClick={onLoadMore}>
-          load more
+          Load more
         </button>
       )}
     </li>

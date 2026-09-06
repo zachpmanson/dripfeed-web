@@ -131,7 +131,7 @@ export function FeedContextMenu({
       >
         {unread > 0 && (
           <button className="ctx-item" onClick={doMarkAllRead}>
-            mark all as read
+            Mark all as read
           </button>
         )}
         <div
@@ -145,12 +145,12 @@ export function FeedContextMenu({
             aria-expanded={moveOpen}
             onClick={() => setMoveOpen((o) => !o)}
           >
-            move to folder…
+            Move to folder…
           </button>
           {moveOpen && (
             <div className="ctx-menu ctx-submenu" role="menu">
               <button className="ctx-item" onClick={() => doMove(null)}>
-                no folder
+                No folder
               </button>
               {folders.map((f) => (
                 <button key={f.id} className="ctx-item" onClick={() => doMove(f.id)}>
@@ -161,10 +161,10 @@ export function FeedContextMenu({
           )}
         </div>
         <button className="ctx-item" onClick={doRename}>
-          rename
+          Rename
         </button>
         <button className="ctx-item danger" onClick={doDelete}>
-          delete
+          Delete
         </button>
         <button
           className="ctx-item"
@@ -173,10 +173,10 @@ export function FeedContextMenu({
             onClose()
           }}
         >
-          open feed URL ↗
+          Open feed URL ↗
         </button>
         {error && <div className="error ctx-error">{error}</div>}
-        {busy && <div className="muted ctx-busy">working…</div>}
+        {busy && <div className="muted ctx-busy">Working…</div>}
       </div>
     </div>
   )

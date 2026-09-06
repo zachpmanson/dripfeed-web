@@ -35,7 +35,7 @@ export function SettingsForm({ initial, onSave, notice }: Props) {
             type="url"
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
-            placeholder="same origin (leave empty)"
+            placeholder="Same origin (leave empty)"
           />
           <span className="muted hint">Leave empty when served from dripfeed.zachmanson.com — the /apps proxy handles it.</span>
         </label>

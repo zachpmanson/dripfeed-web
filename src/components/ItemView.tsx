@@ -92,13 +92,13 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
         </h2>
         <div className="reader-actions">
           <IconButton
-            title={item.unread ? 'mark read' : 'mark unread'}
+            title={item.unread ? 'Mark read' : 'Mark unread'}
             onClick={() => actions.setRead(item, !item.unread)}
           >
             {item.unread ? '○' : '●'}
           </IconButton>
           <IconButton
-            title={item.starred ? 'unstar' : 'star'}
+            title={item.starred ? 'Unstar' : 'Star'}
             onClick={() => actions.setStar(item, !item.starred)}
           >
             {item.starred ? '★' : '☆'}
@@ -106,8 +106,8 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
           <IconButton
             title={
               extractError
-                ? `extract full article — ${extractError}`
-                : 'extract full article from the original URL'
+                ? `Extract full article — ${extractError}`
+                : 'Extract full article from the original URL'
             }
             disabled={extracting}
             onClick={() => void handleExtract()}
@@ -140,7 +140,7 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
       </div>
       {extractError && (
         <div className="extract-error" role="alert">
-          full article unavailable — {extractError}
+          Full article unavailable — {extractError}
         </div>
       )}
 

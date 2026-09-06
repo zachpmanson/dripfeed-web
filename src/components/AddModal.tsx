@@ -57,17 +57,17 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <span className="muted">add</span>
+          <span className="muted">Add</span>
           <button className="icon-btn" onClick={onClose} aria-label="close">
             ✕
           </button>
         </div>
         <div className="seg modal-tabs">
           <button className={tab === 'feed' ? 'active' : ''} onClick={() => setTab('feed')}>
-            feed
+            Feed
           </button>
           <button className={tab === 'folder' ? 'active' : ''} onClick={() => setTab('folder')}>
-            folder
+            Folder
           </button>
         </div>
         <form onSubmit={submit} className="modal-form">
@@ -86,7 +86,7 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
               <label className="field">
                 Folder
                 <select value={folderId ?? 0} onChange={(e) => setFolderId(Number(e.target.value) || null)}>
-                  <option value={0}>no folder</option>
+                  <option value={0}>No folder</option>
                   {folders.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.name}
@@ -110,7 +110,7 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
           {error && <div className="error">{error}</div>}
           {done && <div className="ok">{done}</div>}
           <button className="primary" type="submit" disabled={busy}>
-            {busy ? 'adding…' : tab === 'feed' ? 'add feed' : 'create folder'}
+            {busy ? 'Adding…' : tab === 'feed' ? 'Add feed' : 'Create folder'}
           </button>
         </form>
       </div>
