@@ -16,13 +16,6 @@ export function SettingsForm({ initial, onSave, notice }: Props) {
   return (
     <div className="settings">
       <h1>Dripfeed</h1>
-      <div className="trust-panel">
-        <p>
-          <strong>Should you trust me with your credentials? No!</strong>{' '}
-          I promise I'm not stealing them (they are just in localStorage) but you have no
-          reason to trust me. You are free to read the code and host it yourself.
-        </p>
-      </div>
       <p className="muted">
         Connect to your Nextcloud News instance. Use an <strong>app password</strong> (Profile
         → Security), not your main account password.
@@ -61,6 +54,13 @@ export function SettingsForm({ initial, onSave, notice }: Props) {
         </label>
         <button type="submit">Connect</button>
       </form>
+      <div className="trust-panel">
+        <p>
+          <strong>Should you trust me with your credentials? No!</strong>{' '}
+          I promise I'm not stealing them (they are just in localStorage) but you have no
+          reason to trust me. You are free to read the code and host it yourself.
+        </p>
+      </div>
     </div>
   )
 }
