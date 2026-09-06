@@ -1,5 +1,5 @@
 import type { ThemeSetting } from '../theme'
-import { GIT_SHA, REPO_URL } from '../version'
+import { GIT_SHA, BUILD_TIME, REPO_URL } from '../version'
 
 interface Props {
   uiTheme: ThemeSetting
@@ -82,7 +82,9 @@ export function SettingsModal({
             >
               dripfeed-web ↗
             </a>
-            <span className="muted commit-ref">{GIT_SHA}</span>
+            <span className="muted commit-ref" title={BUILD_TIME ? `built ${BUILD_TIME}` : undefined}>
+              {GIT_SHA}
+            </span>
           </div>
           <div className="setting-row">
             <button className="danger-btn" onClick={onLogout}>

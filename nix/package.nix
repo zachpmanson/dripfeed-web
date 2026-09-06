@@ -1,4 +1,4 @@
-{ lib, stdenv, nodejs, pnpm, pnpmConfigHook, pnpmBuildHook, fetchPnpmDeps }:
+{ lib, stdenv, nodejs, pnpm, pnpmConfigHook, pnpmBuildHook, fetchPnpmDeps, rev ? "unknown", buildDate ? "" }:
 
 # dripfeed-web — static Vite SPA built with pnpm. Served by caddy on naboo
 # at dripfeed.zachmanson.com; the /apps/* path is proxied to the Nextcloud
@@ -23,6 +23,15 @@ stdenv.mkDerivation {
   };
 
   nativeBuildInputs = [ nodejs pnpm pnpmConfigHook pnpmBuildHook ];
+
+  # Injected into vite via define: the locked rev + commit date. The flake
+  # passes these in because `src = lib.cleanSource` strips .git, so vite's
+  # git fallback would otherwise report 'unknown'/'now' on every build.
+  env = {
+    VITE_GIT_SHA = rev;
+    VITE_BUILD_TIME = buildDate;
+  };
+
   installPhase = ''
     runHook preInstall
     mkdir -p $out/dist
