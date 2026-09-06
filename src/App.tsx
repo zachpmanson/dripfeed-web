@@ -361,8 +361,10 @@ export default function App() {
           settings={settings}
           onClose={() => setShowAdd(false)}
           onCreated={() => {
-            // refresh feeds/folders meta so the new item shows in the sidebar
+            // refresh feeds/folders meta so the new item shows in the sidebar,
+            // then close the modal on success
             void store.actions.refreshMeta()
+            setShowAdd(false)
           }}
         />
       )}
