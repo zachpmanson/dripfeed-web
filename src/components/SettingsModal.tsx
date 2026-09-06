@@ -82,8 +82,16 @@ export function SettingsModal({
             >
               dripfeed-web ↗
             </a>
-            <span className="muted commit-ref" title={BUILD_TIME ? `built ${BUILD_TIME}` : undefined}>
-              {GIT_SHA}
+            <span className="muted commit-ref">
+              <a href={`${REPO_URL}/commit/${GIT_SHA}`} target="_blank" rel="noreferrer">
+                {GIT_SHA}
+              </a>
+              {BUILD_TIME && (
+                <>
+                  <br />
+                  <span className="commit-time">{new Date(BUILD_TIME).toLocaleString()}</span>
+                </>
+              )}
             </span>
           </div>
           <div className="setting-row">

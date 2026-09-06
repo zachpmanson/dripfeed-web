@@ -408,6 +408,22 @@ body {
 .commit-ref {
   font-family: ui-monospace, monospace;
   font-size: 0.75rem;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.commit-ref a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.commit-ref a:hover {
+  text-decoration: underline;
+}
+
+.commit-time {
+  font-size: 0.68rem;
+  color: var(--muted);
 }
 
 .setting-row .danger-btn {
