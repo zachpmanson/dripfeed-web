@@ -169,11 +169,14 @@ export function FeedContextMenu({
         <button
           className="ctx-item"
           onClick={() => {
-            if (feed.url) window.open(feed.url, '_blank', 'noopener')
+            // Prefer the feed's website (the normal web version); fall back
+            // to the raw feed URL when the parser found no site link.
+            const target = feed.link ?? feed.url
+            if (target) window.open(target, '_blank', 'noopener')
             onClose()
           }}
         >
-          Open feed URL ↗
+          Open website ↗
         </button>
         {error && <div className="error ctx-error">{error}</div>}
         {busy && <div className="muted ctx-busy">Working…</div>}
