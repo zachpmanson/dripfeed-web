@@ -27,6 +27,9 @@ export interface AppData {
   loadMore: () => Promise<void>
   cursors: Map<number, number> // per-feed paging cursors (-1 = drained)
   unreadDrained: Set<string> // scopes probed for unread via getRead=false
+  /** True while the native unread probe for the current scope is in flight
+   *  (the trailing row shows "Loading…" instead of a clickable button). */
+  unreadProbing: boolean
   actions: {
     setRead: (item: NewsItem, unread: boolean) => Promise<void>
     setStar: (item: NewsItem, starred: boolean) => Promise<void>
@@ -65,6 +68,17 @@ export function useStore(
   const unreadOnlyRef = useRef(unreadOnly)
   unreadOnlyRef.current = unreadOnly
   const [unreadDrained, setUnreadDrained] = useState<Set<string>>(new Set())
+  // In-flight native-unread probes, one promise per scope key: the view
+  // effect, load-more retries and StrictMode double-fires all share a single
+  // request instead of stacking. Per-scope (not one global ref) so switching
+  // feeds while a probe runs starts the new scope's probe instead of
+  // dropping it on the old one's in-flight guard.
+  const unreadProbesRef = useRef(new Map<string, Promise<number>>())
+  // Scope key of the probe that currently owns the unreadProbing flag, so a
+  // probe that settles after the user has moved to another scope can neither
+  // leave the flag stuck nor clobber a newer probe's state.
+  const probeOwnerRef = useRef<string | null>(null)
+  const [unreadProbing, setUnreadProbing] = useState(false)
 
   const refreshPool = useCallback(async () => {
     const [all, fs, fo] = await Promise.all([loadAllItems(), loadFeeds(), loadFolders()])
@@ -90,6 +104,9 @@ export function useStore(
     setReady(false)
     setPool([])
     setUnreadDrained(new Set())
+    setUnreadProbing(false)
+    probeOwnerRef.current = null
+    unreadProbesRef.current.clear()
     setAuthFailed(true)
   }, [])
 
@@ -154,18 +171,57 @@ export function useStore(
     }
   }, [settings, refreshPool])
 
+  // Run (or reuse) the native unread probe for one feed/folder scope.
+  // Success marks the scope drained — the query returned EVERY unread item,
+  // so there is nothing left to page. Failure leaves the scope un-drained
+  // and surfaces as a retry: the trailing row turns back into a "Load more"
+  // button whose click re-runs this. Returns the unread count the server
+  // reported (0 = the scope genuinely has none — still valid to drain).
+  const probeUnread = useCallback(async (type: 0 | 1, id: number): Promise<number> => {
+    const s = settingsRef.current
+    if (!s) return 0
+    const key = unreadScopeKey(type, id)
+    const existing = unreadProbesRef.current.get(key)
+    if (existing) return existing
+    const run = (async () => {
+      probeOwnerRef.current = key
+      setUnreadProbing(true)
+      try {
+        const n = await ensureUnreadScope(s, type, id)
+        setUnreadDrained((prev) => new Set(prev).add(key))
+        return n
+      } catch (e) {
+        // Not drained: the row turns back into a "Load more" button whose
+        // click calls this again. A transient failure must not hide the
+        // unread items nor wedge the button.
+        console.warn('unread probe failed', e)
+        return 0
+      } finally {
+        unreadProbesRef.current.delete(key)
+        if (probeOwnerRef.current === key) {
+          setUnreadProbing(false)
+          probeOwnerRef.current = null
+        }
+        await refreshPool()
+      }
+    })()
+    unreadProbesRef.current.set(key, run)
+    return run
+  }, [refreshPool])
+
   const loadMore = useCallback(async () => {
     const s = settingsRef.current
     if (!s || loadingMore) return
     const v = viewRef.current
     // In unread-only mode, feed/folder scopes are served by the native
     // unread query (getRead=false, no server limit) — the whole unread set
-    // arrives in one request and there is never a history walk here. If the
-    // probe hasn't landed yet, the ensureUnread effect owns it; skip.
-    if (
-      unreadOnlyRef.current &&
-      (v.kind === 'feed' || v.kind === 'folder')
-    ) {
+    // arrives in one request and there is never a history walk here. A
+    // "Load more" click in this mode RETRIES that probe (it failed, or the
+    // entry probe was skipped because another scope's was in flight); it
+    // must never be a silent no-op. In-flight probes are shared per scope,
+    // so rapid clicks don't stack requests.
+    if (unreadOnlyRef.current && (v.kind === 'feed' || v.kind === 'folder')) {
+      await probeUnread(v.kind === 'feed' ? 0 : 1, v.id)
       return
     }
     setLoadingMore(true)
@@ -230,19 +286,12 @@ export function useStore(
       },
       /**
        * Pull the whole unread set for a feed/folder scope in one native
-       * unread query and remember the scope as probed, so the UI stops
-       * offering "load more" for it in unread-only mode. Returns how many
-       * unread items the server had (0 = genuinely none).
+       * unread query (see probeUnread). The scope is marked drained on
+       * success so the UI stops offering "load more" for it in unread-only
+       * mode; on failure it stays un-drained so the button retries.
        */
       ensureUnread: async (type: 0 | 1, id: number) => {
-        const s = settingsRef.current
-        if (!s) return 0
-        const n = await ensureUnreadScope(s, type, id)
-        // only mark probed once the query actually succeeded, so a transient
-        // network failure doesn't permanently hide the unread items
-        setUnreadDrained((prev) => new Set(prev).add(unreadScopeKey(type, id)))
-        await refreshPool()
-        return n
+        return probeUnread(type, id)
       },
       refreshMeta: async () => {
         const s = settingsRef.current
@@ -255,12 +304,23 @@ export function useStore(
         setReady(false)
         setPool([])
         setUnreadDrained(new Set())
+        setUnreadProbing(false)
+        probeOwnerRef.current = null
+        unreadProbesRef.current.clear()
         setAuthFailed(false)
         setError(null)
       },
     }),
     [refreshPool],
   )
+
+  // Snapshot the actions object once. Its closures only depend on the
+  // stable refreshPool, and App's effects key off store.actions' identity —
+  // a fresh object per render made every such effect re-fire on EVERY
+  // render, which is how a failed unread probe kept getting silently
+  // re-armed while the Load more button stayed a dead no-op.
+  const actionsRef = useRef<AppData['actions'] | null>(null)
+  if (!actionsRef.current) actionsRef.current = actions()
 
   // progress subscription
   useEffect(() => {
@@ -280,12 +340,13 @@ export function useStore(
     folders,
     cursors,
     unreadDrained,
+    unreadProbing,
     loadingMore,
     paging,
     progress,
     error,
     authFailed,
     loadMore,
-    actions: actions(),
+    actions: actionsRef.current,
   }
 }

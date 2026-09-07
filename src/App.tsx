@@ -134,7 +134,6 @@ export default function App() {
   // feed auto-fills and the load-more button reflects reality). In-flight
   // guard so StrictMode's double effect fires at most one probe/refill.
   const ensureRef = useRef<Promise<void> | null>(null)
-  const unreadEnsureRef = useRef<Promise<void> | null>(null)
   useEffect(() => {
     if (view.kind !== 'feed' || !settings) return
     // In unread-only mode the native unread query below supersedes the
@@ -151,20 +150,17 @@ export default function App() {
   // request) instead of walking history pages looking for unread items. If
   // the query returns nothing we know the scope genuinely has no unread
   // items — no fruitless deep pagination — and the scope is marked drained.
+  // In-flight work is deduped per scope inside the store's probeUnread, so
+  // switching scopes mid-probe starts the new scope's probe instead of
+  // skipping it, and a failed probe leaves the scope un-drained for the
+  // "Load more" button to retry.
   useEffect(() => {
     if (!settings) return
     if (showAll) return
     if (view.kind !== 'feed' && view.kind !== 'folder') return
     const type = view.kind === 'feed' ? 0 : 1
     if (store.unreadDrained.has(unreadScopeKey(type, view.id))) return
-    if (unreadEnsureRef.current) return
-    unreadEnsureRef.current = store.actions
-      .ensureUnread(type, view.id)
-      .then(() => undefined)
-      .catch((e) => console.warn('unread probe failed', e))
-      .finally(() => {
-        unreadEnsureRef.current = null
-      })
+    void store.actions.ensureUnread(type, view.id)
   }, [view, settings, showAll, store.actions, store.unreadDrained])
 
   if (!settings) {
@@ -250,6 +246,16 @@ export default function App() {
   // Drained = the view's feeds are all paged to the server end (or the
   // view has no feeds of its own to page, e.g. an empty folder).
   const drained = unreadScopeProbed || scope.length === 0 || liveCount === 0
+  // While the native unread probe is in flight the trailing row shows
+  // "Loading…" — never a clickable button, because in only-unread
+  // feed/folder mode the button's only real job is to (re)run that probe
+  // and the pending state would otherwise be a button that no-ops.
+  const unreadProbing =
+    !showAll &&
+    (view.kind === 'feed' || view.kind === 'folder') &&
+    store.unreadProbing &&
+    moreServer &&
+    !drained
 
   // Filter + rank the WHOLE pool, then slice for display. Rarity/selected
   // operate over the full pool (rarity's 20-item feed sample is stable
@@ -342,7 +348,7 @@ export default function App() {
             onLoadMore={store.loadMore}
             moreServer={moreServer}
             drained={drained}
-            loadingMore={loadingMore}
+            loadingMore={loadingMore || unreadProbing}
             paging={paging}
           />
         </div>
