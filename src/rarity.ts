@@ -94,6 +94,27 @@ export function sortByRarity(
   })
 }
 
+/**
+ * Rarity sort with unread first — same scoring as sortByRarity, but a
+ * priority queue: every unread item ranks above every read item, with
+ * rarity order (then pubDate desc) within each group. Marking an item read
+ * drops it below the whole unread block instead of just re-ranking it.
+ */
+export function sortByRarityUnreadFirst(
+  items: NewsItem[],
+  multipliers?: Map<number, number>,
+  now = Date.now(),
+): NewsItem[] {
+  const mult = multipliers ?? rarityMultipliers(items)
+  return [...items].sort((a, b) => {
+    if (a.unread !== b.unread) return a.unread ? -1 : 1
+    const sa = score(a, mult, now)
+    const sb = score(b, mult, now)
+    if (sa !== sb) return sa - sb
+    return (b.pubDate ?? 0) - (a.pubDate ?? 0)
+  })
+}
+
 function score(it: NewsItem, mult: Map<number, number>, now: number): number {
   if (!it.pubDate) return Number.MAX_SAFE_INTEGER // undated items sink
   const m = mult.get(it.feedId) ?? 1

@@ -27,10 +27,10 @@ import {
   type ArticleCssMode,
   type ThemeSetting,
 } from './theme'
-import { rarityMultipliers, rarityStats, sortByRarity } from './rarity'
+import { rarityMultipliers, rarityStats, sortByRarity, sortByRarityUnreadFirst } from './rarity'
 import type { NewsItem } from './api/types'
 
-type SortMode = 'newest' | 'rarity'
+type SortMode = 'newest' | 'rarity' | 'rarityUnread'
 
 const SORT_KEY = 'dripfeed.sort'
 const SHOW_ALL_KEY = 'dripfeed.showAll'
@@ -41,7 +41,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<number | null>(() => itemIdFromUrl())
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     const stored = localStorage.getItem(SORT_KEY)
-    return stored === 'newest' ? 'newest' : 'rarity'
+    return stored === 'newest' ? 'newest' : stored === 'rarityUnread' ? 'rarityUnread' : 'rarity'
   })
   const [showAll, setShowAll] = useState<boolean>(() => localStorage.getItem(SHOW_ALL_KEY) === '1')
 
@@ -260,8 +260,8 @@ export default function App() {
   // Filter + rank the WHOLE pool, then slice for display. Rarity/selected
   // operate over the full pool (rarity's 20-item feed sample is stable
   // regardless of how much history load-more has pulled in).
-  const rarMult = sortMode === 'rarity' ? rarityMultipliers(pool) : undefined
-  const rarStats = sortMode === 'rarity' ? rarityStats(pool) : undefined
+  const rarMult = sortMode !== 'newest' ? rarityMultipliers(pool) : undefined
+  const rarStats = sortMode !== 'newest' ? rarityStats(pool) : undefined
   const visibleItems = filterView(pool, view, sortMode, showAll, rarMult, feedOfFolder)
 
   const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
@@ -296,6 +296,11 @@ export default function App() {
             options={[
               { value: 'newest', label: 'Newest' },
               { value: 'rarity', label: 'Rarity', title: 'Weighted rarity: rare feeds first' },
+              {
+                value: 'rarityUnread',
+                label: 'Rarity · unread first',
+                title: 'Weighted rarity with all unread above all read',
+              },
             ]}
           />
           <span className="muted sync">{pool.length} local</span>
@@ -342,7 +347,7 @@ export default function App() {
             onRead={(item: NewsItem) => {
               void store.actions.setRead(item, !item.unread)
             }}
-            rarityMode={sortMode === 'rarity'}
+            rarityMode={sortMode !== 'newest'}
             rarityStats={rarStats}
             emptyText={showAll ? 'No items here.' : 'No unread items. Nothing dripping?'}
             onLoadMore={store.loadMore}
@@ -442,6 +447,9 @@ function filterView(
   // pool, not the visible slice.
   if (sortMode === 'rarity') {
     return sortByRarity(list, rarMult)
+  }
+  if (sortMode === 'rarityUnread') {
+    return sortByRarityUnreadFirst(list, rarMult)
   }
   return list.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
 }
