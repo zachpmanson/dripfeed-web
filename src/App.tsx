@@ -55,8 +55,9 @@ export default function App() {
   const [showMode, setShowMode] = useState<ShowMode>(() => {
     const stored = localStorage.getItem(SHOW_MODE_KEY)
     if (stored === 'all' || stored === 'unread' || stored === 'priority') return stored
-    // One-time migration from the old boolean toggle ('1' = all, else unread).
-    return localStorage.getItem(LEGACY_SHOW_ALL_KEY) === '1' ? 'all' : 'unread'
+    // One-time migration from the old boolean toggle ('1' = all, else the
+    // default). Default is 'priority' (Unread first).
+    return localStorage.getItem(LEGACY_SHOW_ALL_KEY) === '1' ? 'all' : 'priority'
   })
 
   // Keep the URL in sync with the open view + selected item: each
