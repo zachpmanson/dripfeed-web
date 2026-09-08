@@ -45,6 +45,9 @@ export default function App() {
   const [settings, setSettings] = useState<Settings | null>(loadSettings)
   const [view, setView] = useState<View>(() => viewFromUrl())
   const [selectedId, setSelectedId] = useState<number | null>(() => itemIdFromUrl())
+  // Bumped when the reader header's feed name is clicked, so the sidebar
+  // knows to reveal (expand folder + scroll) that feed in sync.
+  const [revealNonce, setRevealNonce] = useState(0)
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     const stored = localStorage.getItem(SORT_KEY)
     return stored === 'newest' ? 'newest' : 'rarity'
@@ -338,6 +341,7 @@ export default function App() {
           settings={settings}
           showFavicons={showFavicons}
           onMetaChanged={() => void store.actions.refreshMeta()}
+          revealFeed={{ id: view.kind === 'feed' ? view.id : 0, nonce: revealNonce }}
           onSelect={(v) => {
             setView(v)
             setSelectedId(null)
@@ -374,6 +378,7 @@ export default function App() {
           onFeedClick={(feedId) => {
             setView({ kind: 'feed', id: feedId })
             setSelectedId(null)
+            setRevealNonce(revealNonce + 1)
           }}
         />
       </main>

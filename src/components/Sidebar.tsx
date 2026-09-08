@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { NewsFolder, NewsFeed, NewsItem } from '../api/types'
 import { unreadCount, starredCount } from '../selectors'
 import { FeedContextMenu } from './FeedContextMenu'
@@ -21,11 +21,15 @@ interface Props {
   settings: Settings
   showFavicons: boolean
   onMetaChanged: () => void
+  /** A feed to reveal in the sidebar: expand its folder (if any) and scroll
+   *  it into view. `nonce` is bumped on each request so repeat clicks on the
+   *  same feed retrigger the reveal. */
+  revealFeed?: { id: number; nonce: number } | null
 }
 
 const COLLAPSE_KEY = 'dripfeed.folders.collapsed'
 
-export function Sidebar({ feeds, folders, items, view, onSelect, settings, showFavicons, onMetaChanged }: Props) {
+export function Sidebar({ feeds, folders, items, view, onSelect, settings, showFavicons, onMetaChanged, revealFeed }: Props) {
   const totalUnread = unreadCount(items)
   const totalStarred = starredCount(items)
   const feedEntries = [...feeds.values()].sort((a, b) => a.title.localeCompare(b.title))
@@ -46,6 +50,29 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
   })
 
   const [ctx, setCtx] = useState<{ feed: NewsFeed; x: number; y: number } | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+
+  // Reveal a feed the reader's header jumped to: expand its folder if it's
+  // collapsed, then scroll the feed row into view. Expansion is state set
+  // just below, so defer the scroll a beat for the re-render to lay out.
+  useEffect(() => {
+    if (!revealFeed) return
+    let cancelled = false
+    const feed = revealFeed.id != null ? feeds.get(revealFeed.id) : null
+    if (feed && feed.folderId !== null && collapsed.has(feed.folderId)) {
+      const next = new Set(collapsed)
+      next.delete(feed.folderId)
+      applyCollapsed(next)
+    }
+    window.setTimeout(() => {
+      if (cancelled) return
+      const row = scrollRef.current?.querySelector(`[data-feed-id="${revealFeed.id}"]`)
+      ;(row as HTMLElement | null)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }, 60)
+    return () => {
+      cancelled = true
+    }
+  }, [revealFeed?.nonce])
 
   const fold = (ids: Iterable<number>, into: Set<number>) => {
     for (const id of ids) into.add(id)
@@ -87,7 +114,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
           </button>
         </div>
       </div>
-      <div className="sidebar-scroll">
+      <div className="sidebar-scroll" ref={scrollRef}>
         <button
           className={view.kind === 'all' ? 'active' : ''}
           onClick={() => onSelect({ kind: 'all' })}
@@ -187,6 +214,7 @@ function FeedRow({
   const n = unreadCount(items, feed.id)
   return (
     <button
+      data-feed-id={feed.id}
       className={
         view.kind === 'feed' && view.id === feed.id ? 'active feed-row' : 'feed-row'
       }
