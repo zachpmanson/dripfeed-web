@@ -64,6 +64,8 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
     if (!item) return ''
     // Body comes from the server already rewritten with target=_blank.
     // srcdoc + sandbox keeps third-party feed HTML from touching the app.
+    // allow-popups(-to-escape-sandbox) lets those target=_blank links open
+    // in a real new tab — without it the sandbox silently swallows them.
     //
     // The palette is real CSS, not baked hex, so the frame answers to
     // `prefers-color-scheme` like any normal page: light tokens are the
@@ -190,7 +192,7 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
       <iframe
         ref={frameRef}
         className={`reader-frame${articleDark ? ' dark' : ''}`}
-        sandbox="allow-same-origin"
+        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         srcDoc={srcdoc}
         title={item.title}
         onLoad={attachFrameNav}
