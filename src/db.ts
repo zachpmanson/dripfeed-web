@@ -70,17 +70,41 @@ export async function dbClear(): Promise<void> {
   ])
 }
 
+/**
+ * Persist the canonical server feed set, reconciling the local store:
+ * feeds that no longer exist on the server are removed locally too, along
+ * with all of their locally-stored items. Without this, deleting a feed
+ * (server-side DELETE) left a stale copy in IndexedDB that resurfaced on
+ * the next refresh — the bug where "the old copy persists after it's been
+ * removed from the server".
+ */
 export async function dbPutFeeds(feeds: NewsFeed[]): Promise<void> {
   const db = await getDB()
-  const tx = db.transaction('feeds', 'readwrite')
-  await Promise.all(feeds.map((f) => tx.store.put(f)))
+  const tx = db.transaction(['feeds', 'items'], 'readwrite')
+  const ids = new Set(feeds.map((f) => f.id))
+  const existing = await tx.objectStore('feeds').getAll()
+  for (const f of existing) {
+    if (ids.has(f.id)) continue
+    await tx.objectStore('feeds').delete(f.id)
+    const itemKeys = await tx
+      .objectStore('items')
+      .index('by-feed')
+      .getAllKeys(f.id)
+    for (const k of itemKeys) await tx.objectStore('items').delete(k)
+  }
+  for (const f of feeds) await tx.objectStore('feeds').put(f)
   await tx.done
 }
 
 export async function dbPutFolders(folders: NewsFolder[]): Promise<void> {
   const db = await getDB()
   const tx = db.transaction('folders', 'readwrite')
-  await Promise.all(folders.map((f) => tx.store.put(f)))
+  const ids = new Set(folders.map((f) => f.id))
+  const existing = await tx.store.getAll()
+  for (const f of existing) {
+    if (!ids.has(f.id)) await tx.store.delete(f.id)
+  }
+  for (const f of folders) await tx.store.put(f)
   await tx.done
 }
 
