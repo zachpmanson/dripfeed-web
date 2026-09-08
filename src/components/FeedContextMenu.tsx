@@ -33,6 +33,10 @@ export function FeedContextMenu({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Feed's site link (nullable — parser may not have found one) vs the raw
+  // feed URL (always present); both are offered as separate menu items.
+  const websiteUrl = feed.link
+
   // Hover-intent close: give the cursor time to cross any remaining gap or
   // take a diagonal path into the flyout; cancels on re-enter.
   const closeTimer = useRef<number | null>(null)
@@ -166,17 +170,25 @@ export function FeedContextMenu({
         <button className="ctx-item danger" onClick={doDelete}>
           Delete
         </button>
+        {websiteUrl && (
+          <button
+            className="ctx-item"
+            onClick={() => {
+              window.open(websiteUrl, '_blank', 'noopener')
+              onClose()
+            }}
+          >
+            Open website ↗
+          </button>
+        )}
         <button
           className="ctx-item"
           onClick={() => {
-            // Prefer the feed's website (the normal web version); fall back
-            // to the raw feed URL when the parser found no site link.
-            const target = feed.link ?? feed.url
-            if (target) window.open(target, '_blank', 'noopener')
+            window.open(feed.url, '_blank', 'noopener')
             onClose()
           }}
         >
-          Open website ↗
+          Open feed url ↗
         </button>
         {error && <div className="error ctx-error">{error}</div>}
         {busy && <div className="muted ctx-busy">Working…</div>}
