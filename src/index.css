@@ -120,6 +120,23 @@ body {
   color: var(--text);
 }
 
+/* Unread visibility dropdown (All / Unread only / Unread first) — a single
+   dropdown in place of the old two-button seg; matches its bordered look. */
+.header-select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  padding: 0.28rem 0.5rem;
+  cursor: pointer;
+}
+
+.header-select:hover {
+  border-color: var(--accent);
+}
+
 .app-body {
   display: grid;
   grid-template-columns: 14rem minmax(16rem, 24rem) 1fr;

@@ -32,8 +32,14 @@ import type { NewsItem } from './api/types'
 
 type SortMode = 'newest' | 'rarity'
 
+/** Header visibility dropdown: what the item list shows. 'priority' shows
+ *  every item but floats unread ones above read (a view option, not a
+ *  sort — it rides on top of whichever sort mode is selected). */
+type ShowMode = 'all' | 'unread' | 'priority'
+
 const SORT_KEY = 'dripfeed.sort'
-const SHOW_ALL_KEY = 'dripfeed.showAll'
+const SHOW_MODE_KEY = 'dripfeed.showMode'
+const LEGACY_SHOW_ALL_KEY = 'dripfeed.showAll'
 
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(loadSettings)
@@ -43,7 +49,12 @@ export default function App() {
     const stored = localStorage.getItem(SORT_KEY)
     return stored === 'newest' ? 'newest' : 'rarity'
   })
-  const [showAll, setShowAll] = useState<boolean>(() => localStorage.getItem(SHOW_ALL_KEY) === '1')
+  const [showMode, setShowMode] = useState<ShowMode>(() => {
+    const stored = localStorage.getItem(SHOW_MODE_KEY)
+    if (stored === 'all' || stored === 'unread' || stored === 'priority') return stored
+    // One-time migration from the old boolean toggle ('1' = all, else unread).
+    return localStorage.getItem(LEGACY_SHOW_ALL_KEY) === '1' ? 'all' : 'unread'
+  })
 
   // Keep the URL in sync with the open view + selected item: each
   // navigation pushes exactly one history entry (so Back/Forward walk the
@@ -74,10 +85,10 @@ export default function App() {
   }, [sortMode])
 
   useEffect(() => {
-    localStorage.setItem(SHOW_ALL_KEY, showAll ? '1' : '0')
-  }, [showAll])
+    localStorage.setItem(SHOW_MODE_KEY, showMode)
+  }, [showMode])
 
-  const store = useStore(settings, view, !showAll)
+  const store = useStore(settings, view, showMode === 'unread')
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
 
@@ -156,12 +167,12 @@ export default function App() {
   // "Load more" button to retry.
   useEffect(() => {
     if (!settings) return
-    if (showAll) return
+    if (showMode !== 'unread') return
     if (view.kind !== 'feed' && view.kind !== 'folder') return
     const type = view.kind === 'feed' ? 0 : 1
     if (store.unreadDrained.has(unreadScopeKey(type, view.id))) return
     void store.actions.ensureUnread(type, view.id)
-  }, [view, settings, showAll, store.actions, store.unreadDrained])
+  }, [view, settings, showMode, store.actions, store.unreadDrained])
 
   if (!settings) {
     return (
@@ -239,7 +250,7 @@ export default function App() {
   // query (getRead=false, no limit) contains ALL its unread items locally —
   // there is nothing left to page, so suppress the history walk entirely.
   const unreadScopeProbed =
-    !showAll &&
+    showMode === 'unread' &&
     (view.kind === 'feed' || view.kind === 'folder') &&
     store.unreadDrained.has(unreadScopeKey(view.kind === 'feed' ? 0 : 1, view.id))
   const moreServer = unreadScopeProbed ? false : liveCount > 0
@@ -251,7 +262,7 @@ export default function App() {
   // feed/folder mode the button's only real job is to (re)run that probe
   // and the pending state would otherwise be a button that no-ops.
   const unreadProbing =
-    !showAll &&
+    showMode === 'unread' &&
     (view.kind === 'feed' || view.kind === 'folder') &&
     store.unreadProbing &&
     moreServer &&
@@ -262,7 +273,7 @@ export default function App() {
   // regardless of how much history load-more has pulled in).
   const rarMult = sortMode === 'rarity' ? rarityMultipliers(pool) : undefined
   const rarStats = sortMode === 'rarity' ? rarityStats(pool) : undefined
-  const visibleItems = filterView(pool, view, sortMode, showAll, rarMult, feedOfFolder)
+  const visibleItems = filterView(pool, view, sortMode, showMode, rarMult, feedOfFolder)
 
   const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
   const feedById = (feedId: number) => feeds.get(feedId)
@@ -281,15 +292,16 @@ export default function App() {
       <header className="app-header">
         <h1>Dripfeed</h1>
         <div className="header-right">
-          <Seg<boolean>
-            title="Items shown: all, or only unread"
-            value={showAll}
-            onChange={setShowAll}
-            options={[
-              { value: false, label: 'Only unread' },
-              { value: true, label: 'All' },
-            ]}
-          />
+          <select
+            className="header-select"
+            title="Items shown: all, unread only, or all items with unread floated to the top"
+            value={showMode}
+            onChange={(e) => setShowMode(e.target.value as ShowMode)}
+          >
+            <option value="all">All items</option>
+            <option value="unread">Unread only</option>
+            <option value="priority">Unread first</option>
+          </select>
           <Seg<SortMode>
             value={sortMode}
             onChange={setSortMode}
@@ -344,7 +356,7 @@ export default function App() {
             }}
             rarityMode={sortMode === 'rarity'}
             rarityStats={rarStats}
-            emptyText={showAll ? 'No items here.' : 'No unread items. Nothing dripping?'}
+            emptyText={showMode === 'unread' ? 'No unread items. Nothing dripping?' : 'No items here.'}
             onLoadMore={store.loadMore}
             moreServer={moreServer}
             drained={drained}
@@ -405,7 +417,7 @@ function filterView(
   items: NewsItem[],
   view: View,
   sortMode: SortMode,
-  showAll: boolean,
+  showMode: ShowMode,
   rarMult?: Map<number, number>,
   feedOfFolder?: Map<number, Set<number>>,
 ): NewsItem[] {
@@ -433,17 +445,29 @@ function filterView(
         const memberFeeds = feedOfFolder?.get(view.id)
         return !!memberFeeds && memberFeeds.has(i.feedId)
       })
-      if (!showAll) list = list.filter((i) => i.unread)
+      if (showMode === 'unread') list = list.filter((i) => i.unread)
       break
   }
   // Rarity applies to feed/folder views too — the user picks the mode and
   // expects a rare article to float up wherever they read. (Chronological
   // sort stays available via the Newest toggle.) Multipliers cover the full
   // pool, not the visible slice.
+  let ranked: NewsItem[]
   if (sortMode === 'rarity') {
-    return sortByRarity(list, rarMult)
+    ranked = sortByRarity(list, rarMult)
+  } else {
+    ranked = list.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
   }
-  return list.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
+  // Unread priority queue — a VIEW option, not a sort: it rides on top of
+  // the chosen order so every unread item ranks above every read item, with
+  // each group keeping the sort's internal order.
+  if (showMode === 'priority') {
+    const unread: NewsItem[] = []
+    const read: NewsItem[] = []
+    for (const i of ranked) (i.unread ? unread : read).push(i)
+    return unread.concat(read)
+  }
+  return ranked
 }
 
 // --- URL state (restore open view + selected item on reload) ---
