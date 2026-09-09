@@ -637,6 +637,26 @@ body {
 
 .sync {
   font-size: 0.75rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.sync:hover {
+  color: var(--accent);
+}
+
+.sync-spinner {
+  display: inline-block;
+  margin-right: 0.3rem;
+  animation: sync-spin 1s linear infinite;
+}
+
+@keyframes sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .item-list {

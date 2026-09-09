@@ -30,6 +30,9 @@ export interface AppData {
   /** True while the native unread probe for the current scope is in flight
    *  (the trailing row shows "Loading…" instead of a clickable button). */
   unreadProbing: boolean
+  /** True while a manual sync (syncNow) is in flight — the header count
+   *  spins to show the click did something. */
+  syncing: boolean
   actions: {
     setRead: (item: NewsItem, unread: boolean) => Promise<void>
     setStar: (item: NewsItem, starred: boolean) => Promise<void>
@@ -37,6 +40,10 @@ export interface AppData {
     ensureFeed: (feedId: number) => Promise<void>
     ensureUnread: (type: 0 | 1, id: number) => Promise<number>
     refreshMeta: () => Promise<void>
+    /** Manual light refresh (same as refreshMeta, with feedback): newest-500
+     *  window merged + feeds/folders meta, then re-read the pool. Errors are
+     *  surfaced in the UI instead of swallowed by the poll. */
+    syncNow: () => Promise<void>
     reset: () => Promise<void>
   }
 }
@@ -61,6 +68,8 @@ export function useStore(
   const [progress, setProgress] = useState<{ done: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [authFailed, setAuthFailed] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const syncingRef = useRef(false)
   const viewRef = useRef<View>(view)
   viewRef.current = view
   const settingsRef = useRef(settings)
@@ -299,6 +308,26 @@ export function useStore(
         await incrementalSync(s)
         await refreshPool()
       },
+      syncNow: async () => {
+        const s = settingsRef.current
+        if (!s || syncingRef.current) return
+        syncingRef.current = true
+        setSyncing(true)
+        try {
+          await incrementalSync(s)
+          await refreshPool()
+        } catch (e) {
+          if (isAuthError(e)) {
+            await resetToSettings()
+          } else {
+            setError(String(e))
+            console.warn('manual sync failed', e)
+          }
+        } finally {
+          syncingRef.current = false
+          setSyncing(false)
+        }
+      },
       reset: async () => {
         await resetLocal()
         setReady(false)
@@ -346,6 +375,7 @@ export function useStore(
     progress,
     error,
     authFailed,
+    syncing,
     loadMore,
     actions: actionsRef.current,
   }

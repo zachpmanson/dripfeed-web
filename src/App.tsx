@@ -314,7 +314,18 @@ export default function App() {
               { value: 'rarity', label: 'Rarity', title: 'Weighted rarity: rare feeds first' },
             ]}
           />
-          <span className="muted sync">{pool.length} local</span>
+          <button
+            className={`muted sync${store.syncing ? ' syncing' : ''}`}
+            title="Refresh now — re-sync newest items, feeds and folders"
+            onClick={() => void store.actions.syncNow()}
+          >
+            {store.syncing && (
+              <span className="sync-spinner" aria-hidden="true">
+                ↻
+              </span>
+            )}
+            {pool.length} local
+          </button>
           <IconButton
             className="add-btn"
             title="Add feed or folder"
