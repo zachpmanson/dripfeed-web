@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { PlusIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
 import { useStore } from './hooks'
 import { unreadScopeKey } from './store'
 import { loadSettings } from './settings'
@@ -211,7 +212,10 @@ export default function App() {
               </div>
             </>
           ) : (
-            <p className="muted">connecting…</p>
+            <p className="muted spinner-row">
+              <span className="spinner" aria-hidden="true" />
+              connecting…
+            </p>
           )}
           <button
             onClick={() => {
@@ -319,11 +323,7 @@ export default function App() {
             title="Refresh now — re-sync newest items, feeds and folders"
             onClick={() => void store.actions.syncNow()}
           >
-            {store.syncing && (
-              <span className="sync-spinner" aria-hidden="true">
-                ↻
-              </span>
-            )}
+            {store.syncing && <span className="spinner" aria-hidden="true" />}
             {pool.length} local
           </button>
           <IconButton
@@ -331,14 +331,14 @@ export default function App() {
             title="Add feed or folder"
             onClick={() => setShowAdd(true)}
           >
-            +
+            <PlusIcon className="btn-icon" />
           </IconButton>
           <IconButton
             className="add-btn"
             title="Settings"
             onClick={() => setShowSettings(true)}
           >
-            ⚙
+            <Cog6ToothIcon className="btn-icon" />
           </IconButton>
         </div>
       </header>
