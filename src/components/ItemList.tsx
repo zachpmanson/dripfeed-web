@@ -185,7 +185,10 @@ function TrailingRow({
   return (
     <li ref={sentinelRef} className="load-more-row">
       {loadingMore || progress ? (
-        <span className="muted">{progress ?? 'Loading…'}</span>
+        <span className="muted spinner-row">
+          <span className="spinner" aria-hidden="true" />
+          {progress ?? 'Loading…'}
+        </span>
       ) : (
         <button className="load-more" onClick={onLoadMore}>
           Load more

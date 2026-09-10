@@ -78,15 +78,13 @@ body {
   background: transparent;
 }
 
-/* Header icon buttons (+ add, ⚙ settings). Glyph-based; give them a
-   proper target size instead of inheriting tiny base font. */
+/* Header icon buttons (+, ⚙ now Heroicons). Give them a proper target
+   size instead of inheriting tiny base font. */
 .header-right .add-btn {
   border: 1px solid var(--border);
   border-radius: 6px;
   background: transparent;
   color: var(--text);
-  font-size: 1.05rem;
-  line-height: 1;
   width: 2rem;
   height: 2rem;
   display: inline-flex;
@@ -94,6 +92,11 @@ body {
   justify-content: center;
   padding: 0;
   cursor: pointer;
+}
+
+.header-right .add-btn .btn-icon {
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
 .header-right .add-btn:hover {
@@ -193,8 +196,9 @@ body {
   background: transparent;
 }
 
-/* Full-article extraction: inline spinner while the server scrapes. */
-.reader-head .spinner {
+/* One loading indicator everywhere: full-article extraction, manual
+   refresh, load-more/paging, the sync gate's connecting state. */
+.spinner {
   display: inline-block;
   width: 0.85rem;
   height: 0.85rem;
@@ -203,6 +207,14 @@ body {
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   vertical-align: middle;
+  flex: none;
+}
+
+/* Spinner + label on one baseline. */
+.spinner-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 @keyframes spin {
@@ -645,18 +657,6 @@ body {
 
 .sync:hover {
   color: var(--accent);
-}
-
-.sync-spinner {
-  display: inline-block;
-  margin-right: 0.3rem;
-  animation: sync-spin 1s linear infinite;
-}
-
-@keyframes sync-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .item-list {

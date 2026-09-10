@@ -10,6 +10,7 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@heroicons/react": "2.2.0",
     "@tanstack/react-query": "^5.62.0",
     "idb": "^8.0.0",
     "react": "^18.3.1",
