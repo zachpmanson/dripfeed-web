@@ -323,7 +323,11 @@ export default function App() {
             title="Refresh now — re-sync newest items, feeds and folders"
             onClick={() => void store.actions.syncNow()}
           >
-            {store.syncing && <span className="spinner" aria-hidden="true" />}
+            {store.syncing && (
+              <span className="sync-spinner" aria-hidden="true">
+                ↻
+              </span>
+            )}
             {pool.length} local
           </button>
           <IconButton

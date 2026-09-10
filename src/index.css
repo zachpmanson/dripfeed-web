@@ -659,6 +659,18 @@ body {
   color: var(--accent);
 }
 
+.sync-spinner {
+  display: inline-block;
+  margin-right: 0.3rem;
+  animation: sync-spin 1s linear infinite;
+}
+
+@keyframes sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .item-list {
   list-style: none;
   margin: 0;
