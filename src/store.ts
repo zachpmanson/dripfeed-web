@@ -1,5 +1,5 @@
 import { dbClear, dbGetCursor, dbGetFeedItems, dbGetAllFeeds, dbGetAllFolders, dbGetAllItems, dbGetMeta, dbPutFeeds, dbPutFolders, dbPutItems, dbSetCursor, dbSetMeta } from './db'
-import { fetchFeedWindow, fetchInitial, fetchMeta, fetchUnreadScope } from './api/sync'
+import { fetchFeedWindow, fetchInitial, fetchMeta, fetchUnreadScope, fetchUpdatedItems } from './api/sync'
 import { fetchItems } from './api/news'
 import { LIST_TYPES } from './api/types'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
@@ -9,6 +9,13 @@ import { FEED_WINDOW } from './api/sync'
 
 /** Target items to add per load-more invocation (≈ a screenful). */
 export const LOAD_STEP = 60
+
+/**
+ * Meta key for the /items/updated delta marker (UNIX seconds). The poll
+ * reconcile passes the last marker so each tick only pulls items that
+ * actually changed on the server. Seeded at the end of fullSync.
+ */
+const RECONCILE_MARKER = 'reconcile:lastModified'
 
 /**
  * IndexedDB-backed mirror. Initial hydration is per-feed: the newest
@@ -73,6 +80,10 @@ export async function fullSync(settings: Settings): Promise<void> {
   for (const [feedId, minId] of feedWindows) await dbSetCursor(feedId, minId)
 
   await dbSetMeta('initialized', '1')
+  // Seed the reconcile marker so the first poll's /items/updated delta only
+  // carries changes made AFTER hydration — everything the mirror needs has
+  // just been pulled by fetchInitial.
+  await dbSetMeta(RECONCILE_MARKER, String(Math.floor(Date.now() / 1000)))
   dbReady = true
   status = { stage: 'done', done: items.length }
   emit()
@@ -115,6 +126,40 @@ export async function incrementalSync(settings: Settings): Promise<void> {
     batchSize: 500,
   })
   await dbPutItems(resp.items.map(normalizeItem))
+
+  // Server-authoritative pass: pull everything changed since the last poll
+  // and overwrite the matching local rows, so read/star flags updated by
+  // other clients converge here (the newest-500 window above never touches
+  // older locally-stored items).
+  await reconcileUpdated(settings)
+}
+
+/**
+ * Server-authoritative reconcile of local item state against the
+ * /items/updated delta endpoint. The server bumps lastModified on ANY
+ * field change, so every item whose read/starred flag (or body) changed in
+ * another client lands in the delta; this pass overwrites the stale local
+ * row with the server copy.
+ *
+ * The marker (seconds) advances to max(received lastModified, wall-clock
+ * at request time) so truncation to whole seconds and client/server clock
+ * skew can never skip an item: the server compares with >=, so a marker of
+ * floor(now) still catches microtime values recorded in the same second.
+ * Returns how many changed items were applied.
+ */
+export async function reconcileUpdated(settings: Settings): Promise<number> {
+  const prev = Number((await dbGetMeta(RECONCILE_MARKER)) ?? 0)
+  const started = Math.floor(Date.now() / 1000)
+  const items = await fetchUpdatedItems(settings, prev)
+  if (items.length > 0) {
+    await dbPutItems(items.map(normalizeItem))
+  }
+  let marker = started
+  for (const i of items) {
+    if (i.lastModified && i.lastModified > marker) marker = i.lastModified
+  }
+  if (marker > prev) await dbSetMeta(RECONCILE_MARKER, String(marker))
+  return items.length
 }
 
 /**

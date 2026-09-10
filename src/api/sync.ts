@@ -29,6 +29,24 @@ export async function fetchUnreadScope(
 }
 
 /**
+ * Delta pull: every item (read or unread, any feed) whose lastModified is
+ * newer than `sinceSeconds`. The News server bumps last_modified on ANY
+ * field change (NewsMapperV2::update), so read/star marks made by other
+ * clients — the cross-device sync gap — show up here as authoritative
+ * rows. This is the reconcile primitive for the poll (see store.ts).
+ */
+export async function fetchUpdatedItems(
+  settings: Settings,
+  sinceSeconds: number,
+): Promise<NewsItem[]> {
+  const resp = await apiGet<ItemsResponse>(
+    settings,
+    `/items/updated?type=3&lastModified=${sinceSeconds}`,
+  )
+  return resp.items
+}
+
+/**
  * Initial hydration: newest FEED_WINDOW per feed, in parallel, plus the full
  * starred set. The main page (unread/rarity) only needs the newest few per
  * feed; deeper history is fetched on demand by "load more" (see store.ts).
