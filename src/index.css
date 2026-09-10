@@ -196,18 +196,20 @@ body {
   background: transparent;
 }
 
-/* One loading indicator everywhere: full-article extraction, manual
-   refresh, load-more/paging, the sync gate's connecting state. */
+/* One loading indicator everywhere: the circular arrow ↻, spinning.
+   Full-article extraction, manual refresh, load-more/paging, and the
+   sync gate's connecting state all use this. */
 .spinner {
   display: inline-block;
-  width: 0.85rem;
-  height: 0.85rem;
-  border: 2px solid var(--border);
-  border-top-color: var(--text);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+  font-size: 0.9rem;
+  line-height: 1;
+  animation: spin 0.8s linear infinite;
   vertical-align: middle;
   flex: none;
+}
+
+.spinner::before {
+  content: '↻';
 }
 
 /* Spinner + label on one baseline. */
@@ -657,18 +659,6 @@ body {
 
 .sync:hover {
   color: var(--accent);
-}
-
-.sync-spinner {
-  display: inline-block;
-  margin-right: 0.3rem;
-  animation: sync-spin 1s linear infinite;
-}
-
-@keyframes sync-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .item-list {
