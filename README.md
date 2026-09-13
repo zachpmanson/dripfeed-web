@@ -12,6 +12,7 @@ Live at [dripfeed.zachmanson.com](https://dripfeed.zachmanson.com).
 - **Custom article CSS** — replace or extend the reader's default stylesheet from Settings (live preview, `url()`/`@import` stripped).
 - **Offline-ish local mirror** — newest-20-per-feed + full starred set in IndexedDB; 3-minute background poll; optimistic read/star toggles.
 - **Themes** — independent UI and article light/dark/system modes; show/hide favicons.
+- **Click to read** — double click an item to mark it read (the default), or enable single click in Settings.
 
 ## How it works
 

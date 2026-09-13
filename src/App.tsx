@@ -18,11 +18,13 @@ import {
   loadArticleCss,
   loadArticleCssMode,
   loadShowFavicons,
+  loadSingleClickRead,
   loadThemeSetting,
   sanitizeArticleCss,
   saveArticleCss,
   saveArticleCssMode,
   saveShowFavicons,
+  saveSingleClickRead,
   saveThemeSetting,
   uiThemeKey,
   type ArticleCssMode,
@@ -113,6 +115,7 @@ export default function App() {
   const [articleCssMode, setArticleCssModeState] = useState<ArticleCssMode>(loadArticleCssMode)
   const [articleCss, setArticleCssState] = useState<string>(loadArticleCss)
   const [showFavicons, setShowFaviconsState] = useState<boolean>(loadShowFavicons)
+  const [singleClickRead, setSingleClickReadState] = useState<boolean>(loadSingleClickRead)
 
   useEffect(() => {
     applyUiTheme(uiTheme)
@@ -143,6 +146,10 @@ export default function App() {
   const setShowFavicons = (v: boolean) => {
     setShowFaviconsState(v)
     saveShowFavicons(v)
+  }
+  const setSingleClickRead = (v: boolean) => {
+    setSingleClickReadState(v)
+    saveSingleClickRead(v)
   }
 
   // On navigation to an individual feed: top the local window up to 20 and
@@ -366,6 +373,7 @@ export default function App() {
             feedTitle={feedTitle}
             feedById={feedById}
             showFavicons={showFavicons}
+            singleClickRead={singleClickRead}
             onSelect={setSelectedId}
             onRead={(item: NewsItem) => {
               void store.actions.setRead(item, !item.unread)
@@ -414,11 +422,13 @@ export default function App() {
           articleCssMode={articleCssMode}
           articleCss={articleCss}
           showFavicons={showFavicons}
+          singleClickRead={singleClickRead}
           onUiTheme={setUiTheme}
           onArticleTheme={setArticleTheme}
           onArticleCssMode={setArticleCssMode}
           onArticleCss={setArticleCss}
           onShowFavicons={setShowFavicons}
+          onSingleClickRead={setSingleClickRead}
           onLogout={() => {
             void store.actions.reset()
             setSettings(null)
