@@ -8,11 +8,13 @@ interface Props {
   articleCssMode: ArticleCssMode
   articleCss: string
   showFavicons: boolean
+  singleClickRead: boolean
   onUiTheme: (v: ThemeSetting) => void
   onArticleTheme: (v: ThemeSetting) => void
   onArticleCssMode: (v: ArticleCssMode) => void
   onArticleCss: (v: string) => void
   onShowFavicons: (v: boolean) => void
+  onSingleClickRead: (v: boolean) => void
   onLogout: () => void
   onClose: () => void
 }
@@ -23,11 +25,13 @@ export function SettingsModal({
   articleCssMode,
   articleCss,
   showFavicons,
+  singleClickRead,
   onUiTheme,
   onArticleTheme,
   onArticleCssMode,
   onArticleCss,
   onShowFavicons,
+  onSingleClickRead,
   onLogout,
   onClose,
 }: Props) {
@@ -108,6 +112,16 @@ export function SettingsModal({
                 onChange={(e) => onShowFavicons(e.target.checked)}
               />
               Show favicons
+            </label>
+          </div>
+          <div className="setting-row">
+            <label className="setting-label checkbox">
+              <input
+                type="checkbox"
+                checked={singleClickRead}
+                onChange={(e) => onSingleClickRead(e.target.checked)}
+              />
+              Mark as read on single click
             </label>
           </div>
           <div className="setting-row">

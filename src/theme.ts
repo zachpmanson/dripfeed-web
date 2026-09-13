@@ -78,6 +78,29 @@ export function sanitizeArticleCss(css: string): string {
     .replace(/@import\b[^\n]*(?:\n|$)/gi, '')
 }
 
+const SINGLE_CLICK_READ_KEY = 'dripfeed.singleClickRead'
+
+/**
+ * Mark an item read on a single click instead of a double click. Defaults to
+ * off: the long-standing behaviour is single click to select, double click to
+ * mark read.
+ */
+export function loadSingleClickRead(): boolean {
+  try {
+    return localStorage.getItem(SINGLE_CLICK_READ_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function saveSingleClickRead(v: boolean): void {
+  try {
+    localStorage.setItem(SINGLE_CLICK_READ_KEY, v ? '1' : '0')
+  } catch {
+    /* ignore */
+  }
+}
+
 const FAVICONS_KEY = 'dripfeed.showFavicons'
 
 export function loadShowFavicons(): boolean {

@@ -11,6 +11,7 @@ interface Props {
   feedTitle: (feedId: number) => string
   feedById?: (feedId: number) => NewsFeed | undefined
   showFavicons?: boolean
+  singleClickRead?: boolean
   onSelect: (id: number) => void
   onRead: (item: NewsItem) => void // optimistic removal hook once read
   rarityMode?: boolean
@@ -29,6 +30,7 @@ export function ItemList({
   feedTitle,
   feedById,
   showFavicons = true,
+  singleClickRead = false,
   onSelect,
   onRead,
   rarityMode = false,
@@ -116,8 +118,17 @@ export function ItemList({
         <li
           key={item.id}
           className={`item ${item.id === selectedId ? 'selected' : ''} ${item.unread ? '' : 'read'}`}
-          onClick={() => onSelect(item.id)}
-          onDoubleClick={() => onRead(item)}
+          onClick={() => {
+            onSelect(item.id)
+            // Single-click read mode: the click also marks the item read,
+            // but only flips unread → read (selecting an already-read item
+            // must not mark it unread again).
+            if (singleClickRead && item.unread) onRead(item)
+          }}
+          onDoubleClick={() => {
+            // Default behaviour: double click tops the read/unread flag.
+            if (!singleClickRead) onRead(item)
+          }}
         >
           <div className="item-title">
             {item.unread && <span className="unread-dot" />}
