@@ -6,6 +6,32 @@ import { effectiveTheme, sanitizeArticleCss, type ThemeSetting } from '../theme'
 import { IconButton } from './IconButton'
 import type { ArticleCssMode } from '../theme'
 
+/**
+ * A `<base href>` for the srcdoc article frame. Feed bodies legitimately
+ * contain relative links and images (root-relative `/party-tricks/`, or
+ * `../site/metadata.html` — valid RSS, even if uncommon). The srcdoc frame
+ * has no URL of its own, so without a base those would resolve against the
+ * app's origin (or not at all). The article URL is the correct base:
+ * relative paths resolve exactly as they would on the original page.
+ * Returns '' when the item URL isn't an absolute http(s) URL (nothing sane
+ * to resolve against). Attribute-escaped for srcdoc interpolation.
+ */
+function baseHrefFor(url: string | null | undefined): string {
+  if (!url) return ''
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return ''
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return ''
+  const escaped = url
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+  return `<base href=\"${escaped}\">`
+}
+
 interface Props {
   item: NewsItem | null
   feedTitle: (feedId: number) => string
@@ -66,6 +92,9 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
     // srcdoc + sandbox keeps third-party feed HTML from touching the app.
     // allow-popups(-to-escape-sandbox) lets those target=_blank links open
     // in a real new tab — without it the sandbox silently swallows them.
+    // Relative links/images (valid in RSS) resolve against a <base> pointing
+    // at the article URL; the server has historically dropped them instead
+    // (nextcloud/news #3822), but when they survive this makes them work.
     //
     // The palette is real CSS, not baked hex, so the frame answers to
     // `prefers-color-scheme` like any normal page: light tokens are the
@@ -83,7 +112,7 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
         ? ' data-theme="dark"'
         : ' data-theme="light"'
       : ''
-    return `<!doctype html><html${dataTheme}><head><meta charset="utf-8"><style>
+    return `<!doctype html><html${dataTheme}><head><meta charset="utf-8">${baseHrefFor(item.url)}<style>
       :root { color-scheme: light dark; }
       :root { --bg: #fff; --fg: #111; --link: #1a4fb8; --border: #d9dce2; }
       @media (prefers-color-scheme: dark) {
