@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { titleFor } from '../utils'
+import { enclosureHtml, titleFor } from '../utils'
 import type { NewsItem } from '../api/types'
 import type { useStore } from '../hooks'
 import { effectiveTheme, sanitizeArticleCss, type ThemeSetting } from '../theme'
@@ -122,13 +122,14 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
       :root[data-theme="dark"] { --bg: #16181d; --fg: #d8dce3; --link: #7cb2ff; --border: #2a2e37; }
       body { font-family: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif; font-weight: normal; line-height: 1.55; max-width: 46rem; margin: 0 auto; padding: 0.5rem 1rem; color: var(--fg); background: var(--bg); overflow-wrap: anywhere; word-break: break-word; }
       img, video { max-width: 100%; height: auto; }
+      .enclosure { display: block; margin: 0.9rem 0 0; max-width: 100%; }
       pre { max-width: 100%; overflow-x: auto; }
       table, th, td { border: 1px solid #000; border-collapse: collapse; }
       th, td { padding: 0.3rem 0.5rem; }
       a { color: var(--link); overflow-wrap: anywhere; word-break: break-word; }
       .footnote-flash { outline: 2px solid var(--link); outline-offset: 2px; }
     </style>
-    ${articleCssMode === 'custom' && articleCss ? `<style>${sanitizeArticleCss(articleCss)}</style>` : ''}</head><body>${item.body}</body></html>`
+    ${articleCssMode === 'custom' && articleCss ? `<style>${sanitizeArticleCss(articleCss)}</style>` : ''}</head><body>${item.body}${enclosureHtml(item)}</body></html>`
   }, [item, articleTheme, articleCssMode, articleCss])
 
   if (!item) {
