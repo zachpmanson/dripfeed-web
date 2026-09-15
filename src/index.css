@@ -594,6 +594,17 @@ body {
   color: var(--muted);
 }
 
+/* Transient confirmation state ("Copied ✓") — not a dead control, so keep
+   the accent colour and drop the hover wash. */
+.ctx-item:disabled {
+  cursor: default;
+  color: var(--accent);
+}
+
+.ctx-item:disabled:hover {
+  background: transparent;
+}
+
 .ctx-error {
   padding: 0.4rem 0.55rem;
   font-size: 0.8rem;
