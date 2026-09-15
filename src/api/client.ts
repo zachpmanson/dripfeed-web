@@ -76,6 +76,20 @@ export async function apiGet<T>(settings: Settings, path: string): Promise<T> {
   return (await res.json()) as T
 }
 
+/**
+ * GET whose response headers matter as much as the body. The reconcile
+ * marker needs the server's own wall clock (`Date`), and that is only
+ * readable from the response object — `Date` is a CORS-safelisted response
+ * header, so this works cross-origin too.
+ */
+export async function apiGetWithHeaders<T>(
+  settings: Settings,
+  path: string,
+): Promise<{ data: T; headers: Headers }> {
+  const res = await apiFetch(settings, path)
+  return { data: (await res.json()) as T, headers: res.headers }
+}
+
 /** POST, optionally with a JSON body (returns parsed JSON when present). */
 export async function apiPost<T = void>(
   settings: Settings,

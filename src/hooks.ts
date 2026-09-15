@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  fullSync, incrementalSync, isInitialized, isDbReady, loadAllItems,
+  fullSync, incrementalSync, isInitialized, isDbReady, markDbReady, loadAllItems,
   loadFeeds, loadFolders, loadMoreInto, ensureFeedWindow, ensureUnreadScope,
   unreadScopeKey, onStoreChange, getStatus, resetLocal,
   type LoadMoreProgress,
@@ -11,6 +11,12 @@ import { dbGetCursor } from './db'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
 import type { Settings } from './settings'
 import type { View } from './components/Sidebar'
+
+/** Background reconcile interval for the local mirror. */
+const POLL_MS = 3 * 60_000
+
+/** Floor between two background syncs, however they were triggered. */
+const WAKE_THROTTLE_MS = 30_000
 
 export interface AppData {
   ready: boolean
@@ -132,6 +138,11 @@ export function useStore(
       if (await isInitialized()) {
         await refreshPool()
         setReady(true)
+        // The poll is gated on isDbReady(); fullSync sets it, but this
+        // branch (an already-populated DB on a later page load) never runs
+        // fullSync — without this the 3-minute reconcile never fired again
+        // for the life of the tab.
+        markDbReady()
         try {
           await incrementalSync(settings)
           if (!cancelled) await refreshPool()
@@ -159,23 +170,41 @@ export function useStore(
       }
     })()
 
-    const poll = setInterval(() => {
-      if (isDbReady() && settingsRef.current) {
-        incrementalSync(settingsRef.current)
-          .then(() => refreshPool())
-          .catch((e) => {
-            if (isAuthError(e)) {
-              void resetToSettings()
-              return
-            }
-            console.warn('poll sync failed', e)
-          })
-      }
-    }, 3 * 60_000)
+    // Background reconcile. Runs on the interval AND on focus / a visibility
+    // flip, so a tab left open (or backgrounded) catches up the moment you
+    // look at it instead of waiting out the rest of the interval. Shared
+    // throttle: an interval tick, a focus and a visibilitychange arriving
+    // together must not stack three round-trips. The hydrating sync above
+    // counts as the first one, so the window starts now.
+    let lastSync = Date.now()
+    const tick = () => {
+      if (!isDbReady() || !settingsRef.current) return
+      if (Date.now() - lastSync < WAKE_THROTTLE_MS) return
+      lastSync = Date.now()
+      incrementalSync(settingsRef.current)
+        .then(() => {
+          if (!cancelled) void refreshPool()
+        })
+        .catch((e) => {
+          if (isAuthError(e)) {
+            void resetToSettings()
+            return
+          }
+          console.warn('poll sync failed', e)
+        })
+    }
+    const poll = setInterval(tick, POLL_MS)
+    const onWake = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    window.addEventListener('focus', onWake)
+    document.addEventListener('visibilitychange', onWake)
 
     return () => {
       cancelled = true
       clearInterval(poll)
+      window.removeEventListener('focus', onWake)
+      document.removeEventListener('visibilitychange', onWake)
       off()
     }
   }, [settings, refreshPool])
