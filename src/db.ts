@@ -120,6 +120,17 @@ export async function dbGetAllFeeds(): Promise<NewsFeed[]> {
   return db.getAll('feeds')
 }
 
+export async function dbGetFeed(id: number): Promise<NewsFeed | undefined> {
+  const db = await getDB()
+  return db.get('feeds', id)
+}
+
+/** Update one feed row (used for the optimistic unread-badge adjustment). */
+export async function dbPutFeed(feed: NewsFeed): Promise<void> {
+  const db = await getDB()
+  await db.put('feeds', feed)
+}
+
 export async function dbGetAllFolders(): Promise<NewsFolder[]> {
   const db = await getDB()
   return db.getAll('folders')

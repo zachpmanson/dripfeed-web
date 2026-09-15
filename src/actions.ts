@@ -1,9 +1,21 @@
-import { dbPutItem, dbGetFeedItems } from './db'
+import { dbPutItem, dbGetFeed, dbGetFeedItems, dbPutFeed } from './db'
 import { markRead, markUnread, setStar as setStarApi, markFeedRead, fetchFulltext } from './api/news'
 import { notifyLocalChange, normalizeItem } from './store'
 import { isAuthError } from './api/client'
 import type { NewsItem } from './api/types'
 import type { Settings } from './settings'
+
+/**
+ * Optimistic feed-badge adjustment. The sidebar now reads the server's
+ * exact `feed.unreadCount` rather than counting the (partial) local mirror,
+ * so our own toggle has to move that number too — otherwise a click would
+ * leave the badge stale until the next poll.
+ */
+async function bumpFeedUnread(feedId: number, delta: number): Promise<void> {
+  const feed = await dbGetFeed(feedId)
+  if (!feed) return
+  await dbPutFeed({ ...feed, unreadCount: Math.max(0, feed.unreadCount + delta) })
+}
 
 /**
  * State actions: optimistic on the local DB, confirmed on the server.
@@ -13,6 +25,7 @@ import type { Settings } from './settings'
 export async function setRead(settings: Settings, item: NewsItem, unread: boolean): Promise<void> {
   const next: NewsItem = { ...item, unread }
   await dbPutItem(next) // local first (instant UI)
+  await bumpFeedUnread(item.feedId, unread ? 1 : -1)
   notifyLocalChange()
   try {
     if (unread) await markUnread(settings, item.id)
@@ -20,6 +33,7 @@ export async function setRead(settings: Settings, item: NewsItem, unread: boolea
   } catch (e) {
     // Server failed — revert local so we don't drift.
     await dbPutItem(item)
+    await bumpFeedUnread(item.feedId, unread ? -1 : 1)
     notifyLocalChange()
     throw e
   }
@@ -88,14 +102,21 @@ export async function markFeedAllRead(settings: Settings, feedId: number): Promi
   const next = local
     .filter((i) => i.unread)
     .map((i) => ({ ...i, unread: false }))
+  // Optimistic badge zeroing, alongside the item flags (see bumpFeedUnread).
+  // Zeroed even when no locally-stored item flips: the local window is only
+  // a slice of the feed, while the badge is the server's whole count — and
+  // the server-side mark-feed-read below covers the rest.
+  const prevFeed = await dbGetFeed(feedId)
   if (next.length > 0) {
     for (const it of next) await dbPutItem(it)
-    notifyLocalChange()
   }
+  if (prevFeed) await dbPutFeed({ ...prevFeed, unreadCount: 0 })
+  notifyLocalChange()
   try {
     await markFeedRead(settings, feedId, Number.MAX_SAFE_INTEGER)
   } catch (e) {
     for (const orig of prev.values()) await dbPutItem(orig)
+    if (prevFeed) await dbPutFeed(prevFeed)
     notifyLocalChange()
     throw e
   }
