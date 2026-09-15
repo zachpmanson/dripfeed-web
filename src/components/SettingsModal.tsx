@@ -1,5 +1,5 @@
 import type { ThemeSetting, ArticleCssMode } from '../theme'
-import { GIT_SHA, BUILD_TIME, REPO_URL } from '../version'
+import { GIT_SHA, REPO_URL, deployLabel } from '../version'
 import { Seg } from './Seg'
 
 interface Props {
@@ -135,14 +135,8 @@ export function SettingsModal({
             </a>
             <span className="muted commit-ref">
               <a href={`${REPO_URL}/commit/${GIT_SHA}`} target="_blank" rel="noreferrer">
-                {GIT_SHA}
+                {deployLabel()}
               </a>
-              {BUILD_TIME && (
-                <>
-                  <br />
-                  <span className="commit-time">{new Date(BUILD_TIME).toLocaleString()}</span>
-                </>
-              )}
             </span>
           </div>
           <div className="setting-row">
