@@ -3,6 +3,7 @@ import type { NewsFeed, NewsFolder } from '../api/types'
 import type { Settings } from '../settings'
 import { deleteFeed, moveFeed, renameFeed } from '../api/news'
 import { markFeedAllRead } from '../actions'
+import { copyText } from '../utils'
 
 interface Props {
   feed: NewsFeed
@@ -16,8 +17,9 @@ interface Props {
 }
 
 /**
- * Right-click menu on a feed row: mark all read, delete the feed, or move it
- * to another folder (flyout submenu). All hit the News API then refresh.
+ * Right-click menu on a feed row: mark all read, delete the feed, move it to
+ * another folder (flyout submenu), or copy/open its URLs. All hit the News
+ * API then refresh.
  */
 export function FeedContextMenu({
   feed,
@@ -32,6 +34,8 @@ export function FeedContextMenu({
   const [moveOpen, setMoveOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 'copied' shows inline confirmation in the menu item before it closes.
+  const [copied, setCopied] = useState(false)
 
   // Feed's site link (nullable — parser may not have found one) vs the raw
   // feed URL (always present); both are offered as separate menu items.
@@ -119,6 +123,19 @@ export function FeedContextMenu({
     }
   }
 
+  const doCopyFeedUrl = async () => {
+    if (busy) return
+    setError(null)
+    try {
+      await copyText(feed.url)
+      setCopied(true)
+      // Let the confirmation land before the menu disappears.
+      window.setTimeout(onClose, 700)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'could not copy')
+    }
+  }
+
   return (
     <div
       className="ctx-backdrop"
@@ -181,14 +198,8 @@ export function FeedContextMenu({
             Open website ↗
           </button>
         )}
-        <button
-          className="ctx-item"
-          onClick={() => {
-            window.open(feed.url, '_blank', 'noopener')
-            onClose()
-          }}
-        >
-          Open feed url ↗
+        <button className="ctx-item" onClick={doCopyFeedUrl} disabled={copied}>
+          {copied ? 'Copied ✓' : 'Copy feed url'}
         </button>
         {error && <div className="error ctx-error">{error}</div>}
         {busy && <div className="muted ctx-busy">Working…</div>}
