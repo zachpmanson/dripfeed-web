@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { NewsFolder, NewsFeed, NewsItem } from '../api/types'
-import { unreadCount, starredCount } from '../selectors'
+import { starredCount } from '../selectors'
 import { FeedContextMenu } from './FeedContextMenu'
 import { FeedIcon } from './FeedIcon'
 import type { Settings } from '../settings'
@@ -30,9 +30,14 @@ interface Props {
 const COLLAPSE_KEY = 'dripfeed.folders.collapsed'
 
 export function Sidebar({ feeds, folders, items, view, onSelect, settings, showFavicons, onMetaChanged, revealFeed }: Props) {
-  const totalUnread = unreadCount(items)
+  // Unread badges come from the SERVER's per-feed unreadCount, not from
+  // counting the local mirror: the mirror only holds the newest window per
+  // feed, so counting it undercounts (a feed with 300 unread but 20 stored
+  // read items showed 0). Own read/star toggles move the stored count
+  // optimistically (actions.ts) and every poll re-reads it from /feeds.
   const totalStarred = starredCount(items)
   const feedEntries = [...feeds.values()].sort((a, b) => a.title.localeCompare(b.title))
+  const totalUnread = feedEntries.reduce((s, f) => s + f.unreadCount, 0)
 
   // Sorted by folder NAME, then ungrouped ("Feeds") always last.
   const sortedFolders = [...folders]
@@ -139,7 +144,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
         {sortedFolders.map((folder) => {
           const inFolder = feedEntries.filter((f) => f.folderId === folder.id)
           const isCollapsed = collapsed.has(folder.id)
-          const folderUnread = inFolder.reduce((s, f) => s + unreadCount(items, f.id), 0)
+          const folderUnread = inFolder.reduce((s, f) => s + f.unreadCount, 0)
           return (
             <div key={folder.id} className="folder">
               <div className="folder-head">
@@ -163,7 +168,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
               </div>
               {!isCollapsed &&
                 inFolder.map((f) => (
-                  <FeedRow key={f.id} feed={f} items={items} view={view} onSelect={onSelect} onCtx={onCtx} showFavicons={showFavicons} />
+                  <FeedRow key={f.id} feed={f} view={view} onSelect={onSelect} onCtx={onCtx} showFavicons={showFavicons} />
                 ))}
             </div>
           )
@@ -175,7 +180,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
               <span className="folder-name no-caret">Feeds</span>
             </div>
             {ungrouped.map((f) => (
-              <FeedRow key={f.id} feed={f} items={items} view={view} onSelect={onSelect} onCtx={onCtx} showFavicons={showFavicons} />
+              <FeedRow key={f.id} feed={f} view={view} onSelect={onSelect} onCtx={onCtx} showFavicons={showFavicons} />
             ))}
           </div>
         )}
@@ -187,7 +192,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
           settings={settings}
           x={ctx.x}
           y={ctx.y}
-          unread={unreadCount(items, ctx.feed.id)}
+          unread={ctx.feed.unreadCount}
           onClose={() => setCtx(null)}
           onChanged={onMetaChanged}
         />
@@ -198,20 +203,18 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
 
 function FeedRow({
   feed,
-  items,
   view,
   onSelect,
   onCtx,
   showFavicons,
 }: {
   feed: NewsFeed
-  items: NewsItem[]
   view: View
   onSelect: (v: View) => void
   onCtx: (e: React.MouseEvent, feed: NewsFeed) => void
   showFavicons: boolean
 }) {
-  const n = unreadCount(items, feed.id)
+  const n = feed.unreadCount
   return (
     <button
       data-feed-id={feed.id}

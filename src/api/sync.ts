@@ -1,4 +1,4 @@
-import { apiGet } from './client'
+import { apiGet, apiGetWithHeaders } from './client'
 import { fetchItems } from './news'
 import type { FeedsResponse, FoldersResponse, ItemsResponse, NewsFeed, NewsItem } from './types'
 import type { Settings } from '../settings'
@@ -35,15 +35,35 @@ export async function fetchUnreadScope(
  * clients — the cross-device sync gap — show up here as authoritative
  * rows. This is the reconcile primitive for the poll (see store.ts).
  */
+export interface UpdatedItems {
+  items: NewsItem[]
+  /** The server's own wall clock (UNIX seconds) from the response `Date`
+   *  header, or null when the header is missing/unparseable. Callers use it
+   *  as the next marker so the cursor never rides the browser's clock. */
+  serverTime: number | null
+}
+
+/**
+ * The server's own wall clock from a response `Date` header, in UNIX
+ * seconds, or null when the header is missing/unparseable. The reconcile
+ * marker is always derived from this — never from the browser's clock, which
+ * can run ahead of the server and skip changes the delta has not returned.
+ */
+export function serverTimeFrom(headers: Headers): number | null {
+  const date = headers.get('Date')
+  const seconds = date ? new Date(date).getTime() / 1000 : NaN
+  return Number.isFinite(seconds) ? Math.floor(seconds) : null
+}
+
 export async function fetchUpdatedItems(
   settings: Settings,
   sinceSeconds: number,
-): Promise<NewsItem[]> {
-  const resp = await apiGet<ItemsResponse>(
+): Promise<UpdatedItems> {
+  const { data, headers } = await apiGetWithHeaders<ItemsResponse>(
     settings,
     `/items/updated?type=3&lastModified=${sinceSeconds}`,
   )
-  return resp.items
+  return { items: data.items, serverTime: serverTimeFrom(headers) }
 }
 
 /**
@@ -109,14 +129,19 @@ export async function fetchFeedWindow(
   return r.items
 }
 
-/** Feed list + folder tree (small). */
+/** Feed list + folder tree (small), plus the server clock for the marker. */
 export async function fetchMeta(settings: Settings): Promise<{
   feeds: FeedsResponse['feeds']
   folders: FoldersResponse['folders']
+  serverTime: number | null
 }> {
   const [feeds, folders] = await Promise.all([
-    apiGet<FeedsResponse>(settings, '/feeds'),
+    apiGetWithHeaders<FeedsResponse>(settings, '/feeds'),
     apiGet<FoldersResponse>(settings, '/folders'),
   ])
-  return { feeds: feeds.feeds, folders: folders.folders }
+  return {
+    feeds: feeds.data.feeds,
+    folders: folders.folders,
+    serverTime: serverTimeFrom(feeds.headers),
+  }
 }

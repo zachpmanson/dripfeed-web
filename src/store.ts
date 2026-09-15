@@ -18,6 +18,25 @@ export const LOAD_STEP = 60
 const RECONCILE_MARKER = 'reconcile:lastModified'
 
 /**
+ * Seconds to back the reconcile marker off the server's response timestamp,
+ * so changes landing between the server running the delta query and stamping
+ * the response are re-fetched rather than skipped (see reconcileUpdated).
+ */
+const MARKER_SAFETY = 2
+
+/**
+ * The next reconcile marker: the server clock minus MARKER_SAFETY, falling
+ * back to the local clock only when the server sent no usable `Date` header.
+ * The browser's clock is never trusted while the server's is available — a
+ * browser running ahead of the server would stamp a marker past changes the
+ * delta had not yet returned, and the server's `>=` filter would never
+ * surface them again.
+ */
+function markerStamp(serverTime: number | null): number {
+  return serverTime === null ? Math.floor(Date.now() / 1000) : serverTime - MARKER_SAFETY
+}
+
+/**
  * IndexedDB-backed mirror. Initial hydration is per-feed: the newest
  * FEED_WINDOW (20) of every feed + the full starred set — the main page only
  * needs the newest few per feed. Deeper history is fetched on demand by
@@ -66,7 +85,7 @@ export async function fullSync(settings: Settings): Promise<void> {
   status = { stage: 'fetching', done: 0 }
   emit()
 
-  const { feeds, folders } = await fetchMeta(settings)
+  const { feeds, folders, serverTime } = await fetchMeta(settings)
   await dbPutFeeds(feeds)
   await dbPutFolders(folders)
 
@@ -82,8 +101,11 @@ export async function fullSync(settings: Settings): Promise<void> {
   await dbSetMeta('initialized', '1')
   // Seed the reconcile marker so the first poll's /items/updated delta only
   // carries changes made AFTER hydration — everything the mirror needs has
-  // just been pulled by fetchInitial.
-  await dbSetMeta(RECONCILE_MARKER, String(Math.floor(Date.now() / 1000)))
+  // just been pulled by fetchInitial. Seeded from the SERVER's clock (the
+  // /feeds Date header), not the browser's: a browser clock running behind
+  // the server would otherwise seed a marker the server has already passed,
+  // and changes in the gap would never be returned (the filter is `>=`).
+  await dbSetMeta(RECONCILE_MARKER, String(markerStamp(serverTime)))
   dbReady = true
   status = { stage: 'done', done: items.length }
   emit()
@@ -141,20 +163,26 @@ export async function incrementalSync(settings: Settings): Promise<void> {
  * another client lands in the delta; this pass overwrites the stale local
  * row with the server copy.
  *
- * The marker (seconds) advances to max(received lastModified, wall-clock
- * at request time) so truncation to whole seconds and client/server clock
- * skew can never skip an item: the server compares with >=, so a marker of
- * floor(now) still catches microtime values recorded in the same second.
+ * The marker advances on the SERVER's clock (the response `Date` header),
+ * never the browser's. A browser clock running ahead of the server would
+ * push a wall-clock marker past changes the delta had not returned yet, and
+ * the server's `>=` filter would then never surface them again — they'd stay
+ * unread here until a full re-sync. MARKER_SAFETY (2s) backs the stamp off
+ * to cover the window between the server running the query and stamping the
+ * response: items changed in there are re-fetched next tick (an idempotent
+ * overwrite) instead of being skipped. The marker still never moves
+ * backwards, and `Date` is absent only if the response was cached oddly —
+ * then we fall back to the local clock as before.
+ *
  * Returns how many changed items were applied.
  */
 export async function reconcileUpdated(settings: Settings): Promise<number> {
   const prev = Number((await dbGetMeta(RECONCILE_MARKER)) ?? 0)
-  const started = Math.floor(Date.now() / 1000)
-  const items = await fetchUpdatedItems(settings, prev)
+  const { items, serverTime } = await fetchUpdatedItems(settings, prev)
   if (items.length > 0) {
     await dbPutItems(items.map(normalizeItem))
   }
-  let marker = started
+  let marker = markerStamp(serverTime)
   for (const i of items) {
     if (i.lastModified && i.lastModified > marker) marker = i.lastModified
   }
@@ -333,6 +361,19 @@ export async function resetLocal(): Promise<void> {
 
 export function isDbReady(): boolean {
   return dbReady
+}
+
+/**
+ * Flag the local mirror as usable for background sync.
+ *
+ * Set at the end of fullSync AND when an already-populated DB is hydrated on
+ * a later page load. The poll is gated on this flag, and fullSync only ever
+ * runs against an empty DB — so leaving it to fullSync alone meant the 3-minute
+ * reconcile never fired in any session after the first, which is exactly why
+ * a read mark made on the phone stayed unread here until a manual reload.
+ */
+export function markDbReady(): void {
+  dbReady = true
 }
 
 export { FEED_WINDOW }

@@ -10,7 +10,7 @@ Live at [dripfeed.zachmanson.com](https://dripfeed.zachmanson.com).
 - **Unread-only browsing** — per-feed/folder native unread queries; all unread items arrive in one request.
 - **Full-article extraction** — a button in the reader header fetches the original URL via the News server's built-in scraper (`GET /apps/news/items/{id}/fulltext`) and swaps in the extracted body.
 - **Custom article CSS** — replace or extend the reader's default stylesheet from Settings (live preview, `url()`/`@import` stripped).
-- **Offline-ish local mirror** — newest-20-per-feed + full starred set in IndexedDB; 3-minute background poll; optimistic read/star toggles.
+- **Offline-ish local mirror** — newest-20-per-feed + full starred set in IndexedDB; optimistic read/star toggles; a 3-minute background poll (plus a wake on tab focus/visibility) that reconciles read/star state changed by other clients through the server's `/items/updated` delta.
 - **Themes** — independent UI and article light/dark/system modes; show/hide favicons.
 - **Click to read** — double click an item to mark it read (the default), or enable single click in Settings.
 
