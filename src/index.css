@@ -465,6 +465,7 @@ body {
   font-size: 0.75rem;
   line-height: 1.4;
   text-align: right;
+  white-space: nowrap;
 }
 
 .commit-ref a {
@@ -474,11 +475,6 @@ body {
 
 .commit-ref a:hover {
   text-decoration: underline;
-}
-
-.commit-time {
-  font-size: 0.68rem;
-  color: var(--muted);
 }
 
 .setting-row .danger-btn {
