@@ -395,6 +395,9 @@ export default function App() {
           articleTheme={articleTheme}
           articleCssMode={articleCssMode}
           articleCss={articleCss}
+          autoExtract={
+            selected ? (feedById(selected.feedId)?.fullTextEnabled ?? false) : false
+          }
           onFeedClick={(feedId) => {
             setView({ kind: 'feed', id: feedId })
             setSelectedId(null)

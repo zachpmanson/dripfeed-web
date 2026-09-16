@@ -117,6 +117,36 @@ export function moveFeed(
   return apiPost(settings, `/feeds/${feedId}/move`, { folderId: folderId ?? 0 })
 }
 
+/**
+ * Per-feed settings: PATCH /apps/news/feeds/{feedId} (root route, not under
+ * /api/v1-3 — the route the News web UI itself uses for feed settings).
+ *
+ * Only `fullTextEnabled` is exposed here for now; the same route also takes
+ * pinned / ordering / updateMode / preventUpdate / title / folderId, so
+ * further per-feed settings need no new plumbing. Any subset of fields left
+ * out is simply not touched by the server (null = leave alone).
+ *
+ * Same-origin only and no CORS: the route carries no @NoCSRFRequired, so it
+ * is reached exactly like /items/{id}/fulltext — relative fetch + the
+ * OCS-APIREQUEST header, which short-circuits Nextcloud's CSRF check
+ * (Request::passesCSRFCheck() returns true when that header is present).
+ * Responds 200 with an empty array; the caller re-reads the feed from /feeds.
+ */
+export function setFeedFullText(
+  settings: Settings,
+  feedId: number,
+  fullTextEnabled: boolean,
+): Promise<void> {
+  return apiFetchSameOrigin(settings, `/apps/news/feeds/${feedId}`, {
+    method: 'PATCH',
+    headers: {
+      'OCS-APIREQUEST': 'true',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ fullTextEnabled }),
+  }).then(() => undefined)
+}
+
 /** Rename a feed. POST /feeds/{feedId}/rename { feedTitle } */
 export function renameFeed(
   settings: Settings,

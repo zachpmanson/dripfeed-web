@@ -1,5 +1,5 @@
 import { dbPutItem, dbGetFeed, dbGetFeedItems, dbPutFeed } from './db'
-import { markRead, markUnread, setStar as setStarApi, markFeedRead, fetchFulltext } from './api/news'
+import { markRead, markUnread, setStar as setStarApi, markFeedRead, fetchFulltext, setFeedFullText as setFeedFullTextApi } from './api/news'
 import { notifyLocalChange, normalizeItem } from './store'
 import { isAuthError } from './api/client'
 import type { NewsItem } from './api/types'
@@ -88,6 +88,34 @@ export async function extractFulltext(settings: Settings, item: NewsItem): Promi
   }
   await dbPutItem(normalizeItem(extracted))
   notifyLocalChange()
+}
+
+/**
+ * Per-feed settings write. Optimistic on the local feed row (the sidebar
+ * re-render is instant), then the News server's own feed-settings route.
+ * On failure the row is restored so the toggle never lies about what the
+ * server holds — the caller surfaces the error.
+ *
+ * Reached same-origin only, so a feed whose baseUrl points at a DIFFERENT
+ * Nextcloud cannot be written (that install is not behind the /apps proxy).
+ * The error is deliberately left to bubble rather than being swallowed:
+ * a toggle that silently did nothing would be worse than a visible failure.
+ */
+export async function setFeedFullText(
+  settings: Settings,
+  feedId: number,
+  fullTextEnabled: boolean,
+): Promise<void> {
+  const prev = await dbGetFeed(feedId)
+  if (prev) await dbPutFeed({ ...prev, fullTextEnabled })
+  notifyLocalChange()
+  try {
+    await setFeedFullTextApi(settings, feedId, fullTextEnabled)
+  } catch (e) {
+    if (prev) await dbPutFeed(prev)
+    notifyLocalChange()
+    throw e
+  }
 }
 
 /**

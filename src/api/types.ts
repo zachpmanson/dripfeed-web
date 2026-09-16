@@ -38,6 +38,11 @@ export interface NewsFeed {
   ordering: number
   link: string | null
   pinned: boolean
+  /** Server-side full-text scraping for this feed. When true the News server
+   *  runs Readability on NEW/updated items at fetch time and stores the
+   *  extracted body, so items arrive already full. Read from /feeds and set
+   *  through the same-origin PATCH route (see api/news.ts). */
+  fullTextEnabled: boolean
   updateErrorCount: number
   lastUpdateError: string | null
 }
