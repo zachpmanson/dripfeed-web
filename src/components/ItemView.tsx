@@ -39,12 +39,27 @@ interface Props {
   articleTheme: ThemeSetting
   articleCssMode: ArticleCssMode
   articleCss: string
+  /** True when the selected item's feed defaults to the extracted article
+   *  (the feed's News `fullTextEnabled` flag). Drives the auto-extract below
+   *  and, when it flips on while an item is open, that item's extraction. */
+  autoExtract: boolean
   /** Called when the reader header's feed name is clicked — switch the
    *  item list to that feed. */
   onFeedClick: (feedId: number) => void
 }
 
-export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMode, articleCss, onFeedClick }: Props) {
+/**
+ * Items this session has already auto-extracted, keyed by item id, holding
+ * the in-flight promise. Module-level rather than component state for three
+ * reasons: the poll replaces the item OBJECT every few minutes, so effect
+ * state keyed on the object would re-scrape forever; re-selecting an item
+ * must not re-scrape it; and the stored promise single-flights the server
+ * scrape (~6s, capped server-side) when walking quickly down a feed instead
+ * of stacking one request per item.
+ */
+const autoExtracted = new Map<number, Promise<void>>()
+
+export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMode, articleCss, autoExtract, onFeedClick }: Props) {
   // Ref to the sandboxed article iframe so we can reach its document.
   const frameRef = useRef<HTMLIFrameElement | null>(null)
 
@@ -78,10 +93,54 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
   // Full-article extraction state: per selected item, reset on change.
   const [extracting, setExtracting] = useState(false)
   const [extractError, setExtractError] = useState<string | null>(null)
+  // Id of the item on screen, read by an in-flight run's finally/catch so a
+  // scrape that lands after the user moved on cannot paint its spinner or
+  // its error onto a different article.
+  const currentItemIdRef = useRef<number | null>(null)
   useEffect(() => {
+    currentItemIdRef.current = item?.id ?? null
     setExtracting(false)
     setExtractError(null)
   }, [item?.id])
+  // One counter for both extraction paths: a finishing scrape must not clear
+  // the spinner of a newer one (auto-extract while walking down a feed, or a
+  // manual click landing while an auto pass runs). Only the newest run owns
+  // the spinner's off state.
+  const extractSeq = useRef(0)
+  const runExtract = async (target: NewsItem) => {
+    const seq = ++extractSeq.current
+    setExtracting(true)
+    setExtractError(null)
+    try {
+      await actions.extractFulltext(target)
+    } catch (e) {
+      if (currentItemIdRef.current === target.id) {
+        setExtractError(e instanceof Error ? e.message : String(e))
+      }
+    } finally {
+      if (extractSeq.current === seq) setExtracting(false)
+    }
+  }
+
+  // Feed default: opening an item from a feed flagged for full text extracts
+  // it without a click. Deps are item.id (not the item object, which every
+  // poll rebuilds) and autoExtract, so flipping the flag on while an item
+  // from that feed is open extracts it too. A failure is reported in the
+  // header banner like a manual one, but is only ever attempted once per
+  // item per session — a feed that cannot be scraped must not retry in a loop.
+  //
+  // Note this can be a redundant scrape when the SERVER already scraped the
+  // item at fetch time (feed.fullTextEnabled makes it do so): the item body
+  // carries no marker saying where it came from. The cost is one server-side
+  // fetch of the article URL per item opened, and the body swap is invisible
+  // when the content is the same.
+  useEffect(() => {
+    if (!item || !autoExtract) return
+    const { id } = item
+    if (autoExtracted.has(id)) return
+    autoExtracted.set(id, runExtract(item))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.id, autoExtract])
   // Only used for the iframe element's own background while srcdoc loads;
   // the article colours themselves live in CSS inside the frame (below).
   const articleDark = effectiveTheme(articleTheme) === 'dark'
@@ -138,15 +197,7 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
 
   const handleExtract = async () => {
     if (extracting) return
-    setExtracting(true)
-    setExtractError(null)
-    try {
-      await actions.extractFulltext(item)
-    } catch (e) {
-      setExtractError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setExtracting(false)
-    }
+    await runExtract(item)
   }
 
   return (
@@ -174,7 +225,9 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
             title={
               extractError
                 ? `Extract full article — ${extractError}`
-                : 'Extract full article from the original URL'
+                : autoExtract
+                  ? 'Extract full article — this feed defaults to the extracted article'
+                  : 'Extract full article from the original URL'
             }
             disabled={extracting}
             onClick={() => void handleExtract()}

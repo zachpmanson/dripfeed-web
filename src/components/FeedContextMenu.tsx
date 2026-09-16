@@ -14,12 +14,13 @@ interface Props {
   unread: number
   onClose: () => void
   onChanged: () => void // refresh sidebar meta after delete/move
+  onOpenSettings: () => void // hand off to the per-feed settings modal
 }
 
 /**
- * Right-click menu on a feed row: mark all read, delete the feed, move it to
- * another folder (flyout submenu), or copy/open its URLs. All hit the News
- * API then refresh.
+ * Right-click menu on a feed row: mark all read, per-feed settings, delete
+ * the feed, move it to another folder (flyout submenu), or copy/open its
+ * URLs. All hit the News API then refresh.
  */
 export function FeedContextMenu({
   feed,
@@ -30,6 +31,7 @@ export function FeedContextMenu({
   unread,
   onClose,
   onChanged,
+  onOpenSettings,
 }: Props) {
   const [moveOpen, setMoveOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -183,6 +185,16 @@ export function FeedContextMenu({
         </div>
         <button className="ctx-item" onClick={doRename}>
           Rename
+        </button>
+        <button
+          className="ctx-item"
+          onClick={() => {
+            // The modal outlives this menu, so close first.
+            onClose()
+            onOpenSettings()
+          }}
+        >
+          Feed settings…
         </button>
         <button className="ctx-item danger" onClick={doDelete}>
           Delete

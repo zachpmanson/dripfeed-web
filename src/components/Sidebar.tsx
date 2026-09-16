@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { NewsFolder, NewsFeed, NewsItem } from '../api/types'
 import { starredCount } from '../selectors'
 import { FeedContextMenu } from './FeedContextMenu'
+import { FeedSettingsModal } from './FeedSettingsModal'
 import { FeedIcon } from './FeedIcon'
 import type { Settings } from '../settings'
 
@@ -55,6 +56,9 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
   })
 
   const [ctx, setCtx] = useState<{ feed: NewsFeed; x: number; y: number } | null>(null)
+  // Per-feed settings modal, held as an id (not the row object): the poll
+  // replaces feed objects, and the modal should follow the live row.
+  const [settingsFeedId, setSettingsFeedId] = useState<number | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   // Reveal a feed the reader's header jumped to: expand its folder if it's
@@ -194,6 +198,15 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
           y={ctx.y}
           unread={ctx.feed.unreadCount}
           onClose={() => setCtx(null)}
+          onChanged={onMetaChanged}
+          onOpenSettings={() => setSettingsFeedId(ctx.feed.id)}
+        />
+      )}
+      {settingsFeedId !== null && settings && feeds.get(settingsFeedId) && (
+        <FeedSettingsModal
+          feed={feeds.get(settingsFeedId)!}
+          settings={settings}
+          onClose={() => setSettingsFeedId(null)}
           onChanged={onMetaChanged}
         />
       )}
