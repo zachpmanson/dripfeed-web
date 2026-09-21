@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { NewsFeed } from '../api/types'
 import type { Settings } from '../settings'
 import { setFeedFullText } from '../actions'
@@ -22,6 +23,13 @@ interface Props {
  * The write is optimistic (actions.setFeedFullText writes the local feed row
  * first) and reverted on failure, so this only has to own its own in-flight
  * and error state.
+ *
+ * Portalled to <body>: it is opened from a sidebar feed row, so rendered in
+ * place it would sit inside the sidebar's <nav> — where `.sidebar button`
+ * (the feed-row rule) claims its close button and stretches the ✕ across the
+ * whole modal head. The other modals are already App-level; a portal keeps
+ * this one out of that subtree instead of adding another width patch to the
+ * row rule (the folder caret carries one of those already).
  */
 export function FeedSettingsModal({ feed, settings, onClose, onChanged }: Props) {
   // Seeded from the feed row, then owned locally: the row object is replaced
@@ -49,7 +57,7 @@ export function FeedSettingsModal({ feed, settings, onClose, onChanged }: Props)
     }
   }
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
@@ -81,6 +89,7 @@ export function FeedSettingsModal({ feed, settings, onClose, onChanged }: Props)
           {busy && <div className="muted hint">Working…</div>}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
