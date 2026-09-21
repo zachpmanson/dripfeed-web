@@ -96,6 +96,29 @@ export async function dbPutFeeds(feeds: NewsFeed[]): Promise<void> {
   await tx.done
 }
 
+/**
+ * Merge server-authoritative per-feed `fullTextEnabled` flags into the
+ * stored rows, touching no other field and creating no row.
+ *
+ * Needed because `dbPutFeeds` replaces whole rows from the v1-3 `/feeds`
+ * list, which does not carry `fullTextEnabled` (see api/news.ts), so it
+ * wipes the flag on every reconcile. This re-applies it from the route that
+ * does state it. An empty map is a no-op on purpose: a failed or empty read
+ * must leave the stored flags alone rather than clearing them.
+ */
+export async function dbMergeFeedFullText(flags: Map<number, boolean>): Promise<void> {
+  if (flags.size === 0) return
+  const db = await getDB()
+  const tx = db.transaction('feeds', 'readwrite')
+  const existing = await tx.store.getAll()
+  for (const f of existing) {
+    const next = flags.get(f.id)
+    if (next === undefined || next === f.fullTextEnabled) continue
+    await tx.store.put({ ...f, fullTextEnabled: next })
+  }
+  await tx.done
+}
+
 export async function dbPutFolders(folders: NewsFolder[]): Promise<void> {
   const db = await getDB()
   const tx = db.transaction('folders', 'readwrite')
