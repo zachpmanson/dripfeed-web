@@ -130,7 +130,8 @@ export function moveFeed(
  * is reached exactly like /items/{id}/fulltext — relative fetch + the
  * OCS-APIREQUEST header, which short-circuits Nextcloud's CSRF check
  * (Request::passesCSRFCheck() returns true when that header is present).
- * Responds 200 with an empty array; the caller re-reads the feed from /feeds.
+ * Responds 200 with an empty array, so the write itself returns nothing —
+ * the value has to be read back through fetchFeedFullText below.
  */
 export function setFeedFullText(
   settings: Settings,
@@ -145,6 +146,41 @@ export function setFeedFullText(
     },
     body: JSON.stringify({ fullTextEnabled }),
   }).then(() => undefined)
+}
+
+/**
+ * Authoritative per-feed `fullTextEnabled` read: GET the root News route
+ * `/apps/news/feeds` (the same route family the PATCH above writes, and the
+ * feed list the News web UI itself reads).
+ *
+ * It has to be this route: the v1-3 feed list the mirror syncs from
+ * (`/apps/news/api/v1-3/feeds`) does NOT carry the flag — its controller
+ * serialises feeds with `Feed::toAPI()`, which omits `fullTextEnabled` —
+ * while the root route serialises with `Feed::jsonSerialize()`, which
+ * includes it. So a row reconciled from v1-3 alone has no flag to show.
+ *
+ * Same-origin for the same reason as the PATCH (root routes carry no
+ * CORS/CSRF exemption; the OCS-APIREQUEST header satisfies the CSRF check).
+ * Returns id → flag for every feed the server states one for; a feed the
+ * server omits is absent from the map rather than guessed at.
+ */
+export async function fetchFeedFullText(settings: Settings): Promise<Map<number, boolean>> {
+  const res = await apiFetchSameOrigin(settings, '/apps/news/feeds', {
+    headers: {
+      'OCS-APIREQUEST': 'true',
+      Accept: 'application/json',
+    },
+  })
+  const data = (await res.json()) as {
+    feeds?: { id?: number; fullTextEnabled?: boolean }[]
+  }
+  const flags = new Map<number, boolean>()
+  for (const f of data.feeds ?? []) {
+    if (typeof f.id === 'number' && typeof f.fullTextEnabled === 'boolean') {
+      flags.set(f.id, f.fullTextEnabled)
+    }
+  }
+  return flags
 }
 
 /** Rename a feed. POST /feeds/{feedId}/rename { feedTitle } */

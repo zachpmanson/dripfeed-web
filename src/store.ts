@@ -1,6 +1,6 @@
-import { dbClear, dbGetCursor, dbGetFeedItems, dbGetAllFeeds, dbGetAllFolders, dbGetAllItems, dbGetMeta, dbPutFeeds, dbPutFolders, dbPutItems, dbSetCursor, dbSetMeta } from './db'
+import { dbClear, dbGetCursor, dbGetFeedItems, dbGetAllFeeds, dbGetAllFolders, dbGetAllItems, dbGetMeta, dbMergeFeedFullText, dbPutFeeds, dbPutFolders, dbPutItems, dbSetCursor, dbSetMeta } from './db'
 import { fetchFeedWindow, fetchInitial, fetchMeta, fetchUnreadScope, fetchUpdatedItems } from './api/sync'
-import { fetchItems } from './api/news'
+import { fetchFeedFullText, fetchItems } from './api/news'
 import { LIST_TYPES } from './api/types'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
 import { clearSettings } from './settings'
@@ -81,12 +81,36 @@ export async function isInitialized(): Promise<boolean> {
   return (await dbGetMeta('initialized')) === '1'
 }
 
+/**
+ * Re-apply the per-feed `fullTextEnabled` flags the meta sync cannot see.
+ *
+ * `dbPutFeeds` replaces whole rows from the v1-3 `/feeds` list, which does
+ * not carry that field — so without this the flag is wiped on every
+ * reconcile and, after a reload, is absent for every feed (see
+ * api/news.ts for why the root /feeds route is the one that has it).
+ *
+ * Best-effort by design: the meta sync is the load-bearing part, so a
+ * failure here only leaves the stored flags as they were. Same-origin only,
+ * so an install whose `baseUrl` points at a different Nextcloud keeps the
+ * previous behaviour instead of firing a request that cannot work (root
+ * routes carry no CORS exemption — the write path has the same limit).
+ */
+async function hydrateFeedFullText(settings: Settings): Promise<void> {
+  if (settings.baseUrl.trim() !== '') return
+  try {
+    await dbMergeFeedFullText(await fetchFeedFullText(settings))
+  } catch (e) {
+    console.warn('feed settings read failed', e)
+  }
+}
+
 export async function fullSync(settings: Settings): Promise<void> {
   status = { stage: 'fetching', done: 0 }
   emit()
 
   const { feeds, folders, serverTime } = await fetchMeta(settings)
   await dbPutFeeds(feeds)
+  await hydrateFeedFullText(settings)
   await dbPutFolders(folders)
 
   const { items, feedWindows } = await fetchInitial(settings, feeds, (done) => {
@@ -139,6 +163,7 @@ export async function ensureUnreadScope(
 export async function incrementalSync(settings: Settings): Promise<void> {
   const { feeds, folders } = await fetchMeta(settings)
   await dbPutFeeds(feeds)
+  await hydrateFeedFullText(settings)
   await dbPutFolders(folders)
 
   const resp = await fetchItems(settings, {
