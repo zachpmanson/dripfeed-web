@@ -290,6 +290,17 @@ export default function App() {
   const rarStats = sortMode === 'rarity' ? rarityStats(pool) : undefined
   const visibleItems = filterView(pool, view, sortMode, showMode, rarMult, feedOfFolder)
 
+  // Identity of the current VIEW, for the item list's render window: feed /
+  // folder / all / starred, the show mode and the sort mode — never the data.
+  // ItemList restarts its 50-row window when this changes and only then; a
+  // sync that appends or removes items leaves the window (and so the reader's
+  // scroll position) where it is. The window is applied inside ItemList, after
+  // this filtering + ordering, so it slices a fully filtered, fully sorted
+  // list.
+  const viewKey =
+    `${view.kind}:${view.kind === 'feed' || view.kind === 'folder' ? view.id : ''}` +
+    `:${showMode}:${sortMode}`
+
   const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
   const feedById = (feedId: number) => feeds.get(feedId)
   // Selection: prefer the id in the CURRENT view; if the item dropped out of
@@ -369,6 +380,7 @@ export default function App() {
         <div className="list-pane">
           <ItemList
             items={visibleItems}
+            windowKey={viewKey}
             selectedId={selected?.id ?? null}
             feedTitle={feedTitle}
             feedById={feedById}
