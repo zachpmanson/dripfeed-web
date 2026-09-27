@@ -41,9 +41,9 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
   const totalUnread = feedEntries.reduce((s, f) => s + f.unreadCount, 0)
 
   // Sorted by folder NAME, then ungrouped ("Feeds") always last.
-  const sortedFolders = [...folders]
-    .filter((f) => feedEntries.some((fe) => fe.folderId === f.id))
-    .sort((a, b) => a.name.localeCompare(b.name))
+  // Empty folders are kept: a newly created folder must show up immediately,
+  // before any feed is moved into it.
+  const sortedFolders = [...folders].sort((a, b) => a.name.localeCompare(b.name))
   const ungrouped = feedEntries.filter((f) => f.folderId === null)
 
   const [collapsed, setCollapsed] = useState<Set<number>>(() => {
