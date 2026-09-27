@@ -4,6 +4,7 @@ import type { NewsItem } from '../api/types'
 import type { useStore } from '../hooks'
 import { effectiveTheme, sanitizeArticleCss, type ThemeSetting } from '../theme'
 import { IconButton } from './IconButton'
+import { Spinner } from './Spinner'
 import type { ArticleCssMode } from '../theme'
 
 /**
@@ -233,7 +234,7 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
             onClick={() => void handleExtract()}
           >
             {extracting ? (
-              <span className="spinner" />
+              <Spinner />
             ) : (
               <svg
                 viewBox="0 0 16 16"

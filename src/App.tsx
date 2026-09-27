@@ -11,6 +11,7 @@ import { ItemView } from './components/ItemView'
 import { AddModal } from './components/AddModal'
 import { SettingsModal } from './components/SettingsModal'
 import { Seg } from './components/Seg'
+import { Spinner } from './components/Spinner'
 import { IconButton } from './components/IconButton'
 import {
   applyUiTheme,
@@ -220,7 +221,7 @@ export default function App() {
             </>
           ) : (
             <p className="muted spinner-row">
-              <span className="spinner" aria-hidden="true" />
+              <Spinner />
               connecting…
             </p>
           )}
@@ -341,7 +342,7 @@ export default function App() {
             title="Refresh now — re-sync newest items, feeds and folders"
             onClick={() => void store.actions.syncNow()}
           >
-            {store.syncing && <span className="spinner" aria-hidden="true" />}
+            {store.syncing && <Spinner />}
             {pool.length} local
           </button>
           <IconButton

@@ -198,18 +198,29 @@ body {
 
 /* One loading indicator everywhere: the circular arrow ↻, spinning.
    Full-article extraction, manual refresh, load-more/paging, and the
-   sync gate's connecting state all use this. */
+   sync gate's connecting state all use this — see components/Spinner.tsx.
+
+   A transform turns about the box centre, so the mark has to be drawn to that
+   centre: a character's ink is not centred in its em box (DejaVu Sans' ↻ ink
+   centre sits 0.097em above it), which makes a typeset ↻ orbit its axis rather
+   than turn on it. The path is drawn centred instead, so the turn is exact on
+   any font, browser and size.
+
+   One box, a 1em square, so the mark takes the size of the line it is in. */
 .spinner {
   display: inline-block;
-  font-size: 0.9rem;
+  width: 1em;
+  height: 1em;
   line-height: 1;
-  animation: spin 0.8s linear infinite;
   vertical-align: middle;
   flex: none;
+  animation: spin 0.8s linear infinite;
 }
 
-.spinner::before {
-  content: '↻';
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
 }
 
 /* Spinner + label on one baseline. */
