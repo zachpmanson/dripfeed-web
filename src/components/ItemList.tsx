@@ -3,6 +3,7 @@ import type { NewsItem, NewsFeed } from '../api/types'
 import type { RarityInfo } from '../rarity'
 import type { LoadMoreProgress } from '../store'
 import { FeedIcon } from './FeedIcon'
+import { Spinner } from './Spinner'
 import { titleFor } from '../utils'
 
 /**
@@ -306,7 +307,7 @@ function TrailingRow({
     <li ref={sentinelRef} className="load-more-row">
       {loadingMore || progress ? (
         <span className="muted spinner-row">
-          <span className="spinner" aria-hidden="true" />
+          <Spinner />
           {progress ?? 'Loading…'}
         </span>
       ) : (
