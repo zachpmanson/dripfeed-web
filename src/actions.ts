@@ -44,7 +44,7 @@ export async function setStar(settings: Settings, item: NewsItem, starred: boole
   await dbPutItem(next)
   notifyLocalChange()
   try {
-    await setStarApi(settings, item.id)
+    await setStarApi(settings, item.id, starred)
   } catch (e) {
     await dbPutItem(item)
     notifyLocalChange()

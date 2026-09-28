@@ -41,8 +41,8 @@ export function markUnread(settings: Settings, itemId: number): Promise<void> {
   return apiPost(settings, `/items/${itemId}/unread`)
 }
 
-export function setStar(settings: Settings, itemId: number): Promise<void> {
-  return apiPost(settings, `/items/${itemId}/star`)
+export function setStar(settings: Settings, itemId: number, starred: boolean): Promise<void> {
+  return apiPost(settings, `/items/${itemId}/${starred ? 'star' : 'unstar'}`)
 }
 
 /**
