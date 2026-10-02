@@ -211,12 +211,6 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
         </h2>
         <div className="reader-actions">
           <IconButton
-            title={item.unread ? 'Mark read' : 'Mark unread'}
-            onClick={() => actions.setRead(item, !item.unread)}
-          >
-            {item.unread ? '●' : '○'}
-          </IconButton>
-          <IconButton
             title={item.starred ? 'Unstar' : 'Star'}
             onClick={() => actions.setStar(item, !item.starred)}
           >
@@ -251,6 +245,12 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
                 <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
               </svg>
             )}
+          </IconButton>
+          <IconButton
+            title={item.unread ? 'Mark read' : 'Mark unread'}
+            onClick={() => actions.setRead(item, !item.unread)}
+          >
+            {item.unread ? '●' : '○'}
           </IconButton>
         </div>
       </div>
