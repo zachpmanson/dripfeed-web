@@ -288,7 +288,7 @@ export default function App() {
   // operate over the full pool (rarity's 20-item feed sample is stable
   // regardless of how much history load-more has pulled in).
   const rarMult = sortMode === 'rarity' ? rarityMultipliers(pool) : undefined
-  const rarStats = sortMode === 'rarity' ? rarityStats(pool) : undefined
+  const rarStats = rarityStats(pool)
   const visibleItems = filterView(pool, view, sortMode, showMode, rarMult, feedOfFolder)
 
   // Identity of the current VIEW, for the item list's render window: feed /
@@ -371,6 +371,7 @@ export default function App() {
           view={view}
           settings={settings}
           showFavicons={showFavicons}
+          rarityStats={rarStats}
           onMetaChanged={() => void store.actions.refreshMeta()}
           revealFeed={{ id: view.kind === 'feed' ? view.id : 0, nonce: revealNonce }}
           onSelect={(v) => {
