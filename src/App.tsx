@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { PlusIcon, Cog6ToothIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
 import { useStore } from './hooks'
 import { unreadScopeKey } from './store'
 import { loadSettings } from './settings'
@@ -342,7 +342,7 @@ export default function App() {
             title={`Refresh now — re-sync newest items, feeds and folders (${pool.length} local)`}
             onClick={() => void store.actions.syncNow()}
           >
-            {store.syncing ? <Spinner /> : <ArrowPathIcon className="btn-icon" />}
+            <Spinner />
           </IconButton>
           <IconButton
             className="add-btn"
