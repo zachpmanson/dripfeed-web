@@ -1,8 +1,12 @@
 import type { ThemeSetting, ArticleCssMode } from '../theme'
 import { GIT_SHA, REPO_URL, deployLabel } from '../version'
 import { Seg } from './Seg'
+import type { NewsFeed, NewsFolder } from '../api/types'
+import { downloadOpml } from '../opml'
 
 interface Props {
+  feeds: NewsFeed[]
+  folders: NewsFolder[]
   uiTheme: ThemeSetting
   articleTheme: ThemeSetting
   articleCssMode: ArticleCssMode
@@ -20,6 +24,8 @@ interface Props {
 }
 
 export function SettingsModal({
+  feeds,
+  folders,
   uiTheme,
   articleTheme,
   articleCssMode,
@@ -138,6 +144,11 @@ export function SettingsModal({
                 {deployLabel()}
               </a>
             </span>
+          </div>
+          <div className="setting-row">
+            <button onClick={() => downloadOpml(feeds, folders)}>
+              Export OPML
+            </button>
           </div>
           <div className="setting-row">
             <button className="danger-btn" onClick={onLogout}>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { PlusIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, Cog6ToothIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
 import { useStore } from './hooks'
 import { unreadScopeKey } from './store'
 import { loadSettings } from './settings'
@@ -337,14 +337,13 @@ export default function App() {
               { value: 'rarity', label: 'Rarity', title: 'Weighted rarity: rare feeds first' },
             ]}
           />
-          <button
-            className={`muted sync${store.syncing ? ' syncing' : ''}`}
-            title="Refresh now — re-sync newest items, feeds and folders"
+          <IconButton
+            className={`add-btn sync${store.syncing ? ' syncing' : ''}`}
+            title={`Refresh now — re-sync newest items, feeds and folders (${pool.length} local)`}
             onClick={() => void store.actions.syncNow()}
           >
-            {store.syncing && <Spinner />}
-            {pool.length} local
-          </button>
+            {store.syncing ? <Spinner /> : <ArrowPathIcon className="btn-icon" />}
+          </IconButton>
           <IconButton
             className="add-btn"
             title="Add feed or folder"
@@ -434,6 +433,8 @@ export default function App() {
       )}
       {showSettings && (
         <SettingsModal
+          feeds={[...store.feeds.values()]}
+          folders={store.folders}
           uiTheme={uiTheme}
           articleTheme={articleTheme}
           articleCssMode={articleCssMode}
