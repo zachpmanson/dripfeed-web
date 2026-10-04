@@ -83,6 +83,7 @@ export async function dbPutFeeds(feeds: NewsFeed[]): Promise<void> {
   const tx = db.transaction(['feeds', 'items'], 'readwrite')
   const ids = new Set(feeds.map((f) => f.id))
   const existing = await tx.objectStore('feeds').getAll()
+  const existingById = new Map(existing.map((f) => [f.id, f]))
   for (const f of existing) {
     if (ids.has(f.id)) continue
     await tx.objectStore('feeds').delete(f.id)
@@ -92,7 +93,20 @@ export async function dbPutFeeds(feeds: NewsFeed[]): Promise<void> {
       .getAllKeys(f.id)
     for (const k of itemKeys) await tx.objectStore('items').delete(k)
   }
-  for (const f of feeds) await tx.objectStore('feeds').put(f)
+  for (const f of feeds) {
+    // The v1-3 feed response omits fullTextEnabled. Preserve the value we
+    // already have instead of letting a metadata refresh clear the setting;
+    // hydrateFeedFullText will replace it when the authoritative route is
+    // reachable. This matters especially immediately after an optimistic
+    // settings write, before the next full-text hydration completes.
+    const previous = existingById.get(f.id)
+    const hasFullTextFlag = typeof (f as Partial<NewsFeed>).fullTextEnabled === 'boolean'
+    await tx.objectStore('feeds').put(
+      !hasFullTextFlag && previous
+        ? { ...f, fullTextEnabled: previous.fullTextEnabled }
+        : f,
+    )
+  }
   await tx.done
 }
 
