@@ -5,6 +5,7 @@ import { FeedContextMenu } from './FeedContextMenu'
 import { FeedSettingsModal } from './FeedSettingsModal'
 import { FeedIcon } from './FeedIcon'
 import type { Settings } from '../settings'
+import type { RarityInfo } from '../rarity'
 
 export type View =
   | { kind: 'all' } // ALL items, ignores the only-unread/all toggle
@@ -21,6 +22,7 @@ interface Props {
   onSelect: (v: View) => void
   settings: Settings
   showFavicons: boolean
+  rarityStats: Map<number, RarityInfo>
   onMetaChanged: () => void
   /** A feed to reveal in the sidebar: expand its folder (if any) and scroll
    *  it into view. `nonce` is bumped on each request so repeat clicks on the
@@ -30,7 +32,7 @@ interface Props {
 
 const COLLAPSE_KEY = 'dripfeed.folders.collapsed'
 
-export function Sidebar({ feeds, folders, items, view, onSelect, settings, showFavicons, onMetaChanged, revealFeed }: Props) {
+export function Sidebar({ feeds, folders, items, view, onSelect, settings, showFavicons, rarityStats, onMetaChanged, revealFeed }: Props) {
   // Unread badges come from the SERVER's per-feed unreadCount, not from
   // counting the local mirror: the mirror only holds the newest window per
   // feed, so counting it undercounts (a feed with 300 unread but 20 stored
@@ -172,7 +174,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
               </div>
               {!isCollapsed &&
                 inFolder.map((f) => (
-                  <FeedRow key={f.id} feed={f} view={view} onSelect={onSelect} onCtx={onCtx} showFavicons={showFavicons} />
+                  <FeedRow key={f.id} feed={f} view={view} onSelect={onSelect} onCtx={onCtx} showFavicons={showFavicons} rarityInfo={rarityStats.get(f.id)} />
                 ))}
             </div>
           )
@@ -184,7 +186,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
               <span className="folder-name no-caret">Feeds</span>
             </div>
             {ungrouped.map((f) => (
-              <FeedRow key={f.id} feed={f} view={view} onSelect={onSelect} onCtx={onCtx} showFavicons={showFavicons} />
+              <FeedRow key={f.id} feed={f} view={view} onSelect={onSelect} onCtx={onCtx} showFavicons={showFavicons} rarityInfo={rarityStats.get(f.id)} />
             ))}
           </div>
         )}
@@ -220,17 +222,23 @@ function FeedRow({
   onSelect,
   onCtx,
   showFavicons,
+  rarityInfo,
 }: {
   feed: NewsFeed
   view: View
   onSelect: (v: View) => void
   onCtx: (e: React.MouseEvent, feed: NewsFeed) => void
   showFavicons: boolean
+  rarityInfo?: RarityInfo
 }) {
   const n = feed.unreadCount
+  const tooltip = rarityInfo
+    ? `Average gap: ${rarityInfo.gap.toFixed(2)}h; multiplier: ${rarityInfo.mult.toPrecision(4)}`
+    : 'Average gap: unavailable (fewer than 2 dated items); multiplier: 1 (neutral fallback)'
   return (
     <button
       data-feed-id={feed.id}
+      title={tooltip}
       className={
         view.kind === 'feed' && view.id === feed.id ? 'active feed-row' : 'feed-row'
       }
