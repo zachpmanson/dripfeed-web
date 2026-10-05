@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { DocumentTextIcon, EnvelopeIcon, EnvelopeOpenIcon, StarIcon } from '@heroicons/react/24/outline'
+import { DocumentTextIcon, StarIcon } from '@heroicons/react/24/outline'
 import { StarIcon as SolidStarIcon } from '@heroicons/react/24/solid'
 import { enclosureHtml, titleFor } from '../utils'
 import { dimRepeatedChunks } from '../boilerplate'
@@ -244,7 +244,7 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
             title={item.unread ? 'Mark read' : 'Mark unread'}
             onClick={() => actions.setRead(item, !item.unread)}
           >
-            {item.unread ? <EnvelopeIcon className="btn-icon" aria-hidden="true" /> : <EnvelopeOpenIcon className="btn-icon" aria-hidden="true" />}
+            {item.unread ? '●' : '○'}
           </IconButton>
         </div>
       </div>
