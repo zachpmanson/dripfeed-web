@@ -78,8 +78,8 @@ body {
   background: transparent;
 }
 
-/* Header icon buttons (+, ⚙ now Heroicons). Give them a proper target
-   size instead of inheriting tiny base font. */
+/* Header icon buttons. Give them a proper target size instead of inheriting
+   tiny base font. */
 .header-right .add-btn {
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -179,6 +179,14 @@ body {
   font-size: 0.65rem;
   padding: 0.15rem 0.3rem;
   border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn .btn-icon {
+  width: 1em;
+  height: 1em;
 }
 
 .icon-btn:hover {
@@ -196,17 +204,9 @@ body {
   background: transparent;
 }
 
-/* One loading indicator everywhere: the circular arrow ↻, spinning.
-   Full-article extraction, manual refresh, load-more/paging, and the
-   sync gate's connecting state all use this — see components/Spinner.tsx.
-
-   A transform turns about the box centre, so the mark has to be drawn to that
-   centre: a character's ink is not centred in its em box (DejaVu Sans' ↻ ink
-   centre sits 0.097em above it), which makes a typeset ↻ orbit its axis rather
-   than turn on it. The path is drawn centred instead, so the turn is exact on
-   any font, browser and size.
-
-   One box, a 1em square, so the mark takes the size of the line it is in. */
+/* One Heroicons loading indicator everywhere. Full-article extraction,
+   manual refresh, load-more/paging, and the sync gate's connecting state all
+   use this — see components/Spinner.tsx. */
 .spinner {
   display: inline-block;
   width: 1em;
@@ -343,17 +343,15 @@ body {
 
 .caret {
   display: inline-block;
-  width: 0.55em;
-  height: 0.55em;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(45deg); /* points down */
+  width: 0.8rem;
+  height: 0.8rem;
+  transform: rotate(0deg); /* points down */
   transition: transform 0.15s ease;
   flex-shrink: 0;
 }
 
 .caret.collapsed {
-  transform: rotate(135deg); /* points left (collapsed content is below) */
+  transform: rotate(90deg); /* points left (collapsed content is below) */
 }
 
 .modal-backdrop,
@@ -605,7 +603,7 @@ body {
   color: var(--muted);
 }
 
-/* Transient confirmation state ("Copied ✓") — not a dead control, so keep
+/* Transient confirmation state ("Copied") — not a dead control, so keep
    the accent colour and drop the hover wash. */
 .ctx-item:disabled {
   cursor: default;
@@ -751,6 +749,12 @@ body {
 /* List rows: icon + feed + right-aligned date sit centred vertically. */
 .item-list .item-meta {
   align-items: center;
+}
+
+.list-star-icon {
+  width: 0.85em;
+  height: 0.85em;
+  flex: none;
 }
 
 /* reader pane: whole header (title + date + author) sits above this */
@@ -920,6 +924,13 @@ body {
   font-size: 1.05rem;
   line-height: 1;
   padding: 0.2rem 0.35rem;
+}
+
+.menu-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
 }
 
 .reader-title a {

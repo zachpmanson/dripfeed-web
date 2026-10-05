@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ChevronDownIcon } from '@heroicons/react/24/outline'
 import type { NewsFolder, NewsFeed, NewsItem } from '../api/types'
 import { starredCount } from '../selectors'
 import { FeedContextMenu } from './FeedContextMenu'
@@ -121,7 +122,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
             }}
             aria-label={allCollapsed ? 'expand all' : 'collapse all'}
           >
-            <span className={`caret${allCollapsed ? ' collapsed' : ''}`} />
+            <ChevronDownIcon className={`caret${allCollapsed ? ' collapsed' : ''}`} aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -168,7 +169,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
                     onClick={() => toggle(folder.id)}
                     aria-expanded={!isCollapsed}
                   >
-                    <span className={`caret${isCollapsed ? ' collapsed' : ''}`} />
+                    <ChevronDownIcon className={`caret${isCollapsed ? ' collapsed' : ''}`} aria-hidden="true" />
                   </button>
                 </span>
               </div>

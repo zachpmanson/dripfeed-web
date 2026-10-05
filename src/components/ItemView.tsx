@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { DocumentTextIcon, EnvelopeIcon, EnvelopeOpenIcon, StarIcon } from '@heroicons/react/24/outline'
+import { StarIcon as SolidStarIcon } from '@heroicons/react/24/solid'
 import { enclosureHtml, titleFor } from '../utils'
 import { dimRepeatedChunks } from '../boilerplate'
 import type { NewsItem } from '../api/types'
@@ -219,7 +221,7 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
             title={item.starred ? 'Unstar' : 'Star'}
             onClick={() => actions.setStar(item, !item.starred)}
           >
-            {item.starred ? '★' : '☆'}
+            {item.starred ? <SolidStarIcon className="btn-icon" aria-hidden="true" /> : <StarIcon className="btn-icon" aria-hidden="true" />}
           </IconButton>
           <IconButton
             title={
@@ -235,27 +237,14 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
             {extracting ? (
               <Spinner />
             ) : (
-              <svg
-                viewBox="0 0 16 16"
-                width="14"
-                height="14"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <rect x="3.5" y="2" width="9" height="12" rx="1" />
-                <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
-              </svg>
+              <DocumentTextIcon className="btn-icon" aria-hidden="true" />
             )}
           </IconButton>
           <IconButton
             title={item.unread ? 'Mark read' : 'Mark unread'}
             onClick={() => actions.setRead(item, !item.unread)}
           >
-            {item.unread ? '●' : '○'}
+            {item.unread ? <EnvelopeIcon className="btn-icon" aria-hidden="true" /> : <EnvelopeOpenIcon className="btn-icon" aria-hidden="true" />}
           </IconButton>
         </div>
       </div>
