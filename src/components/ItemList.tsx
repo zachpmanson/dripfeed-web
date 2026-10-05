@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { StarIcon } from '@heroicons/react/24/solid'
 import type { NewsItem, NewsFeed } from '../api/types'
 import type { RarityInfo } from '../rarity'
 import type { LoadMoreProgress } from '../store'
@@ -257,7 +258,11 @@ export function ItemList({
             ) : (
               <span className="date muted">{formatDate(item.pubDate)}</span>
             )}
-            {item.starred && <span aria-label="starred">★</span>}
+            {item.starred && (
+              <span aria-label="starred">
+                <StarIcon className="list-star-icon" aria-hidden="true" />
+              </span>
+            )}
           </div>
         </li>
       ))}

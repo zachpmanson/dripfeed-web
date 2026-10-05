@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ArrowTopRightOnSquareIcon, CheckIcon } from '@heroicons/react/24/outline'
 import type { NewsFeed, NewsFolder } from '../api/types'
 import type { Settings } from '../settings'
 import { deleteFeed, moveFeed, renameFeed } from '../api/news'
@@ -207,11 +208,11 @@ export function FeedContextMenu({
               onClose()
             }}
           >
-            Open website ↗
+            Open website <ArrowTopRightOnSquareIcon className="menu-icon" aria-hidden="true" />
           </button>
         )}
         <button className="ctx-item" onClick={doCopyFeedUrl} disabled={copied}>
-          {copied ? 'Copied ✓' : 'Copy feed url'}
+          {copied ? <>Copied <CheckIcon className="menu-icon" aria-hidden="true" /></> : 'Copy feed url'}
         </button>
         {error && <div className="error ctx-error">{error}</div>}
         {busy && <div className="muted ctx-busy">Working…</div>}

@@ -1,3 +1,4 @@
+import { ArrowTopRightOnSquareIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { ThemeSetting, ArticleCssMode } from '../theme'
 import { GIT_SHA, REPO_URL, deployLabel } from '../version'
 import { Seg } from './Seg'
@@ -52,7 +53,7 @@ export function SettingsModal({
         <div className="modal-head">
           <span className="muted">Settings</span>
           <button className="icon-btn" onClick={onClose} aria-label="close">
-            ✕
+            <XMarkIcon className="btn-icon" aria-hidden="true" />
           </button>
         </div>
         <div className="settings-form">
@@ -151,7 +152,7 @@ export function SettingsModal({
               target="_blank"
               rel="noreferrer"
             >
-              dripfeed-web ↗
+              dripfeed-web <ArrowTopRightOnSquareIcon className="menu-icon" aria-hidden="true" />
             </a>
             <span className="muted commit-ref">
               <a href={`${REPO_URL}/commit/${GIT_SHA}`} target="_blank" rel="noreferrer">

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { XMarkIcon } from '@heroicons/react/24/outline'
 import type { NewsFolder } from '../api/types'
 import type { Settings } from '../settings'
 import { createFeed, createFolder } from '../api/news'
@@ -59,7 +60,7 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
         <div className="modal-head">
           <span className="muted">Add</span>
           <button className="icon-btn" onClick={onClose} aria-label="close">
-            ✕
+            <XMarkIcon className="btn-icon" aria-hidden="true" />
           </button>
         </div>
         <div className="seg modal-tabs">

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { XMarkIcon } from '@heroicons/react/24/outline'
 import { createPortal } from 'react-dom'
 import type { NewsFeed } from '../api/types'
 import type { Settings } from '../settings'
@@ -26,7 +27,7 @@ interface Props {
  *
  * Portalled to <body>: it is opened from a sidebar feed row, so rendered in
  * place it would sit inside the sidebar's <nav> — where `.sidebar button`
- * (the feed-row rule) claims its close button and stretches the ✕ across the
+ * (the feed-row rule) claims its close button and stretches it across the
  * whole modal head. The other modals are already App-level; a portal keeps
  * this one out of that subtree instead of adding another width patch to the
  * row rule (the folder caret carries one of those already).
@@ -63,7 +64,7 @@ export function FeedSettingsModal({ feed, settings, onClose, onChanged }: Props)
         <div className="modal-head">
           <span className="muted">Feed settings — {feed.title}</span>
           <button className="icon-btn" onClick={onClose} aria-label="close">
-            ✕
+            <XMarkIcon className="btn-icon" aria-hidden="true" />
           </button>
         </div>
         <div className="settings-form">
