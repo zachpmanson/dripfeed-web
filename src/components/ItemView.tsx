@@ -196,7 +196,7 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
       .footnote-flash { outline: 2px solid var(--link); outline-offset: 2px; }
     </style>
     ${articleCssMode === 'custom' && articleCss ? `<style>${sanitizeArticleCss(articleCss)}</style>` : ''}
-    ${dimBoilerplate ? '<style>.dim-boilerplate { opacity: 0.25; }</style>' : ''}</head><body>${body}${enclosureHtml(item)}</body></html>`
+    ${dimBoilerplate ? '<style>.dim-boilerplate { opacity: 0.15; }</style>' : ''}</head><body>${body}${enclosureHtml(item)}</body></html>`
   }, [item, articleTheme, articleCssMode, articleCss, dimBoilerplate, recentBodies])
 
   if (!item) {
