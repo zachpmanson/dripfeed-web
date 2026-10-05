@@ -3,6 +3,7 @@ import { PlusIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
 import { useStore } from './hooks'
 import { unreadScopeKey } from './store'
 import { loadSettings } from './settings'
+import { loadDimBoilerplate, saveDimBoilerplate } from './boilerplate'
 import type { Settings } from './settings'
 import { SettingsForm } from './components/SettingsForm'
 import { Sidebar, type View } from './components/Sidebar'
@@ -117,6 +118,7 @@ export default function App() {
   const [articleCss, setArticleCssState] = useState<string>(loadArticleCss)
   const [showFavicons, setShowFaviconsState] = useState<boolean>(loadShowFavicons)
   const [singleClickRead, setSingleClickReadState] = useState<boolean>(loadSingleClickRead)
+  const [dimBoilerplate, setDimBoilerplateState] = useState<boolean>(loadDimBoilerplate)
 
   useEffect(() => {
     applyUiTheme(uiTheme)
@@ -151,6 +153,10 @@ export default function App() {
   const setSingleClickRead = (v: boolean) => {
     setSingleClickReadState(v)
     saveSingleClickRead(v)
+  }
+  const setDimBoilerplate = (v: boolean) => {
+    setDimBoilerplateState(v)
+    saveDimBoilerplate(v)
   }
 
   // On navigation to an individual feed: top the local window up to 20 and
@@ -313,6 +319,16 @@ export default function App() {
       (visibleItems.find((i) => i.id === selectedId) ?? pool.find((i) => i.id === selectedId))) ||
     visibleItems[0] ||
     null
+  const recentBodies = selected
+    ? (() => {
+        const recent = pool
+          .filter((i) => i.feedId === selected.feedId)
+          .sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
+          .slice(0, 5)
+        if (!recent.some((i) => i.id === selected.id)) recent.push(selected)
+        return recent.map((i) => i.body)
+      })()
+    : []
 
   return (
     <div className="app">
@@ -408,6 +424,8 @@ export default function App() {
           articleTheme={articleTheme}
           articleCssMode={articleCssMode}
           articleCss={articleCss}
+          dimBoilerplate={dimBoilerplate}
+          recentBodies={recentBodies}
           autoExtract={
             selected ? (feedById(selected.feedId)?.fullTextEnabled ?? false) : false
           }
@@ -441,12 +459,14 @@ export default function App() {
           articleCss={articleCss}
           showFavicons={showFavicons}
           singleClickRead={singleClickRead}
+          dimBoilerplate={dimBoilerplate}
           onUiTheme={setUiTheme}
           onArticleTheme={setArticleTheme}
           onArticleCssMode={setArticleCssMode}
           onArticleCss={setArticleCss}
           onShowFavicons={setShowFavicons}
           onSingleClickRead={setSingleClickRead}
+          onDimBoilerplate={setDimBoilerplate}
           onLogout={() => {
             void store.actions.reset()
             setSettings(null)

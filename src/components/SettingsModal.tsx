@@ -13,12 +13,14 @@ interface Props {
   articleCss: string
   showFavicons: boolean
   singleClickRead: boolean
+  dimBoilerplate: boolean
   onUiTheme: (v: ThemeSetting) => void
   onArticleTheme: (v: ThemeSetting) => void
   onArticleCssMode: (v: ArticleCssMode) => void
   onArticleCss: (v: string) => void
   onShowFavicons: (v: boolean) => void
   onSingleClickRead: (v: boolean) => void
+  onDimBoilerplate: (v: boolean) => void
   onLogout: () => void
   onClose: () => void
 }
@@ -32,12 +34,14 @@ export function SettingsModal({
   articleCss,
   showFavicons,
   singleClickRead,
+  dimBoilerplate,
   onUiTheme,
   onArticleTheme,
   onArticleCssMode,
   onArticleCss,
   onShowFavicons,
   onSingleClickRead,
+  onDimBoilerplate,
   onLogout,
   onClose,
 }: Props) {
@@ -128,6 +132,16 @@ export function SettingsModal({
                 onChange={(e) => onSingleClickRead(e.target.checked)}
               />
               Mark as read on single click
+            </label>
+          </div>
+          <div className="setting-row">
+            <label className="setting-label checkbox">
+              <input
+                type="checkbox"
+                checked={dimBoilerplate}
+                onChange={(e) => onDimBoilerplate(e.target.checked)}
+              />
+              Dim Boilerplate Text
             </label>
           </div>
           <div className="setting-row">

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { enclosureHtml, titleFor } from '../utils'
+import { dimRepeatedChunks } from '../boilerplate'
 import type { NewsItem } from '../api/types'
 import type { useStore } from '../hooks'
 import { effectiveTheme, sanitizeArticleCss, type ThemeSetting } from '../theme'
@@ -40,6 +41,8 @@ interface Props {
   articleTheme: ThemeSetting
   articleCssMode: ArticleCssMode
   articleCss: string
+  dimBoilerplate: boolean
+  recentBodies: string[]
   /** True when the selected item's feed defaults to the extracted article
    *  (the feed's News `fullTextEnabled` flag). Drives the auto-extract below
    *  and, when it flips on while an item is open, that item's extraction. */
@@ -60,7 +63,7 @@ interface Props {
  */
 const autoExtracted = new Map<number, Promise<void>>()
 
-export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMode, articleCss, autoExtract, onFeedClick }: Props) {
+export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMode, articleCss, dimBoilerplate, recentBodies, autoExtract, onFeedClick }: Props) {
   // Ref to the sandboxed article iframe so we can reach its document.
   const frameRef = useRef<HTMLIFrameElement | null>(null)
 
@@ -166,6 +169,7 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
     // scheme. Both levers are exactly what DevTools' scheme emulation and
     // the Force Color Scheme extension can reach — the frame no longer needs
     // the app to re-render to change palette.
+    const body = dimBoilerplate ? dimRepeatedChunks(item.body, recentBodies) : item.body
     const explicit = articleTheme !== 'system'
     const dataTheme = explicit
       ? articleTheme === 'dark'
@@ -189,8 +193,9 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
       a { color: var(--link); overflow-wrap: anywhere; word-break: break-word; }
       .footnote-flash { outline: 2px solid var(--link); outline-offset: 2px; }
     </style>
-    ${articleCssMode === 'custom' && articleCss ? `<style>${sanitizeArticleCss(articleCss)}</style>` : ''}</head><body>${item.body}${enclosureHtml(item)}</body></html>`
-  }, [item, articleTheme, articleCssMode, articleCss])
+    ${articleCssMode === 'custom' && articleCss ? `<style>${sanitizeArticleCss(articleCss)}</style>` : ''}
+    ${dimBoilerplate ? '<style>.dim-boilerplate { opacity: 0.5; }</style>' : ''}</head><body>${body}${enclosureHtml(item)}</body></html>`
+  }, [item, articleTheme, articleCssMode, articleCss, dimBoilerplate, recentBodies])
 
   if (!item) {
     return <div className="reader empty muted">Select an item</div>
