@@ -1,9 +1,9 @@
 import { ArrowTopRightOnSquareIcon, XMarkIcon } from '@heroicons/react/24/outline'
-import type { ThemeSetting, ArticleCssMode } from '../theme'
-import { GIT_SHA, REPO_URL, deployLabel } from '../version'
-import { Seg } from './Seg'
-import type { NewsFeed, NewsFolder } from '../api/types'
-import { downloadOpml } from '../opml'
+import type { ThemeSetting, ArticleCssMode } from '../../theme'
+import { GIT_SHA, REPO_URL, deployLabel } from '../../version'
+import { Seg } from '../ui/Seg'
+import type { NewsFeed, NewsFolder } from '../../api/types'
+import { downloadOpml } from '../../opml'
 
 interface Props {
   feeds: NewsFeed[]

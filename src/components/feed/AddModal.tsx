@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
-import type { NewsFolder } from '../api/types'
-import type { Settings } from '../settings'
-import { createFeed, createFolder } from '../api/news'
+import type { NewsFolder } from '../../api/types'
+import type { Settings } from '../../settings'
+import { createFeed, createFolder } from '../../api/news'
 
 interface Props {
   folders: NewsFolder[]

@@ -10,7 +10,7 @@ import { isAuthError } from './api/client'
 import { dbGetCursor } from './db'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
 import type { Settings } from './settings'
-import type { View } from './components/Sidebar'
+import type { View } from './views'
 
 /** Background reconcile interval for the local mirror. */
 const POLL_MS = 3 * 60_000

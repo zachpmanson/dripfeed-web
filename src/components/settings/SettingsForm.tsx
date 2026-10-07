@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { saveSettings } from '../settings'
-import type { Settings } from '../settings'
+import { saveSettings } from '../../settings'
+import type { Settings } from '../../settings'
 
 interface Props {
   initial: Settings | null

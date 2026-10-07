@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { NewsFeed } from '../api/types'
+import type { NewsFeed } from '../../api/types'
 
 interface Props {
   feed: NewsFeed

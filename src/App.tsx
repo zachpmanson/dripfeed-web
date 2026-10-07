@@ -1,102 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
-import { PlusIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
+import useUrlState from './hooks/useUrlState'
+import useListPreferences from './hooks/useListPreferences'
+import useThemePreferences from './hooks/useThemePreferences'
 import { useStore } from './hooks'
 import { unreadScopeKey } from './store'
 import { loadSettings } from './settings'
-import { loadDimBoilerplate, saveDimBoilerplate } from './boilerplate'
 import type { Settings } from './settings'
-import { SettingsForm } from './components/SettingsForm'
-import { Sidebar, type View } from './components/Sidebar'
-import { ItemList } from './components/ItemList'
-import { ItemView } from './components/ItemView'
-import { AddModal } from './components/AddModal'
-import { SettingsModal } from './components/SettingsModal'
-import { Seg } from './components/Seg'
-import { Spinner } from './components/Spinner'
-import { IconButton } from './components/IconButton'
-import {
-  applyUiTheme,
-  articleThemeKey,
-  loadArticleCss,
-  loadArticleCssMode,
-  loadShowFavicons,
-  loadSingleClickRead,
-  loadThemeSetting,
-  sanitizeArticleCss,
-  saveArticleCss,
-  saveArticleCssMode,
-  saveShowFavicons,
-  saveSingleClickRead,
-  saveThemeSetting,
-  uiThemeKey,
-  type ArticleCssMode,
-  type ThemeSetting,
-} from './theme'
-import { rarityMultipliers, rarityStats, sortByRarity } from './rarity'
+import { SettingsForm } from './components/settings/SettingsForm'
+import { Sidebar } from './components/feed/Sidebar'
+import { ItemList } from './components/items/ItemList'
+import { ItemView } from './components/reader/ItemView'
+import { AddModal } from './components/feed/AddModal'
+import { SettingsModal } from './components/settings/SettingsModal'
+import AppHeader from './components/app/AppHeader'
+import SyncGate from './components/app/SyncGate'
+import { rarityMultipliers, rarityStats } from './rarity'
+import { filterView } from './selectors'
 import type { NewsItem } from './api/types'
-
-type SortMode = 'newest' | 'rarity'
-
-/** Header visibility dropdown: what the item list shows. 'priority' shows
- *  every item but floats unread ones above read (a view option, not a
- *  sort — it rides on top of whichever sort mode is selected). */
-type ShowMode = 'all' | 'unread' | 'priority'
-
-const SORT_KEY = 'dripfeed.sort'
-const SHOW_MODE_KEY = 'dripfeed.showMode'
-const LEGACY_SHOW_ALL_KEY = 'dripfeed.showAll'
 
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(loadSettings)
-  const [view, setView] = useState<View>(() => viewFromUrl())
-  const [selectedId, setSelectedId] = useState<number | null>(() => itemIdFromUrl())
+  const { view, setView, selectedId, setSelectedId } = useUrlState()
   // Bumped when the reader header's feed name is clicked, so the sidebar
   // knows to reveal (expand folder + scroll) that feed in sync.
   const [revealNonce, setRevealNonce] = useState(0)
-  const [sortMode, setSortMode] = useState<SortMode>(() => {
-    const stored = localStorage.getItem(SORT_KEY)
-    return stored === 'newest' ? 'newest' : 'rarity'
-  })
-  const [showMode, setShowMode] = useState<ShowMode>(() => {
-    const stored = localStorage.getItem(SHOW_MODE_KEY)
-    if (stored === 'all' || stored === 'unread' || stored === 'priority') return stored
-    // One-time migration from the old boolean toggle ('1' = all, else the
-    // default). Default is 'priority' (Unread first).
-    return localStorage.getItem(LEGACY_SHOW_ALL_KEY) === '1' ? 'all' : 'priority'
-  })
-
-  // Keep the URL in sync with the open view + selected item: each
-  // navigation pushes exactly one history entry (so Back/Forward walk the
-  // view/item trail) and a refresh restores the same place. Values are
-  // written together so a feed/folder switch (view + item reset in one
-  // event) can't leave a ghost item behind. pushState never fires
-  // popstate, so there's no round-trip to suppress — writeUrl's
-  // unchanged-URL check is what skips re-pushing after a pop restores
-  // state.
-  useEffect(() => {
-    writeUrl(view, selectedId)
-  }, [view, selectedId])
-
-  // Back/forward: the URL changed — read view + item back out of the query
-  // string. The effect above then sees the URL already matching and skips
-  // pushing, so no duplicate history entries.
-  useEffect(() => {
-    const onPop = () => {
-      setView(viewFromUrl())
-      setSelectedId(itemIdFromUrl())
-    }
-    window.addEventListener('popstate', onPop)
-    return () => window.removeEventListener('popstate', onPop)
-  }, [])
-
-  useEffect(() => {
-    localStorage.setItem(SORT_KEY, sortMode)
-  }, [sortMode])
-
-  useEffect(() => {
-    localStorage.setItem(SHOW_MODE_KEY, showMode)
-  }, [showMode])
-
+  const { sortMode, setSortMode, showMode, setShowMode } = useListPreferences()
   const store = useStore(settings, view, showMode === 'unread')
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -107,57 +35,22 @@ export default function App() {
     if (store.authFailed) setSettings(null)
   }, [store.authFailed])
 
-  // --- theme (UI + article, each light/dark/system) ---
-  const [uiTheme, setUiThemeState] = useState<ThemeSetting>(() =>
-    loadThemeSetting(uiThemeKey),
-  )
-  const [articleTheme, setArticleThemeState] = useState<ThemeSetting>(() =>
-    loadThemeSetting(articleThemeKey),
-  )
-  const [articleCssMode, setArticleCssModeState] = useState<ArticleCssMode>(loadArticleCssMode)
-  const [articleCss, setArticleCssState] = useState<string>(loadArticleCss)
-  const [showFavicons, setShowFaviconsState] = useState<boolean>(loadShowFavicons)
-  const [singleClickRead, setSingleClickReadState] = useState<boolean>(loadSingleClickRead)
-  const [dimBoilerplate, setDimBoilerplateState] = useState<boolean>(loadDimBoilerplate)
-
-  useEffect(() => {
-    applyUiTheme(uiTheme)
-    if (uiTheme !== 'system') return
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = () => applyUiTheme(uiTheme)
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [uiTheme])
-
-  const setUiTheme = (v: ThemeSetting) => {
-    setUiThemeState(v)
-    saveThemeSetting(uiThemeKey, v)
-  }
-  const setArticleTheme = (v: ThemeSetting) => {
-    setArticleThemeState(v)
-    saveThemeSetting(articleThemeKey, v)
-  }
-  const setArticleCssMode = (v: ArticleCssMode) => {
-    setArticleCssModeState(v)
-    saveArticleCssMode(v)
-  }
-  const setArticleCss = (v: string) => {
-    // Sanitize on save so hostile url()/@import never reaches the frame.
-    setArticleCssState(v)
-    saveArticleCss(sanitizeArticleCss(v))
-  }
-  const setShowFavicons = (v: boolean) => {
-    setShowFaviconsState(v)
-    saveShowFavicons(v)
-  }
-  const setSingleClickRead = (v: boolean) => {
-    setSingleClickReadState(v)
-    saveSingleClickRead(v)
-  }
-  const setDimBoilerplate = (v: boolean) => {
-    setDimBoilerplateState(v)
-    saveDimBoilerplate(v)
-  }
+  const {
+    uiTheme,
+    articleTheme,
+    articleCssMode,
+    articleCss,
+    showFavicons,
+    singleClickRead,
+    dimBoilerplate,
+    setUiTheme,
+    setArticleTheme,
+    setArticleCssMode,
+    setArticleCss,
+    setShowFavicons,
+    setSingleClickRead,
+    setDimBoilerplate,
+  } = useThemePreferences()
 
   // On navigation to an individual feed: top the local window up to 20 and
   // probe the server for whether more history exists (so a short/partial
@@ -211,39 +104,17 @@ export default function App() {
 
   if (!store.ready) {
     return (
-      <div className="sync-gate">
-        <div className="sync-card">
-          <h1>Dripfeed</h1>
-          {store.error ? (
-            <div className="error">{store.error}</div>
-          ) : store.progress ? (
-            <>
-              <p className="muted">
-                syncing… {store.progress.done.toLocaleString()} items
-              </p>
-              <div className="progress indeterminate">
-                <div className="progress-bar" />
-              </div>
-            </>
-          ) : (
-            <p className="muted spinner-row">
-              <Spinner />
-              connecting…
-            </p>
-          )}
-          <button
-            onClick={() => {
-              void store.actions.reset()
-              // reset() wipes stored creds + local mirror; drop App state too,
-              // or the sync-gate stays stuck (ready=false, settings unchanged
-              // → the sync effect never re-runs) until a hard refresh.
-              setSettings(null)
-            }}
-          >
-            start over
-          </button>
-        </div>
-      </div>
+      <SyncGate
+        error={store.error}
+        progress={store.progress}
+        onStartOver={() => {
+          void store.actions.reset()
+          // reset() wipes stored creds + local mirror; drop App state too,
+          // or the sync-gate stays stuck (ready=false, settings unchanged
+          // → the sync effect never re-runs) until a hard refresh.
+          setSettings(null)
+        }}
+      />
     )
   }
 
@@ -332,50 +203,17 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>Dripfeed</h1>
-        <div className="header-right">
-          <select
-            className="header-select"
-            title="Items shown: all, unread only, or all items with unread floated to the top"
-            value={showMode}
-            onChange={(e) => setShowMode(e.target.value as ShowMode)}
-          >
-            <option value="all">All items</option>
-            <option value="unread">Unread only</option>
-            <option value="priority">Unread first</option>
-          </select>
-          <Seg<SortMode>
-            value={sortMode}
-            onChange={setSortMode}
-            options={[
-              { value: 'newest', label: 'Newest' },
-              { value: 'rarity', label: 'Rarity', title: 'Weighted rarity: rare feeds first' },
-            ]}
-          />
-          <IconButton
-            className={`add-btn sync${store.syncing ? ' syncing' : ''}`}
-            title={`Refresh now — re-sync newest items, feeds and folders (${pool.length} local)`}
-            onClick={() => void store.actions.syncNow()}
-          >
-            <Spinner />
-          </IconButton>
-          <IconButton
-            className="add-btn"
-            title="Add feed or folder"
-            onClick={() => setShowAdd(true)}
-          >
-            <PlusIcon className="btn-icon" />
-          </IconButton>
-          <IconButton
-            className="add-btn"
-            title="Settings"
-            onClick={() => setShowSettings(true)}
-          >
-            <Cog6ToothIcon className="btn-icon" />
-          </IconButton>
-        </div>
-      </header>
+      <AppHeader
+        showMode={showMode}
+        onShowModeChange={setShowMode}
+        sortMode={sortMode}
+        onSortModeChange={setSortMode}
+        syncing={store.syncing}
+        poolLength={pool.length}
+        onSync={() => void store.actions.syncNow()}
+        onAdd={() => setShowAdd(true)}
+        onSettings={() => setShowSettings(true)}
+      />
 
       <main className="app-body">
         {store.error && <div className="error">{store.error}</div>}
@@ -476,112 +314,4 @@ export default function App() {
       )}
     </div>
   )
-}
-
-function filterView(
-  items: NewsItem[],
-  view: View,
-  sortMode: SortMode,
-  showMode: ShowMode,
-  rarMult?: Map<number, number>,
-  feedOfFolder?: Map<number, Set<number>>,
-): NewsItem[] {
-  let list: NewsItem[]
-  switch (view.kind) {
-    case 'all':
-      // Dedicated view: ALL items, independent of the global toggle.
-      list = items
-      break
-    case 'allUnread':
-      // Dedicated view: unread only, independent of the global toggle.
-      list = items.filter((i) => i.unread)
-      break
-    case 'starred':
-      // Independent of the global toggle: always show all starred.
-      list = items.filter((i) => i.starred)
-      break
-    case 'feed':
-    case 'folder':
-      // Feeds/folders RESPECT the global only-unread/all toggle, since
-      // these are the views you read through day-to-day.
-      list = items.filter((i) => {
-        if (view.kind === 'feed') return i.feedId === view.id
-        // folder: item belongs if its feed is a member of the folder
-        const memberFeeds = feedOfFolder?.get(view.id)
-        return !!memberFeeds && memberFeeds.has(i.feedId)
-      })
-      if (showMode === 'unread') list = list.filter((i) => i.unread)
-      break
-  }
-  // Rarity applies to feed/folder views too — the user picks the mode and
-  // expects a rare article to float up wherever they read. (Chronological
-  // sort stays available via the Newest toggle.) Multipliers cover the full
-  // pool, not the visible slice.
-  let ranked: NewsItem[]
-  if (sortMode === 'rarity') {
-    ranked = sortByRarity(list, rarMult)
-  } else {
-    ranked = list.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
-  }
-  // Unread priority queue — a VIEW option, not a sort: it rides on top of
-  // the chosen order so every unread item ranks above every read item, with
-  // each group keeping the sort's internal order.
-  if (showMode === 'priority') {
-    const unread: NewsItem[] = []
-    const read: NewsItem[] = []
-    for (const i of ranked) (i.unread ? unread : read).push(i)
-    return unread.concat(read)
-  }
-  return ranked
-}
-
-// --- URL state (restore open view + selected item on reload) ---
-// Scheme: ?view=all|allUnread|starred|feed|folder&id=<n>&item=<n>
-
-function viewFromUrl(): View {
-  const p = new URLSearchParams(window.location.search)
-  const kind = p.get('view')
-  const id = p.get('id')
-  switch (kind) {
-    case 'allUnread':
-      return { kind: 'allUnread' }
-    case 'starred':
-      return { kind: 'starred' }
-    case 'feed':
-      return id ? { kind: 'feed', id: Number(id) } : { kind: 'all' }
-    case 'folder':
-      return id ? { kind: 'folder', id: Number(id) } : { kind: 'all' }
-    default:
-      return { kind: 'all' }
-  }
-}
-
-function itemIdFromUrl(): number | null {
-  const p = new URLSearchParams(window.location.search)
-  const v = p.get('item')
-  const n = v ? Number(v) : NaN
-  return Number.isFinite(n) && n > 0 ? n : null
-}
-
-/** pushState (not replace) so each navigation is a history entry and
- *  back/forward walk the view/item trail. View + item are written together
- *  so a view switch clears a stale item in the SAME entry. Skips pushing
- *  when the URL is unchanged — which also prevents re-pushing after a pop
- *  restores state. */
-function writeUrl(view: View, selectedId: number | null): void {
-  const p = new URLSearchParams(window.location.search)
-  if (view.kind === 'feed' || view.kind === 'folder') {
-    p.set('view', view.kind)
-    p.set('id', String(view.id))
-  } else {
-    p.set('view', view.kind)
-    p.delete('id')
-  }
-  if (selectedId === null) p.delete('item')
-  else p.set('item', String(selectedId))
-  const qs = p.toString()
-  const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname
-  if (window.location.search !== `?${qs}`) {
-    window.history.pushState(null, '', url)
-  }
 }

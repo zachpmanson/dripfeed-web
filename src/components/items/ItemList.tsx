@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { StarIcon } from '@heroicons/react/24/solid'
-import type { NewsItem, NewsFeed } from '../api/types'
-import type { RarityInfo } from '../rarity'
-import type { LoadMoreProgress } from '../store'
-import { FeedIcon } from './FeedIcon'
-import { Spinner } from './Spinner'
-import { titleFor } from '../utils'
+import type { NewsItem, NewsFeed } from '../../api/types'
+import type { RarityInfo } from '../../rarity'
+import type { LoadMoreProgress } from '../../store'
+import ItemRow from './ItemRow'
+import TrailingRow from './TrailingRow'
 
 /**
  * How many rows the list renders up front, and how many more each batch adds
@@ -226,45 +224,19 @@ export function ItemList({
   return (
     <ul className="item-list">
       {rendered.map((item) => (
-        <li
+        <ItemRow
           key={item.id}
-          className={`item ${item.id === selectedId ? 'selected' : ''} ${item.unread ? '' : 'read'}`}
-          onClick={() => {
-            onSelect(item.id)
-            // Single-click read mode: the click also marks the item read,
-            // but only flips unread → read (selecting an already-read item
-            // must not mark it unread again).
-            if (singleClickRead && item.unread) onRead(item)
-          }}
-          onDoubleClick={() => {
-            // Default behaviour: double click tops the read/unread flag.
-            if (!singleClickRead) onRead(item)
-          }}
-        >
-          <div className="item-title">
-            {item.unread && <span className="unread-dot" />}
-            {titleFor(item)}
-          </div>
-          <div className="item-meta">
-            {showFavicons && feedById && (() => {
-              const f = feedById(item.feedId)
-              return f ? <FeedIcon feed={f} size={12} /> : null
-            })()}
-            <span className="feed">{feedTitle(item.feedId)}</span>
-            {rarityMode ? (
-              <span className="rarity-line" title="real age / effective age / rarity">
-                {rarityLine(item, rarityStats)}
-              </span>
-            ) : (
-              <span className="date muted">{formatDate(item.pubDate)}</span>
-            )}
-            {item.starred && (
-              <span aria-label="starred">
-                <StarIcon className="list-star-icon" aria-hidden="true" />
-              </span>
-            )}
-          </div>
-        </li>
+          item={item}
+          selected={item.id === selectedId}
+          feedTitle={feedTitle}
+          feedById={feedById}
+          showFavicons={showFavicons}
+          singleClickRead={singleClickRead}
+          onSelect={onSelect}
+          onRead={onRead}
+          rarityMode={rarityMode}
+          rarityStats={rarityStats}
+        />
       ))}
       {items.length === 0 && <li className="empty muted">{emptyText}</li>}
       <TrailingRow
@@ -277,90 +249,4 @@ export function ItemList({
       />
     </ul>
   )
-}
-
-function TrailingRow({
-  sentinelRef,
-  onLoadMore,
-  moreServer,
-  drained,
-  loadingMore,
-  paging,
-}: {
-  sentinelRef: React.RefObject<HTMLLIElement>
-  onLoadMore?: () => void
-  moreServer: boolean
-  drained: boolean
-  loadingMore: boolean
-  paging?: LoadMoreProgress | null
-}) {
-  const more = moreServer && !drained
-  const progress =
-    paging && paging.totalFeeds > 0
-      ? `Paging feed ${Math.min(paging.feedsPaged, paging.totalFeeds)} of ${paging.totalFeeds}…`
-      : null
-
-  if (!more) {
-    // Drained: the current view has no more server history to pull.
-    return (
-      <li ref={sentinelRef} className="load-more-row done">
-        <span className="muted">— up to date —</span>
-      </li>
-    )
-  }
-  return (
-    <li ref={sentinelRef} className="load-more-row">
-      {loadingMore || progress ? (
-        <span className="muted spinner-row">
-          <Spinner />
-          {progress ?? 'Loading…'}
-        </span>
-      ) : (
-        <button className="load-more" onClick={onLoadMore}>
-          Load more
-        </button>
-      )}
-    </li>
-  )
-}
-
-function formatDate(ms: number | null): string {
-  if (!ms) return ''
-  return new Date(ms).toLocaleString(undefined, {
-    day: 'numeric',
-    month: 'short',
-  })
-}
-
-function rarityLine(item: NewsItem, stats?: Map<number, RarityInfo>, now = Date.now()): string {
-  if (!item.pubDate) return '—'
-  const info = stats?.get(item.feedId)
-  // Unknown feed (no gap sample): dripfeed falls back to a 720h default gap.
-  const gap = info?.gap ?? 720
-  const mult =
-    info?.mult ??
-    Math.min(100, Math.max(0.0001, Math.pow(72 / Math.max(0.1, gap), 2.5)))
-  const rarity = info?.rarity ?? gap / (gap + 72)
-  const ageH = Math.max(0, (now - item.pubDate) / 3_600_000)
-  return `${formatAge(ageH)} / ${formatAge(ageH * mult)} / ${Math.floor(rarity * 100)}%`
-}
-
-/**
- * Time-ago style age with short labels, no "ago": walks the same unit
- * ladder as the reference time-ago function (seconds → minutes → hours →
- * days → months → years), dropping the largest whole unit. E.g. 45m, 2h,
- * 3d, 5mo, 1y. Input is in hours.
- */
-function formatAge(hours: number): string {
-  const s = Math.floor(hours * 3600)
-  if (s < 60) return `${Math.max(1, s)}s`
-  const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h`
-  const d = Math.floor(h / 24)
-  if (d < 30) return `${d}d`
-  const mo = Math.floor(d / 30)
-  if (mo < 12) return `${mo}mo`
-  return `${Math.floor(mo / 12)}y`
 }

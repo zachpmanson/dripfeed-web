@@ -1,19 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDownIcon } from '@heroicons/react/24/outline'
-import type { NewsFolder, NewsFeed, NewsItem } from '../api/types'
-import { starredCount } from '../selectors'
+import type { NewsFolder, NewsFeed, NewsItem } from '../../api/types'
+import { starredCount } from '../../selectors'
 import { FeedContextMenu } from './FeedContextMenu'
 import { FeedSettingsModal } from './FeedSettingsModal'
-import { FeedIcon } from './FeedIcon'
-import type { Settings } from '../settings'
-import type { RarityInfo } from '../rarity'
-
-export type View =
-  | { kind: 'all' } // ALL items, ignores the only-unread/all toggle
-  | { kind: 'allUnread' } // unread only, ignores the only-unread/all toggle
-  | { kind: 'starred' }
-  | { kind: 'folder'; id: number } // combined feed of a folder's feeds
-  | { kind: 'feed'; id: number }
+import FeedRow from './FeedRow'
+import FolderSection from './FolderSection'
+import type { Settings } from '../../settings'
+import type { RarityInfo } from '../../rarity'
+import type { View } from '../../views'
+export type { View } from '../../views'
 
 interface Props {
   feeds: Map<number, NewsFeed>
@@ -148,38 +144,22 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
           <span className="count">{totalStarred}</span>
         </button>
 
-        {sortedFolders.map((folder) => {
-          const inFolder = feedEntries.filter((f) => f.folderId === folder.id)
-          const isCollapsed = collapsed.has(folder.id)
-          const folderUnread = inFolder.reduce((s, f) => s + f.unreadCount, 0)
-          return (
-            <div key={folder.id} className="folder">
-              <div className="folder-head">
-                <button
-                  className={`folder-name-btn${view.kind === 'folder' && view.id === folder.id ? ' active' : ''}`}
-                  onClick={() => onSelect({ kind: 'folder', id: folder.id })}
-                >
-                  <span className="folder-name">{folder.name}</span>
-                  {folderUnread > 0 && <span className="count">{folderUnread}</span>}
-                </button>
-                <span className="folder-right">
-                  <button
-                    className="icon-btn caret-btn"
-                    title={isCollapsed ? 'Expand folder' : 'Collapse folder'}
-                    onClick={() => toggle(folder.id)}
-                    aria-expanded={!isCollapsed}
-                  >
-                    <ChevronDownIcon className={`caret${isCollapsed ? ' collapsed' : ''}`} aria-hidden="true" />
-                  </button>
-                </span>
-              </div>
-              {!isCollapsed &&
-                inFolder.map((f) => (
-                  <FeedRow key={f.id} feed={f} view={view} onSelect={onSelect} onCtx={onCtx} showFavicons={showFavicons} rarityInfo={rarityStats.get(f.id)} />
-                ))}
-            </div>
-          )
-        })}
+        {sortedFolders.map((folder) => (
+          <FolderSection
+            key={folder.id}
+            folder={folder}
+            feeds={feedEntries.filter((feed) => feed.folderId === folder.id)}
+            selected={view.kind === 'folder' && view.id === folder.id}
+            selectedFeedId={view.kind === 'feed' ? view.id : null}
+            collapsed={collapsed.has(folder.id)}
+            onSelectFolder={() => onSelect({ kind: 'folder', id: folder.id })}
+            onSelectFeed={(id) => onSelect({ kind: 'feed', id })}
+            onToggle={toggle}
+            onCtx={onCtx}
+            showFavicons={showFavicons}
+            rarityStats={rarityStats}
+          />
+        ))}
 
         {ungrouped.length > 0 && (
           <div className="folder">
@@ -187,7 +167,15 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
               <span className="folder-name no-caret">Feeds</span>
             </div>
             {ungrouped.map((f) => (
-              <FeedRow key={f.id} feed={f} view={view} onSelect={onSelect} onCtx={onCtx} showFavicons={showFavicons} rarityInfo={rarityStats.get(f.id)} />
+              <FeedRow
+                key={f.id}
+                feed={f}
+                active={view.kind === 'feed' && view.id === f.id}
+                onSelect={() => onSelect({ kind: 'feed', id: f.id })}
+                onCtx={onCtx}
+                showFavicons={showFavicons}
+                rarityInfo={rarityStats.get(f.id)}
+              />
             ))}
           </div>
         )}
@@ -214,43 +202,5 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
         />
       )}
     </nav>
-  )
-}
-
-function FeedRow({
-  feed,
-  view,
-  onSelect,
-  onCtx,
-  showFavicons,
-  rarityInfo,
-}: {
-  feed: NewsFeed
-  view: View
-  onSelect: (v: View) => void
-  onCtx: (e: React.MouseEvent, feed: NewsFeed) => void
-  showFavicons: boolean
-  rarityInfo?: RarityInfo
-}) {
-  const n = feed.unreadCount
-  const tooltip = rarityInfo
-    ? `Average gap: ${rarityInfo.gap.toFixed(2)}h; multiplier: ${rarityInfo.mult.toPrecision(4)}`
-    : 'Average gap: unavailable (fewer than 2 dated items); multiplier: 1 (neutral fallback)'
-  return (
-    <button
-      data-feed-id={feed.id}
-      title={tooltip}
-      className={
-        view.kind === 'feed' && view.id === feed.id ? 'active feed-row' : 'feed-row'
-      }
-      onClick={() => onSelect({ kind: 'feed', id: feed.id })}
-      onContextMenu={(e) => onCtx(e, feed)}
-    >
-      <span className="feed-left">
-        {showFavicons && <FeedIcon feed={feed} size={14} />}
-        <span className="feed-name">{feed.title}</span>
-      </span>
-      {n > 0 && <span className="count">{n}</span>}
-    </button>
   )
 }

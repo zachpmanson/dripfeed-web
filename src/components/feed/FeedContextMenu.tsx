@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowTopRightOnSquareIcon, CheckIcon } from '@heroicons/react/24/outline'
-import type { NewsFeed, NewsFolder } from '../api/types'
-import type { Settings } from '../settings'
-import { deleteFeed, moveFeed, renameFeed } from '../api/news'
-import { markFeedAllRead } from '../actions'
-import { copyText } from '../utils'
+import type { NewsFeed, NewsFolder } from '../../api/types'
+import type { Settings } from '../../settings'
+import { deleteFeed, moveFeed, renameFeed } from '../../api/news'
+import { markFeedAllRead } from '../../actions'
+import { copyText } from '../../utils'
 
 interface Props {
   feed: NewsFeed

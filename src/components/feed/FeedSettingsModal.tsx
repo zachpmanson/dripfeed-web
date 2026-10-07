@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { createPortal } from 'react-dom'
-import type { NewsFeed } from '../api/types'
-import type { Settings } from '../settings'
-import { setFeedFullText } from '../actions'
+import type { NewsFeed } from '../../api/types'
+import type { Settings } from '../../settings'
+import { setFeedFullText } from '../../actions'
 
 interface Props {
   feed: NewsFeed
