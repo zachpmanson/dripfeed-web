@@ -53,10 +53,7 @@ export function feedGaps(items: Iterable<NewsItem>): Map<number, number> {
   return gaps
 }
 
-export function rarityMultipliers(
-  items: Iterable<NewsItem>,
-  _now = Date.now(),
-): Map<number, number> {
+export function rarityMultipliers(items: Iterable<NewsItem>): Map<number, number> {
   const mult = new Map<number, number>()
   for (const [feedId, avgGap] of feedGaps(items)) {
     const raw = Math.pow(72 / Math.max(0.1, avgGap), 2.5)

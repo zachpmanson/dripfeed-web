@@ -1,8 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  fullSync, incrementalSync, isInitialized, isDbReady, markDbReady, loadAllItems,
-  loadFeeds, loadFolders, loadMoreInto, ensureFeedWindow, ensureUnreadScope,
-  unreadScopeKey, onStoreChange, getStatus, resetLocal,
+  fullSync,
+  incrementalSync,
+  isInitialized,
+  isDbReady,
+  markDbReady,
+  loadAllItems,
+  loadFeeds,
+  loadFolders,
+  loadMoreInto,
+  ensureFeedWindow,
+  ensureUnreadScope,
+  unreadScopeKey,
+  onStoreChange,
+  getStatus,
+  resetLocal,
   type LoadMoreProgress,
 } from './store'
 import { setRead, setStar, extractFulltext, isAuthFailure } from './actions'
@@ -59,11 +71,7 @@ export interface AppData {
  * run, instant reads from the DB, growing server pool + render window via
  * loadMore, background poll.
  */
-export function useStore(
-  settings: Settings | null,
-  view: View,
-  unreadOnly: boolean,
-): AppData {
+export function useStore(settings: Settings | null, view: View, unreadOnly: boolean): AppData {
   const [ready, setReady] = useState(false)
   const [pool, setPool] = useState<NewsItem[]>([])
   const [feeds, setFeeds] = useState<Map<number, NewsFeed>>(new Map())
@@ -207,7 +215,7 @@ export function useStore(
       document.removeEventListener('visibilitychange', onWake)
       off()
     }
-  }, [settings, refreshPool])
+  }, [settings, refreshPool, resetToSettings])
 
   // Run (or reuse) the native unread probe for one feed/folder scope.
   // Success marks the scope drained — the query returned EVERY unread item,
@@ -215,37 +223,40 @@ export function useStore(
   // and surfaces as a retry: the trailing row turns back into a "Load more"
   // button whose click re-runs this. Returns the unread count the server
   // reported (0 = the scope genuinely has none — still valid to drain).
-  const probeUnread = useCallback(async (type: 0 | 1, id: number): Promise<number> => {
-    const s = settingsRef.current
-    if (!s) return 0
-    const key = unreadScopeKey(type, id)
-    const existing = unreadProbesRef.current.get(key)
-    if (existing) return existing
-    const run = (async () => {
-      probeOwnerRef.current = key
-      setUnreadProbing(true)
-      try {
-        const n = await ensureUnreadScope(s, type, id)
-        setUnreadDrained((prev) => new Set(prev).add(key))
-        return n
-      } catch (e) {
-        // Not drained: the row turns back into a "Load more" button whose
-        // click calls this again. A transient failure must not hide the
-        // unread items nor wedge the button.
-        console.warn('unread probe failed', e)
-        return 0
-      } finally {
-        unreadProbesRef.current.delete(key)
-        if (probeOwnerRef.current === key) {
-          setUnreadProbing(false)
-          probeOwnerRef.current = null
+  const probeUnread = useCallback(
+    async (type: 0 | 1, id: number): Promise<number> => {
+      const s = settingsRef.current
+      if (!s) return 0
+      const key = unreadScopeKey(type, id)
+      const existing = unreadProbesRef.current.get(key)
+      if (existing) return existing
+      const run = (async () => {
+        probeOwnerRef.current = key
+        setUnreadProbing(true)
+        try {
+          const n = await ensureUnreadScope(s, type, id)
+          setUnreadDrained((prev) => new Set(prev).add(key))
+          return n
+        } catch (e) {
+          // Not drained: the row turns back into a "Load more" button whose
+          // click calls this again. A transient failure must not hide the
+          // unread items nor wedge the button.
+          console.warn('unread probe failed', e)
+          return 0
+        } finally {
+          unreadProbesRef.current.delete(key)
+          if (probeOwnerRef.current === key) {
+            setUnreadProbing(false)
+            probeOwnerRef.current = null
+          }
+          await refreshPool()
         }
-        await refreshPool()
-      }
-    })()
-    unreadProbesRef.current.set(key, run)
-    return run
-  }, [refreshPool])
+      })()
+      unreadProbesRef.current.set(key, run)
+      return run
+    },
+    [refreshPool],
+  )
 
   const loadMore = useCallback(async () => {
     const s = settingsRef.current
@@ -279,16 +290,19 @@ export function useStore(
       setLoadingMore(false)
       setPaging(null)
     }
-  }, [loadingMore, refreshPool, feeds, unreadDrained])
+  }, [loadingMore, refreshPool, feeds, probeUnread])
 
   // Bounce to login when a user-triggered action (mark read/star/extract)
   // hits a stale credential: 401 or a bruteforce 429. Keeps the store in sync
   // with the resetToSettings path so the UI lands on the login form.
-  const failAuth = useCallback(async (e: unknown) => {
-    if (!isAuthFailure(e)) return false
-    await resetToSettings()
-    return true
-  }, [resetToSettings])
+  const failAuth = useCallback(
+    async (e: unknown) => {
+      if (!isAuthFailure(e)) return false
+      await resetToSettings()
+      return true
+    },
+    [resetToSettings],
+  )
 
   const actions = useCallback(
     () => ({
@@ -369,7 +383,7 @@ export function useStore(
         setError(null)
       },
     }),
-    [refreshPool],
+    [refreshPool, failAuth, probeUnread, resetToSettings],
   )
 
   // Snapshot the actions object once. Its closures only depend on the

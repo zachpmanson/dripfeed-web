@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" vite.config.ts",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" vite.config.ts eslint.config.js package.json README.md index.html",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" vite.config.ts eslint.config.js package.json README.md index.html"
   },
   "dependencies": {
     "@heroicons/react": "2.2.0",
@@ -17,10 +20,17 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.9",
     "typescript": "^5.7.2",
+    "typescript-eslint": "^8.71.1",
     "vite": "^6.0.3"
   }
 }

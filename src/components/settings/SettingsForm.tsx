@@ -17,8 +17,8 @@ export function SettingsForm({ initial, onSave, notice }: Props) {
     <div className="settings">
       <h1>Dripfeed</h1>
       <p className="muted">
-        Connect to your Nextcloud News instance. Use an <strong>app password</strong> (Profile
-        → Security), not your main account password.
+        Connect to your Nextcloud News instance. Use an <strong>app password</strong> (Profile →
+        Security), not your main account password.
       </p>
       {notice && <p className="error">{notice}</p>}
       <form
@@ -37,7 +37,9 @@ export function SettingsForm({ initial, onSave, notice }: Props) {
             onChange={(e) => setBaseUrl(e.target.value)}
             placeholder="Same origin (leave empty)"
           />
-          <span className="muted hint">Leave empty when served from dripfeed.zachmanson.com — the /apps proxy handles it.</span>
+          <span className="muted hint">
+            Leave empty when served from dripfeed.zachmanson.com — the /apps proxy handles it.
+          </span>
         </label>
         <label>
           Username
@@ -56,9 +58,9 @@ export function SettingsForm({ initial, onSave, notice }: Props) {
       </form>
       <div className="trust-panel">
         <p>
-          <strong>Should you trust me with your credentials? No!</strong>{' '}
-          I promise I'm not stealing them (they are just in localStorage) but you have no
-          reason to trust me. You are free to read the code and host it yourself.
+          <strong>Should you trust me with your credentials? No!</strong> I promise I'm not stealing
+          them (they are just in localStorage) but you have no reason to trust me. You are free to
+          read the code and host it yourself.
         </p>
       </div>
     </div>

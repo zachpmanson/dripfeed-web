@@ -81,9 +81,9 @@ export function FeedSettingsModal({ feed, settings, onClose, onChanged }: Props)
           </div>
           <div className="setting-row">
             <span className="muted hint">
-              Items from this feed open as the full article. Also asks the server to
-              scrape new items when the feed updates, so other clients show full text too.
-              Existing items are extracted as you open them.
+              Items from this feed open as the full article. Also asks the server to scrape new
+              items when the feed updates, so other clients show full text too. Existing items are
+              extracted as you open them.
             </span>
           </div>
           {error && <div className="error">{error}</div>}

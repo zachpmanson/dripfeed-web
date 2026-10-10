@@ -12,7 +12,12 @@ interface Props<T> {
 }
 
 /** A bordered segmented toggle (e.g. only-unread/all, newest/rarity). */
-export function Seg<T extends string | number | boolean>({ options, value, onChange, title }: Props<T>) {
+export function Seg<T extends string | number | boolean>({
+  options,
+  value,
+  onChange,
+  title,
+}: Props<T>) {
   return (
     <div className="seg" title={title}>
       {options.map((opt) => (

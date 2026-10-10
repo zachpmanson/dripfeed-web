@@ -84,8 +84,7 @@ export function ItemList({
   // the window; extend it to include that row — a selected item that isn't in
   // the DOM is a worse bug than a long list. Grow-only: moving the selection on
   // does not shrink the window back.
-  const selectedIndex =
-    selectedId === null ? -1 : items.findIndex((i) => i.id === selectedId)
+  const selectedIndex = selectedId === null ? -1 : items.findIndex((i) => i.id === selectedId)
   const limit = Math.max(renderCount, selectedIndex + 1)
   useEffect(() => {
     if (selectedIndex >= renderCount) {
@@ -184,7 +183,6 @@ export function ItemList({
       alive = false
       cancelAnimationFrame(raf1)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length, renderCount])
 
   useEffect(() => {
@@ -211,7 +209,6 @@ export function ItemList({
     )
     io.observe(el)
     return () => io.disconnect()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Order AND filtering are owned by the caller (App applies newest or rarity,

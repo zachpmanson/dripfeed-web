@@ -29,7 +29,18 @@ interface Props {
 
 const COLLAPSE_KEY = 'dripfeed.folders.collapsed'
 
-export function Sidebar({ feeds, folders, items, view, onSelect, settings, showFavicons, rarityStats, onMetaChanged, revealFeed }: Props) {
+export function Sidebar({
+  feeds,
+  folders,
+  items,
+  view,
+  onSelect,
+  settings,
+  showFavicons,
+  rarityStats,
+  onMetaChanged,
+  revealFeed,
+}: Props) {
   // Unread badges come from the SERVER's per-feed unreadCount, not from
   // counting the local mirror: the mirror only holds the newest window per
   // feed, so counting it undercounts (a feed with 300 unread but 20 stored
@@ -80,7 +91,10 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
     return () => {
       cancelled = true
     }
-  }, [revealFeed?.nonce])
+    // The nonce is the reveal event: unrelated feed/collapse updates should not
+    // restart its delayed scroll. Read those values from the render that handles it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealFeed?.id, revealFeed?.nonce])
 
   const fold = (ids: Iterable<number>, into: Set<number>) => {
     for (const id of ids) into.add(id)
@@ -96,8 +110,7 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
     else next.add(id)
     applyCollapsed(next)
   }
-  const allCollapsed =
-    sortedFolders.length > 0 && sortedFolders.every((f) => collapsed.has(f.id))
+  const allCollapsed = sortedFolders.length > 0 && sortedFolders.every((f) => collapsed.has(f.id))
 
   const onCtx = (e: React.MouseEvent, feed: NewsFeed) => {
     e.preventDefault()
@@ -114,11 +127,20 @@ export function Sidebar({ feeds, folders, items, view, onSelect, settings, showF
             title={allCollapsed ? 'Expand all folders' : 'Collapse all folders'}
             onClick={() => {
               if (allCollapsed) applyCollapsed(new Set())
-              else applyCollapsed(fold(sortedFolders.map((f) => f.id), new Set()))
+              else
+                applyCollapsed(
+                  fold(
+                    sortedFolders.map((f) => f.id),
+                    new Set(),
+                  ),
+                )
             }}
             aria-label={allCollapsed ? 'expand all' : 'collapse all'}
           >
-            <ChevronDownIcon className={`caret${allCollapsed ? ' collapsed' : ''}`} aria-hidden="true" />
+            <ChevronDownIcon
+              className={`caret${allCollapsed ? ' collapsed' : ''}`}
+              aria-hidden="true"
+            />
           </button>
         </div>
       </div>

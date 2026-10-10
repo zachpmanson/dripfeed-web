@@ -86,7 +86,10 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
               </label>
               <label className="field">
                 Folder
-                <select value={folderId ?? 0} onChange={(e) => setFolderId(Number(e.target.value) || null)}>
+                <select
+                  value={folderId ?? 0}
+                  onChange={(e) => setFolderId(Number(e.target.value) || null)}
+                >
                   <option value={0}>No folder</option>
                   {folders.map((f) => (
                     <option key={f.id} value={f.id}>

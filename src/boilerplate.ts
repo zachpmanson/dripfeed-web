@@ -25,7 +25,9 @@ export function dimRepeatedChunks(body: string, recentBodies: string[]): string 
   const documents = recentBodies.map((html) => parser.parseFromString(html, 'text/html'))
   const chunksByDocument = documents.map((doc) => {
     const chunks = new Set<string>()
-    for (const element of doc.querySelectorAll('p, li, blockquote, footer, aside, h1, h2, h3, h4, h5, h6')) {
+    for (const element of doc.querySelectorAll(
+      'p, li, blockquote, footer, aside, h1, h2, h3, h4, h5, h6',
+    )) {
       const text = normalizeChunk(element.textContent ?? '')
       if (text.length >= 20) chunks.add(text)
     }
@@ -40,7 +42,9 @@ export function dimRepeatedChunks(body: string, recentBodies: string[]): string 
   if (repeated.size === 0) return body
 
   const current = parser.parseFromString(body, 'text/html')
-  for (const element of current.querySelectorAll('p, li, blockquote, footer, aside, h1, h2, h3, h4, h5, h6')) {
+  for (const element of current.querySelectorAll(
+    'p, li, blockquote, footer, aside, h1, h2, h3, h4, h5, h6',
+  )) {
     if (repeated.has(normalizeChunk(element.textContent ?? ''))) {
       element.classList.add('dim-boilerplate')
     }

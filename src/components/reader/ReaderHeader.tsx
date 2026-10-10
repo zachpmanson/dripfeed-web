@@ -50,11 +50,7 @@ export default function ReaderHeader({
           disabled={extracting}
           onClick={onExtract}
         >
-          {extracting ? (
-            <Spinner />
-          ) : (
-            <DocumentTextIcon className="btn-icon" aria-hidden="true" />
-          )}
+          {extracting ? <Spinner /> : <DocumentTextIcon className="btn-icon" aria-hidden="true" />}
         </IconButton>
         <IconButton
           title={item.unread ? 'Mark read' : 'Mark unread'}

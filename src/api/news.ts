@@ -57,10 +57,7 @@ export function setStar(settings: Settings, itemId: number, starred: boolean): P
  * CSRF check accepts. Resolves with the updated item, or null when the
  * server couldn't extract anything (204 / empty body).
  */
-export async function fetchFulltext(
-  settings: Settings,
-  itemId: number,
-): Promise<NewsItem | null> {
+export async function fetchFulltext(settings: Settings, itemId: number): Promise<NewsItem | null> {
   const res = await apiFetchSameOrigin(settings, `/apps/news/items/${itemId}/fulltext`, {
     headers: {
       'OCS-APIREQUEST': 'true',
@@ -84,10 +81,7 @@ export function fetchFolders(settings: Settings): Promise<FoldersResponse> {
 }
 
 /** Create a folder. Body: { name }. Returns the folder (or array via wrappers). */
-export function createFolder(
-  settings: Settings,
-  name: string,
-): Promise<FoldersResponse> {
+export function createFolder(settings: Settings, name: string): Promise<FoldersResponse> {
   return apiPost<FoldersResponse>(settings, '/folders', { name })
 }
 
@@ -184,10 +178,6 @@ export async function fetchFeedFullText(settings: Settings): Promise<Map<number,
 }
 
 /** Rename a feed. POST /feeds/{feedId}/rename { feedTitle } */
-export function renameFeed(
-  settings: Settings,
-  feedId: number,
-  feedTitle: string,
-): Promise<void> {
+export function renameFeed(settings: Settings, feedId: number, feedTitle: string): Promise<void> {
   return apiPost(settings, `/feeds/${feedId}/rename`, { feedTitle })
 }

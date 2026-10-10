@@ -1,5 +1,12 @@
 import { dbPutItem, dbGetFeed, dbGetFeedItems, dbPutFeed } from './db'
-import { markRead, markUnread, setStar as setStarApi, markFeedRead, fetchFulltext, setFeedFullText as setFeedFullTextApi } from './api/news'
+import {
+  markRead,
+  markUnread,
+  setStar as setStarApi,
+  markFeedRead,
+  fetchFulltext,
+  setFeedFullText as setFeedFullTextApi,
+} from './api/news'
 import { notifyLocalChange, normalizeItem } from './store'
 import { isAuthError } from './api/client'
 import type { NewsItem } from './api/types'
@@ -79,7 +86,7 @@ export async function extractFulltext(settings: Settings, item: NewsItem): Promi
       e instanceof TypeError ||
       (e instanceof DOMException && (e.name === 'AbortError' || e.name === 'TimeoutError'))
     ) {
-      throw new Error('network error — could not reach the server')
+      throw new Error('network error — could not reach the server', { cause: e })
     }
     throw e
   }
@@ -127,9 +134,7 @@ export async function setFeedFullText(
 export async function markFeedAllRead(settings: Settings, feedId: number): Promise<void> {
   const local = await dbGetFeedItems(feedId)
   const prev = new Map(local.map((i) => [i.id, i]))
-  const next = local
-    .filter((i) => i.unread)
-    .map((i) => ({ ...i, unread: false }))
+  const next = local.filter((i) => i.unread).map((i) => ({ ...i, unread: false }))
   // Optimistic badge zeroing, alongside the item flags (see bumpFeedUnread).
   // Zeroed even when no locally-stored item flips: the local window is only
   // a slice of the feed, while the badge is the server's whole count — and

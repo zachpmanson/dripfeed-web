@@ -33,10 +33,7 @@ export default function FolderSection({
   return (
     <div className="folder">
       <div className="folder-head">
-        <button
-          className={`folder-name-btn${selected ? ' active' : ''}`}
-          onClick={onSelectFolder}
-        >
+        <button className={`folder-name-btn${selected ? ' active' : ''}`} onClick={onSelectFolder}>
           <span className="folder-name">{folder.name}</span>
           {unread > 0 && <span className="count">{unread}</span>}
         </button>
@@ -47,7 +44,10 @@ export default function FolderSection({
             onClick={() => onToggle(folder.id)}
             aria-expanded={!collapsed}
           >
-            <ChevronDownIcon className={`caret${collapsed ? ' collapsed' : ''}`} aria-hidden="true" />
+            <ChevronDownIcon
+              className={`caret${collapsed ? ' collapsed' : ''}`}
+              aria-hidden="true"
+            />
           </button>
         </span>
       </div>

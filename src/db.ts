@@ -62,12 +62,7 @@ function getDB(): Promise<IDBPDatabase<DripfeedDB>> {
 
 export async function dbClear(): Promise<void> {
   const db = await getDB()
-  await Promise.all([
-    db.clear('items'),
-    db.clear('feeds'),
-    db.clear('folders'),
-    db.clear('meta'),
-  ])
+  await Promise.all([db.clear('items'), db.clear('feeds'), db.clear('folders'), db.clear('meta')])
 }
 
 /**
@@ -87,10 +82,7 @@ export async function dbPutFeeds(feeds: NewsFeed[]): Promise<void> {
   for (const f of existing) {
     if (ids.has(f.id)) continue
     await tx.objectStore('feeds').delete(f.id)
-    const itemKeys = await tx
-      .objectStore('items')
-      .index('by-feed')
-      .getAllKeys(f.id)
+    const itemKeys = await tx.objectStore('items').index('by-feed').getAllKeys(f.id)
     for (const k of itemKeys) await tx.objectStore('items').delete(k)
   }
   for (const f of feeds) {
@@ -101,11 +93,9 @@ export async function dbPutFeeds(feeds: NewsFeed[]): Promise<void> {
     // settings write, before the next full-text hydration completes.
     const previous = existingById.get(f.id)
     const hasFullTextFlag = typeof (f as Partial<NewsFeed>).fullTextEnabled === 'boolean'
-    await tx.objectStore('feeds').put(
-      !hasFullTextFlag && previous
-        ? { ...f, fullTextEnabled: previous.fullTextEnabled }
-        : f,
-    )
+    await tx
+      .objectStore('feeds')
+      .put(!hasFullTextFlag && previous ? { ...f, fullTextEnabled: previous.fullTextEnabled } : f)
   }
   await tx.done
 }

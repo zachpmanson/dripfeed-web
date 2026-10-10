@@ -98,7 +98,9 @@ export function SettingsModal({
                 className="css-input"
                 value={articleCss}
                 onChange={(e) => onArticleCss(e.target.value)}
-                placeholder={"/* Custom CSS, applied on top of the default.\n   url() and @import are stripped. */"}
+                placeholder={
+                  '/* Custom CSS, applied on top of the default.\n   url() and @import are stripped. */'
+                }
                 spellCheck={false}
               />
               <div className="css-actions">
@@ -146,12 +148,7 @@ export function SettingsModal({
             </label>
           </div>
           <div className="setting-row">
-            <a
-              className="setting-label repo-link"
-              href={REPO_URL}
-              target="_blank"
-              rel="noreferrer"
-            >
+            <a className="setting-label repo-link" href={REPO_URL} target="_blank" rel="noreferrer">
               dripfeed-web <ArrowTopRightOnSquareIcon className="menu-icon" aria-hidden="true" />
             </a>
             <span className="muted commit-ref">
@@ -161,9 +158,7 @@ export function SettingsModal({
             </span>
           </div>
           <div className="setting-row">
-            <button onClick={() => downloadOpml(feeds, folders)}>
-              Export OPML
-            </button>
+            <button onClick={() => downloadOpml(feeds, folders)}>Export OPML</button>
           </div>
           <div className="setting-row">
             <button className="danger-btn" onClick={onLogout}>

@@ -26,11 +26,8 @@ function baseHrefFor(url: string | null | undefined): string {
     return ''
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return ''
-  const escaped = url
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-  return `<base href=\"${escaped}\">`
+  const escaped = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+  return `<base href="${escaped}">`
 }
 
 interface Props {
@@ -62,7 +59,18 @@ interface Props {
  */
 const autoExtracted = new Map<number, Promise<void>>()
 
-export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMode, articleCss, dimBoilerplate, recentBodies, autoExtract, onFeedClick }: Props) {
+export function ItemView({
+  item,
+  feedTitle,
+  actions,
+  articleTheme,
+  articleCssMode,
+  articleCss,
+  dimBoilerplate,
+  recentBodies,
+  autoExtract,
+  onFeedClick,
+}: Props) {
   // Ref to the sandboxed article iframe so we can reach its document.
   const frameRef = useRef<HTMLIFrameElement | null>(null)
 
@@ -224,10 +232,10 @@ export function ItemView({ item, feedTitle, actions, articleTheme, articleCssMod
         >
           {feedTitle(item.feedId)}
         </button>
-        {item.author && (
-          <span className="muted author">by {item.author}</span>
-        )}
-        <span className="muted date">{item.pubDate ? new Date(item.pubDate).toLocaleString() : ''}</span>
+        {item.author && <span className="muted author">by {item.author}</span>}
+        <span className="muted date">
+          {item.pubDate ? new Date(item.pubDate).toLocaleString() : ''}
+        </span>
       </div>
       {extractError && (
         <div className="extract-error" role="alert">

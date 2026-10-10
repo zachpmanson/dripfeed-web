@@ -45,10 +45,12 @@ export default function ItemRow({
         {titleFor(item)}
       </div>
       <div className="item-meta">
-        {showFavicons && feedById && (() => {
-          const feed = feedById(item.feedId)
-          return feed ? <FeedIcon feed={feed} size={12} /> : null
-        })()}
+        {showFavicons &&
+          feedById &&
+          (() => {
+            const feed = feedById(item.feedId)
+            return feed ? <FeedIcon feed={feed} size={12} /> : null
+          })()}
         <span className="feed">{feedTitle(item.feedId)}</span>
         {rarityMode ? (
           <span className="rarity-line" title="real age / effective age / rarity">
@@ -80,9 +82,7 @@ function rarityLine(item: NewsItem, stats?: Map<number, RarityInfo>, now = Date.
   const info = stats?.get(item.feedId)
   // Unknown feed (no gap sample): dripfeed falls back to a 720h default gap.
   const gap = info?.gap ?? 720
-  const mult =
-    info?.mult ??
-    Math.min(100, Math.max(0.0001, Math.pow(72 / Math.max(0.1, gap), 2.5)))
+  const mult = info?.mult ?? Math.min(100, Math.max(0.0001, Math.pow(72 / Math.max(0.1, gap), 2.5)))
   const rarity = info?.rarity ?? gap / (gap + 72)
   const ageH = Math.max(0, (now - item.pubDate) / 3_600_000)
   return `${formatAge(ageH)} / ${formatAge(ageH * mult)} / ${Math.floor(rarity * 100)}%`

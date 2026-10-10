@@ -148,21 +148,13 @@ export function FeedContextMenu({
         onClose()
       }}
     >
-      <div
-        className="ctx-menu"
-        style={{ left: x, top: y }}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="ctx-menu" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
         {unread > 0 && (
           <button className="ctx-item" onClick={doMarkAllRead}>
             Mark all as read
           </button>
         )}
-        <div
-          className="ctx-sub"
-          onMouseEnter={openMove}
-          onMouseLeave={scheduleClose}
-        >
+        <div className="ctx-sub" onMouseEnter={openMove} onMouseLeave={scheduleClose}>
           <button
             className="ctx-item"
             aria-haspopup="menu"
@@ -212,7 +204,13 @@ export function FeedContextMenu({
           </button>
         )}
         <button className="ctx-item" onClick={doCopyFeedUrl} disabled={copied}>
-          {copied ? <>Copied <CheckIcon className="menu-icon" aria-hidden="true" /></> : 'Copy feed url'}
+          {copied ? (
+            <>
+              Copied <CheckIcon className="menu-icon" aria-hidden="true" />
+            </>
+          ) : (
+            'Copy feed url'
+          )}
         </button>
         {error && <div className="error ctx-error">{error}</div>}
         {busy && <div className="muted ctx-busy">Working…</div>}

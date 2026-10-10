@@ -9,7 +9,7 @@ Live at [dripfeed.zachmanson.com](https://dripfeed.zachmanson.com).
 - **Rarity sorting** — cross-feed views rank by rarity (scaling real post age by inverse power law of feed posting frequency), computed over each feed's newest 20 items. Feed/folder views stay newest-first.
 - **Unread-only browsing** — per-feed/folder native unread queries; all unread items arrive in one request.
 - **Full-article extraction** — a button in the reader header fetches the original URL via the News server's built-in scraper (`GET /apps/news/items/{id}/fulltext`) and swaps in the extracted body.
-- **Per-feed settings** — right-click a feed → *Feed settings* to default a feed to full-article extraction. The flag is the News server's own per-feed `fullTextEnabled` (`PATCH /apps/news/feeds/{feedId}`), so the server scrapes new items as they arrive and other clients see the full text too; the reader also extracts existing items as you open them.
+- **Per-feed settings** — right-click a feed → _Feed settings_ to default a feed to full-article extraction. The flag is the News server's own per-feed `fullTextEnabled` (`PATCH /apps/news/feeds/{feedId}`), so the server scrapes new items as they arrive and other clients see the full text too; the reader also extracts existing items as you open them.
 - **Custom article CSS** — replace or extend the reader's default stylesheet from Settings (live preview, `url()`/`@import` stripped).
 - **Offline-ish local mirror** — newest-20-per-feed + full starred set in IndexedDB; optimistic read/star toggles; a 3-minute background poll (plus a wake on tab focus/visibility) that reconciles read/star state changed by other clients through the server's `/items/updated` delta.
 - **Themes** — independent UI and article light/dark/system modes; show/hide favicons.
@@ -30,9 +30,12 @@ pnpm install
 pnpm dev          # vite dev server (proxies /apps/* to nextcloud.zachmanson.com)
 pnpm build        # typecheck + production build to dist/
 pnpm typecheck    # tsc --noEmit only
+pnpm lint         # ESLint checks for app and Vite config
+pnpm format       # format source and project config/docs with Prettier
+pnpm format:check # verify formatting without changing files
 ```
 
-The Makefile wraps these (`make dev`, `make build`, `make typecheck`).
+The Makefile wraps these (`make dev`, `make build`, `make typecheck`, `make lint`, `make format`, `make format-check`).
 
 ## Deploying (Nix)
 

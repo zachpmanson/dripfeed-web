@@ -20,9 +20,7 @@ import {
 } from '../theme'
 
 export default function useThemePreferences() {
-  const [uiTheme, setUiThemeState] = useState<ThemeSetting>(() =>
-    loadThemeSetting(uiThemeKey),
-  )
+  const [uiTheme, setUiThemeState] = useState<ThemeSetting>(() => loadThemeSetting(uiThemeKey))
   const [articleTheme, setArticleThemeState] = useState<ThemeSetting>(() =>
     loadThemeSetting(articleThemeKey),
   )

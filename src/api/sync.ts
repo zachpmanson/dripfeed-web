@@ -103,7 +103,10 @@ export async function fetchInitial(
       // Window boundary = oldest id of THIS page (starred items, fetched
       // separately, may be older and must not move the cursor).
       if (items.length > 0) {
-        feedWindows.set(f.id, items.reduce((m, i) => Math.min(m, i.id), items[0].id))
+        feedWindows.set(
+          f.id,
+          items.reduce((m, i) => Math.min(m, i.id), items[0].id),
+        )
       }
       return items
     }),

@@ -1,5 +1,25 @@
-import { dbClear, dbGetCursor, dbGetFeedItems, dbGetAllFeeds, dbGetAllFolders, dbGetAllItems, dbGetMeta, dbMergeFeedFullText, dbPutFeeds, dbPutFolders, dbPutItems, dbSetCursor, dbSetMeta } from './db'
-import { fetchFeedWindow, fetchInitial, fetchMeta, fetchUnreadScope, fetchUpdatedItems } from './api/sync'
+import {
+  dbClear,
+  dbGetCursor,
+  dbGetFeedItems,
+  dbGetAllFeeds,
+  dbGetAllFolders,
+  dbGetAllItems,
+  dbGetMeta,
+  dbMergeFeedFullText,
+  dbPutFeeds,
+  dbPutFolders,
+  dbPutItems,
+  dbSetCursor,
+  dbSetMeta,
+} from './db'
+import {
+  fetchFeedWindow,
+  fetchInitial,
+  fetchMeta,
+  fetchUnreadScope,
+  fetchUpdatedItems,
+} from './api/sync'
 import { fetchFeedFullText, fetchItems } from './api/news'
 import { LIST_TYPES } from './api/types'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
@@ -253,9 +273,7 @@ export async function loadMoreInto(
     .map((id) => allFeeds.find((f) => f.id === id))
     .filter((f): f is NewsFeed => !!f)
   let live = (
-    await Promise.all(
-      targets.map(async (f) => ({ f, cursor: await dbGetCursor(f.id) })),
-    )
+    await Promise.all(targets.map(async (f) => ({ f, cursor: await dbGetCursor(f.id) })))
   ).filter((x) => x.cursor !== undefined && x.cursor >= 0)
 
   const totalFeeds = live.length
@@ -315,7 +333,7 @@ export async function loadMoreInto(
  */
 export async function ensureFeedWindow(settings: Settings, feedId: number): Promise<number> {
   const all = await dbGetAllItems()
-  let local = all.reduce((n, i) => (i.feedId === feedId ? n + 1 : n), 0)
+  const local = all.reduce((n, i) => (i.feedId === feedId ? n + 1 : n), 0)
   let added = 0
   let cursor = await dbGetCursor(feedId)
 
@@ -329,7 +347,8 @@ export async function ensureFeedWindow(settings: Settings, feedId: number): Prom
     }
     await dbPutItems(items.map(normalizeItem))
     added += items.length
-    cursor = items.length < FEED_WINDOW ? -1 : items.reduce((m, i) => Math.min(m, i.id), items[0].id)
+    cursor =
+      items.length < FEED_WINDOW ? -1 : items.reduce((m, i) => Math.min(m, i.id), items[0].id)
     await dbSetCursor(feedId, cursor)
   }
 

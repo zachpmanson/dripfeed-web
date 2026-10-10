@@ -247,7 +247,9 @@ export default function App() {
             }}
             rarityMode={sortMode === 'rarity'}
             rarityStats={rarStats}
-            emptyText={showMode === 'unread' ? 'No unread items. Nothing dripping?' : 'No items here.'}
+            emptyText={
+              showMode === 'unread' ? 'No unread items. Nothing dripping?' : 'No items here.'
+            }
             onLoadMore={store.loadMore}
             moreServer={moreServer}
             drained={drained}
@@ -264,9 +266,7 @@ export default function App() {
           articleCss={articleCss}
           dimBoilerplate={dimBoilerplate}
           recentBodies={recentBodies}
-          autoExtract={
-            selected ? (feedById(selected.feedId)?.fullTextEnabled ?? false) : false
-          }
+          autoExtract={selected ? (feedById(selected.feedId)?.fullTextEnabled ?? false) : false}
           onFeedClick={(feedId) => {
             setView({ kind: 'feed', id: feedId })
             setSelectedId(null)

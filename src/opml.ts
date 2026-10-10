@@ -3,12 +3,18 @@ import type { NewsFeed, NewsFolder } from './api/types'
 function escapeXml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => {
     switch (char) {
-      case '&': return '&amp;'
-      case '<': return '&lt;'
-      case '>': return '&gt;'
-      case '"': return '&quot;'
-      case "'": return '&apos;'
-      default: return char
+      case '&':
+        return '&amp;'
+      case '<':
+        return '&lt;'
+      case '>':
+        return '&gt;'
+      case '"':
+        return '&quot;'
+      case "'":
+        return '&apos;'
+      default:
+        return char
     }
   })
 }
