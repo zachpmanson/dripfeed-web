@@ -1,4 +1,4 @@
-.PHONY: dev build typecheck lint format format-check clean deploy
+.PHONY: dev build typecheck test lint format format-check clean deploy
 
 dev:
 	pnpm dev
@@ -8,6 +8,9 @@ build:
 
 typecheck:
 	pnpm typecheck
+
+test:
+	pnpm test
 
 lint:
 	pnpm lint
