@@ -59,16 +59,12 @@ export async function setStar(settings: Settings, item: NewsItem, starred: boole
   }
 }
 
-/**
- * True when an action failure should bounce the user back to the login form:
- * either a hard 401 (credentials rejected) or a 429 (rate-limit / bruteforce
- * throttle, which Nextcloud returns for a few requests before it settles on
- * 401 when the stored app password is stale). Treating 429 as auth-related
- * here is what makes a changed password force a re-login instead of leaving
- * the user silently stuck on failing POSTs.
+/** Only a 401 confirms that the server rejected the stored credentials.
+ * Rate limits (429) and other server errors should be surfaced without
+ * destroying the local session or sending the user back to Settings.
  */
 export function isAuthFailure(e: unknown): boolean {
-  return isAuthError(e) || (e instanceof Error && /\b429\b/.test(e.message))
+  return isAuthError(e)
 }
 
 /**
