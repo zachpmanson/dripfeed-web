@@ -123,7 +123,7 @@ export function Sidebar({
         <span className="muted">folders</span>
         <div className="sidebar-actions flex gap-1">
           <button
-            className="icon-btn inline-flex items-center justify-center rounded px-1 py-0.5 text-app-muted hover:bg-app-border hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
+            className="icon-btn inline-flex size-8 items-center justify-center rounded p-0 text-app-muted hover:bg-app-border hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
             title={allCollapsed ? 'Expand all folders' : 'Collapse all folders'}
             onClick={() => {
               if (allCollapsed) applyCollapsed(new Set())
