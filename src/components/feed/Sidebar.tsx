@@ -146,20 +146,20 @@ export function Sidebar({
       </div>
       <div className="sidebar-scroll min-h-0 overflow-y-auto p-2" ref={scrollRef}>
         <button
-          className={`mb-0.5 flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-sm text-app-text hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${view.kind === 'all' ? 'active' : ''}`}
+          className={`mb-0.5 flex w-full items-center justify-between rounded-md border-0 px-2.5 py-1.5 text-left text-sm text-app-text hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${view.kind === 'all' ? 'active' : ''}`}
           onClick={() => onSelect({ kind: 'all' })}
         >
           <span>All items</span>
         </button>
         <button
-          className={`mb-0.5 flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-sm text-app-text hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${view.kind === 'allUnread' ? 'active' : ''}`}
+          className={`mb-0.5 flex w-full items-center justify-between rounded-md border-0 px-2.5 py-1.5 text-left text-sm text-app-text hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${view.kind === 'allUnread' ? 'active' : ''}`}
           onClick={() => onSelect({ kind: 'allUnread' })}
         >
           <span>All unread</span>
           <span className="count">{totalUnread}</span>
         </button>
         <button
-          className={`mb-0.5 flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-sm text-app-text hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${view.kind === 'starred' ? 'active' : ''}`}
+          className={`mb-0.5 flex w-full items-center justify-between rounded-md border-0 px-2.5 py-1.5 text-left text-sm text-app-text hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${view.kind === 'starred' ? 'active' : ''}`}
           onClick={() => onSelect({ kind: 'starred' })}
         >
           <span>Starred</span>
