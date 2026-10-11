@@ -17,8 +17,8 @@ import {
   resetLocal,
   type LoadMoreProgress,
 } from './store'
-import { setRead, setStar, extractFulltext, isAuthFailure } from './actions'
-import { isAuthError } from './api/client'
+import { setRead, setStar, extractFulltext } from './actions'
+import { apiErrorMessage, isAuthError } from './api/client'
 import { dbGetCursor } from './db'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
 import type { Settings } from './settings'
@@ -62,6 +62,7 @@ export interface AppData {
      *  window merged + feeds/folders meta, then re-read the pool. Errors are
      *  surfaced in the UI instead of swallowed by the poll. */
     syncNow: () => Promise<void>
+    clearError: () => void
     reset: () => Promise<void>
   }
 }
@@ -133,6 +134,17 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
     setAuthFailed(true)
   }, [])
 
+  const reportError = useCallback(
+    async (e: unknown) => {
+      if (isAuthError(e)) {
+        await resetToSettings()
+        return
+      }
+      setError(apiErrorMessage(e))
+    },
+    [resetToSettings],
+  )
+
   // hydrate / poll
   useEffect(() => {
     if (!settings) return
@@ -155,10 +167,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
           await incrementalSync(settings)
           if (!cancelled) await refreshPool()
         } catch (e) {
-          if (isAuthError(e)) {
-            await resetToSettings()
-            return
-          }
+          await reportError(e)
           console.warn('incremental sync failed', e)
         }
       } else {
@@ -169,11 +178,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
           setReady(true)
         } catch (e) {
           if (cancelled) return
-          if (isAuthError(e)) {
-            await resetToSettings()
-            return
-          }
-          setError(String(e))
+          await reportError(e)
         }
       }
     })()
@@ -184,20 +189,21 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
     // throttle: an interval tick, a focus and a visibilitychange arriving
     // together must not stack three round-trips. The hydrating sync above
     // counts as the first one, so the window starts now.
-    let lastSync = Date.now()
+    let nextSyncAt = Date.now() + WAKE_THROTTLE_MS
+    let failureBackoff = WAKE_THROTTLE_MS
     const tick = () => {
       if (!isDbReady() || !settingsRef.current) return
-      if (Date.now() - lastSync < WAKE_THROTTLE_MS) return
-      lastSync = Date.now()
+      if (Date.now() < nextSyncAt) return
+      nextSyncAt = Date.now() + WAKE_THROTTLE_MS
       incrementalSync(settingsRef.current)
         .then(() => {
+          failureBackoff = WAKE_THROTTLE_MS
           if (!cancelled) void refreshPool()
         })
         .catch((e) => {
-          if (isAuthError(e)) {
-            void resetToSettings()
-            return
-          }
+          failureBackoff = Math.min(failureBackoff * 2, 15 * 60_000)
+          nextSyncAt = Date.now() + failureBackoff
+          void reportError(e)
           console.warn('poll sync failed', e)
         })
     }
@@ -215,7 +221,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
       document.removeEventListener('visibilitychange', onWake)
       off()
     }
-  }, [settings, refreshPool, resetToSettings])
+  }, [settings, refreshPool, reportError])
 
   // Run (or reuse) the native unread probe for one feed/folder scope.
   // Success marks the scope drained — the query returned EVERY unread item,
@@ -241,6 +247,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
           // Not drained: the row turns back into a "Load more" button whose
           // click calls this again. A transient failure must not hide the
           // unread items nor wedge the button.
+          await reportError(e)
           console.warn('unread probe failed', e)
           return 0
         } finally {
@@ -255,7 +262,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
       unreadProbesRef.current.set(key, run)
       return run
     },
-    [refreshPool],
+    [refreshPool, reportError],
   )
 
   const loadMore = useCallback(async () => {
@@ -286,23 +293,14 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
       setPaging({ added: 0, feedsPaged: 0, totalFeeds: 0 })
       await loadMoreInto(s, scope, undefined, (p) => setPaging(p))
       await refreshPool()
+      setError(null)
+    } catch (e) {
+      await reportError(e)
     } finally {
       setLoadingMore(false)
       setPaging(null)
     }
-  }, [loadingMore, refreshPool, feeds, probeUnread])
-
-  // Bounce to login when a user-triggered action (mark read/star/extract)
-  // hits a stale credential: 401 or a bruteforce 429. Keeps the store in sync
-  // with the resetToSettings path so the UI lands on the login form.
-  const failAuth = useCallback(
-    async (e: unknown) => {
-      if (!isAuthFailure(e)) return false
-      await resetToSettings()
-      return true
-    },
-    [resetToSettings],
-  )
+  }, [loadingMore, refreshPool, feeds, probeUnread, reportError])
 
   const actions = useCallback(
     () => ({
@@ -310,7 +308,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
         try {
           await setRead(settingsRef.current!, item, unread)
         } catch (e) {
-          await failAuth(e)
+          await reportError(e)
           throw e
         }
       },
@@ -318,7 +316,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
         try {
           await setStar(settingsRef.current!, item, starred)
         } catch (e) {
-          await failAuth(e)
+          await reportError(e)
           throw e
         }
       },
@@ -326,15 +324,19 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
         try {
           await extractFulltext(settingsRef.current!, item)
         } catch (e) {
-          await failAuth(e)
+          await reportError(e)
           throw e
         }
       },
       ensureFeed: async (feedId: number) => {
         const s = settingsRef.current
         if (!s) return
-        await ensureFeedWindow(s, feedId)
-        await refreshPool()
+        try {
+          await ensureFeedWindow(s, feedId)
+          await refreshPool()
+        } catch (e) {
+          await reportError(e)
+        }
       },
       /**
        * Pull the whole unread set for a feed/folder scope in one native
@@ -348,8 +350,12 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
       refreshMeta: async () => {
         const s = settingsRef.current
         if (!s) return
-        await incrementalSync(s)
-        await refreshPool()
+        try {
+          await incrementalSync(s)
+          await refreshPool()
+        } catch (e) {
+          await reportError(e)
+        }
       },
       syncNow: async () => {
         const s = settingsRef.current
@@ -360,17 +366,14 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
           await incrementalSync(s)
           await refreshPool()
         } catch (e) {
-          if (isAuthError(e)) {
-            await resetToSettings()
-          } else {
-            setError(String(e))
-            console.warn('manual sync failed', e)
-          }
+          await reportError(e)
+          console.warn('manual sync failed', e)
         } finally {
           syncingRef.current = false
           setSyncing(false)
         }
       },
+      clearError: () => setError(null),
       reset: async () => {
         await resetLocal()
         setReady(false)
@@ -383,7 +386,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
         setError(null)
       },
     }),
-    [refreshPool, failAuth, probeUnread, resetToSettings],
+    [refreshPool, reportError, probeUnread],
   )
 
   // Snapshot the actions object once. Its closures only depend on the

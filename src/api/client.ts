@@ -6,9 +6,34 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly retryAfterMs?: number,
   ) {
     super(message)
+    this.name = 'ApiError'
   }
+}
+
+let rateLimitedUntil = 0
+
+function parseRetryAfter(value: string | null, now = Date.now()): number | undefined {
+  if (!value) return undefined
+  const seconds = Number(value)
+  const delay = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - now
+  return Number.isFinite(delay) ? Math.max(0, delay) : undefined
+}
+
+function rateLimitMessage(delay?: number): string {
+  if (delay === undefined)
+    return 'The server is rate-limiting requests. Please wait before trying again.'
+  const seconds = Math.ceil(delay / 1000)
+  return `The server is rate-limiting requests. Try again in ${seconds}s.`
+}
+
+export function apiErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) return error.message
+  if (error instanceof TypeError)
+    return 'Could not reach the server. Check your connection and try again.'
+  return error instanceof Error ? error.message : String(error)
 }
 
 export function isAuthError(e: unknown): e is ApiError {
@@ -35,13 +60,27 @@ async function authedFetch(
     headers.set('Content-Type', 'application/json')
   }
 
+  const remainingCooldown = rateLimitedUntil - Date.now()
+  if (remainingCooldown > 0) {
+    throw new ApiError(rateLimitMessage(remainingCooldown), 429, remainingCooldown)
+  }
+
   const res = await fetch(url, { ...init, headers })
 
   if (res.status === 401) {
     throw new ApiError('Not authorized — check your username and app password', 401)
   }
   if (!res.ok) {
-    throw new ApiError(`Server error ${res.status} on ${url}`, res.status)
+    if (res.status === 429) {
+      const retryAfterMs = parseRetryAfter(res.headers.get('Retry-After')) ?? 60_000
+      rateLimitedUntil = Math.max(rateLimitedUntil, Date.now() + retryAfterMs)
+      throw new ApiError(rateLimitMessage(retryAfterMs), 429, retryAfterMs)
+    }
+    const message =
+      res.status >= 500
+        ? 'The server is having trouble. Your changes were not synced; please try again later.'
+        : `Request failed (${res.status}). Please try again.`
+    throw new ApiError(message, res.status)
   }
   return res
 }
