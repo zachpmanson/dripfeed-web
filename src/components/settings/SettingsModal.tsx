@@ -9,14 +9,12 @@ interface Props {
   feeds: NewsFeed[]
   folders: NewsFolder[]
   uiTheme: ThemeSetting
-  articleTheme: ThemeSetting
   articleCssMode: ArticleCssMode
   articleCss: string
   showFavicons: boolean
   singleClickRead: boolean
   dimBoilerplate: boolean
   onUiTheme: (v: ThemeSetting) => void
-  onArticleTheme: (v: ThemeSetting) => void
   onArticleCssMode: (v: ArticleCssMode) => void
   onArticleCss: (v: string) => void
   onShowFavicons: (v: boolean) => void
@@ -30,14 +28,12 @@ export function SettingsModal({
   feeds,
   folders,
   uiTheme,
-  articleTheme,
   articleCssMode,
   articleCss,
   showFavicons,
   singleClickRead,
   dimBoilerplate,
   onUiTheme,
-  onArticleTheme,
   onArticleCssMode,
   onArticleCss,
   onShowFavicons,
@@ -62,18 +58,6 @@ export function SettingsModal({
             <Seg<ThemeSetting>
               value={uiTheme}
               onChange={onUiTheme}
-              options={[
-                { value: 'light', label: 'Light' },
-                { value: 'dark', label: 'Dark' },
-                { value: 'system', label: 'System' },
-              ]}
-            />
-          </div>
-          <div className="setting-row">
-            <span className="setting-label">Article dark mode</span>
-            <Seg<ThemeSetting>
-              value={articleTheme}
-              onChange={onArticleTheme}
               options={[
                 { value: 'light', label: 'Light' },
                 { value: 'dark', label: 'Dark' },
