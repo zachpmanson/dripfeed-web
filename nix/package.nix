@@ -19,7 +19,7 @@ stdenv.mkDerivation {
     inherit pname version;
     src = lib.cleanSource ../.;
     fetcherVersion = 3;
-    hash = "sha256-FvsComrCSQPyIB9CEUoAS3L2JQhUonY38QKRitsJpL8=";
+    hash = "sha256-hyJ2gLUAIQyaGHv1M/MVgBsPVT59BYs8Z6O79pYczOE=";
   };
 
   nativeBuildInputs = [ nodejs pnpm pnpmConfigHook pnpmBuildHook ];
