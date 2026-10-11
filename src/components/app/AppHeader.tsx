@@ -28,11 +28,11 @@ export default function AppHeader({
   onSettings: () => void
 }) {
   return (
-    <header className="app-header">
-      <h1>Dripfeed</h1>
-      <div className="header-right">
+    <header className="flex items-center justify-between border-b border-app-border bg-app-panel px-4 py-2.5">
+      <h1 className="m-0 text-base tracking-[0.02em]">Dripfeed</h1>
+      <div className="header-right flex items-center gap-2">
         <select
-          className="header-select"
+          className="header-select cursor-pointer rounded-md border border-app-border bg-app-panel px-2 py-1 text-[0.85rem] leading-[1.4] text-app-text hover:border-app-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
           title="Items shown: all, unread only, or all items with unread floated to the top"
           value={showMode}
           onChange={(e) => onShowModeChange(e.target.value as ShowMode)}

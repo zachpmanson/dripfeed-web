@@ -24,20 +24,23 @@ export default function TrailingRow({
 
   if (!more) {
     return (
-      <li ref={sentinelRef} className="load-more-row done">
-        <span className="muted">— up to date —</span>
+      <li
+        ref={sentinelRef}
+        className="list-none border-b border-app-border p-2 text-center text-[0.7rem] uppercase tracking-wider"
+      >
+        <span className="text-app-muted">— up to date —</span>
       </li>
     )
   }
   return (
-    <li ref={sentinelRef} className="load-more-row">
+    <li ref={sentinelRef} className="list-none border-b border-app-border p-2 text-center">
       {loadingMore || progress ? (
-        <span className="muted spinner-row">
+        <span className="flex items-center justify-center gap-2 text-app-muted">
           <Spinner />
           {progress ?? 'Loading…'}
         </span>
       ) : (
-        <button className="load-more" onClick={onLoadMore}>
+        <button className="w-full p-2" onClick={onLoadMore}>
           Load more
         </button>
       )}

@@ -19,11 +19,11 @@ export function Seg<T extends string | number | boolean>({
   title,
 }: Props<T>) {
   return (
-    <div className="seg" title={title}>
+    <div className="flex overflow-hidden rounded-md border border-app-border" title={title}>
       {options.map((opt) => (
         <button
           key={String(opt.value)}
-          className={value === opt.value ? 'active' : ''}
+          className={`border-0 rounded-none px-2.5 py-1.5 text-sm ${value === opt.value ? 'relative z-10 bg-app-accent font-semibold text-app-on-accent shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]' : 'bg-transparent text-app-muted opacity-85 hover:text-app-text'}`}
           title={opt.title}
           onClick={() => onChange(opt.value)}
         >

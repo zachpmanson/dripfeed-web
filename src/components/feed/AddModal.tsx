@@ -55,23 +55,36 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <span className="muted">Add</span>
-          <button className="icon-btn" onClick={onClose} aria-label="close">
-            <XMarkIcon className="btn-icon" aria-hidden="true" />
+    <div className="fixed inset-0 z-[1000] bg-black/45" onClick={onClose}>
+      <div
+        className="fixed left-1/2 top-1/2 z-[1001] w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-[10px] border border-app-border bg-app-panel p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between uppercase tracking-[0.06em]">
+          <span className="text-app-muted">Add</span>
+          <button
+            className="inline-flex items-center justify-center rounded p-1 text-app-muted hover:bg-app-border hover:text-app-text"
+            onClick={onClose}
+            aria-label="close"
+          >
+            <XMarkIcon className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
-        <div className="seg modal-tabs">
-          <button className={tab === 'feed' ? 'active' : ''} onClick={() => setTab('feed')}>
+        <div className="mb-4 flex overflow-hidden rounded-md border border-app-border">
+          <button
+            className={`rounded-none border-0 px-2.5 py-1.5 text-sm ${tab === 'feed' ? 'bg-app-accent font-semibold text-app-on-accent' : 'bg-transparent text-app-muted'}`}
+            onClick={() => setTab('feed')}
+          >
             Feed
           </button>
-          <button className={tab === 'folder' ? 'active' : ''} onClick={() => setTab('folder')}>
+          <button
+            className={`rounded-none border-0 px-2.5 py-1.5 text-sm ${tab === 'folder' ? 'bg-app-accent font-semibold text-app-on-accent' : 'bg-transparent text-app-muted'}`}
+            onClick={() => setTab('folder')}
+          >
             Folder
           </button>
         </div>
-        <form onSubmit={submit} className="modal-form">
+        <form onSubmit={submit} className="flex flex-col gap-3">
           {tab === 'feed' ? (
             <>
               <label className="field">
@@ -113,7 +126,11 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
           )}
           {error && <div className="error">{error}</div>}
           {done && <div className="ok">{done}</div>}
-          <button className="primary" type="submit" disabled={busy}>
+          <button
+            className="cursor-pointer rounded-md border-0 bg-app-accent p-2.5 font-semibold text-app-on-accent disabled:cursor-default disabled:opacity-60"
+            type="submit"
+            disabled={busy}
+          >
             {busy ? 'Adding…' : tab === 'feed' ? 'Add feed' : 'Create folder'}
           </button>
         </form>

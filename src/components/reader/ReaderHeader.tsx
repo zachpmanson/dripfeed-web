@@ -22,13 +22,13 @@ export default function ReaderHeader({
   onExtract: () => void
 }) {
   return (
-    <div className="reader-head">
-      <h2 className="reader-title">
+    <div className="mb-3 flex items-start justify-between gap-3">
+      <h2 className="m-0 text-lg leading-snug">
         <a href={item.url} target="_blank" rel="noreferrer">
           {titleFor(item)}
         </a>
       </h2>
-      <div className="reader-actions">
+      <div className="m-0 flex shrink-0 gap-2">
         <IconButton
           title={item.starred ? 'Unstar' : 'Star'}
           onClick={() => actions.setStar(item, !item.starred)}

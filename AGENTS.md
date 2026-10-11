@@ -2,23 +2,21 @@
 
 ## Frontend style
 
-Keep changes consistent with the existing Vite + React + TypeScript app. The
-Chainmail frontend guide is a useful source for component and state conventions,
-but its Tailwind-specific rules do not apply here: this project uses regular CSS
-in `src/index.css`.
+Keep changes consistent with the Vite + React + TypeScript app and use Tailwind
+CSS v4 utilities for component presentation.
 
 ### Styling
 
-- Keep component styles in `src/index.css`; use the existing class names and
-  layout rather than introducing a styling framework or one-off styling system.
+- Prefer Tailwind utility classes in JSX; keep `src/index.css` for theme tokens,
+  document defaults, reusable animation primitives, and styles that cannot be
+  expressed clearly with utilities.
 - Use the CSS custom properties for app surfaces, text, borders, and accents.
   Add theme-dependent values to both the root and light-theme blocks.
 - Keep app chrome styling separate from article content. User-provided article
   CSS and rendered feed HTML have their own behavior; avoid broad selectors that
   unintentionally affect them.
-- Prefer semantic class names and existing component patterns. Avoid inline
-  style objects for static presentation; use them when values are genuinely
-  dynamic.
+- Avoid inline style objects for static presentation; use them when values are
+  genuinely dynamic.
 - Preserve keyboard focus, accessible labels, and usable target sizes for
   interactive controls. Reuse existing components such as `IconButton` where
   appropriate.

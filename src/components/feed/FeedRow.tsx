@@ -25,13 +25,13 @@ export default function FeedRow({
     <button
       data-feed-id={feed.id}
       title={tooltip}
-      className={active ? 'active feed-row' : 'feed-row'}
+      className={`feed-row mb-0.5 flex w-full items-center justify-between rounded-md bg-transparent px-2.5 py-1.5 text-left text-[0.85rem] text-app-text hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${active ? 'active rounded-r-md rounded-l-none shadow-[inset_2px_0_0_var(--accent)]' : ''}`}
       onClick={onSelect}
       onContextMenu={(e) => onCtx(e, feed)}
     >
-      <span className="feed-left">
+      <span className="feed-left flex min-w-0 items-center gap-2">
         {showFavicons && <FeedIcon feed={feed} size={14} />}
-        <span className="feed-name">{feed.title}</span>
+        <span className="feed-name truncate">{feed.title}</span>
       </span>
       {n > 0 && <span className="count">{n}</span>}
     </button>

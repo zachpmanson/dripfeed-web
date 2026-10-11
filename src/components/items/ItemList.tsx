@@ -219,7 +219,7 @@ export function ItemList({
   const rendered = limit >= items.length ? items : items.slice(0, limit)
 
   return (
-    <ul className="item-list">
+    <ul className="item-list m-0 flex-1 list-none overflow-y-auto border-r border-app-border p-0">
       {rendered.map((item) => (
         <ItemRow
           key={item.id}
@@ -235,7 +235,7 @@ export function ItemList({
           rarityStats={rarityStats}
         />
       ))}
-      {items.length === 0 && <li className="empty muted">{emptyText}</li>}
+      {items.length === 0 && <li className="empty px-3 py-4 text-app-muted">{emptyText}</li>}
       <TrailingRow
         sentinelRef={sentinelRef}
         onLoadMore={onLoadMore}

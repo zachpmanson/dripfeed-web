@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process'
 import { defineConfig } from 'vite'
+import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 
 // Short git sha + build time, visible in the settings popup. Prefer env vars
@@ -34,7 +35,7 @@ export default defineConfig({
     __GIT_SHA__: JSON.stringify(gitSha()),
     __BUILD_TIME__: JSON.stringify(buildTime()),
   },
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   server: {
     // Local dev against the real instance: proxy the News API same-origin so
     // we never rely on CORS. Matches the production caddy layout.

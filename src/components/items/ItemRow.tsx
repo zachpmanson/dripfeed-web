@@ -29,7 +29,16 @@ export default function ItemRow({
 }) {
   return (
     <li
-      className={`item ${selected ? 'selected' : ''} ${item.unread ? '' : 'read'}`}
+      className={`item cursor-pointer border-b border-app-border px-3 py-2.5 hover:bg-app-panel focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-app-accent ${selected ? 'selected bg-app-panel shadow-[inset_3px_0_0_var(--accent)]' : ''}`}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onSelect(item.id)
+          if (singleClickRead && item.unread) onRead(item)
+        }
+      }}
       onClick={() => {
         onSelect(item.id)
         // Single-click read mode flips unread → read only; selecting an
@@ -40,24 +49,28 @@ export default function ItemRow({
         if (!singleClickRead) onRead(item)
       }}
     >
-      <div className="item-title">
-        {item.unread && <span className="unread-dot" />}
+      <div
+        className={`item-title mb-0.5 line-clamp-2 text-[0.9rem] leading-[1.3] ${item.unread ? '' : 'text-app-muted'}`}
+      >
+        {item.unread && (
+          <span className="unread-dot mr-1.5 inline-block size-2 rounded-full bg-app-accent align-middle" />
+        )}
         {titleFor(item)}
       </div>
-      <div className="item-meta">
+      <div className="item-meta flex items-center gap-2 text-xs text-app-muted">
         {showFavicons &&
           feedById &&
           (() => {
             const feed = feedById(item.feedId)
             return feed ? <FeedIcon feed={feed} size={12} /> : null
           })()}
-        <span className="feed">{feedTitle(item.feedId)}</span>
+        <span className="feed min-w-0 truncate">{feedTitle(item.feedId)}</span>
         {rarityMode ? (
           <span className="rarity-line" title="real age / effective age / rarity">
             {rarityLine(item, rarityStats)}
           </span>
         ) : (
-          <span className="date muted">{formatDate(item.pubDate)}</span>
+          <span className="date ml-auto whitespace-nowrap">{formatDate(item.pubDate)}</span>
         )}
         {item.starred && (
           <span aria-label="starred">

@@ -118,12 +118,12 @@ export function Sidebar({
   }
 
   return (
-    <nav className="sidebar">
-      <div className="sidebar-toolbar">
+    <nav className="sidebar flex min-h-0 flex-col border-r border-app-border bg-app-panel">
+      <div className="sidebar-toolbar flex items-center justify-between border-b border-app-border px-2.5 py-2 text-[0.7rem] tracking-wider text-app-muted uppercase">
         <span className="muted">folders</span>
-        <div className="sidebar-actions">
+        <div className="sidebar-actions flex gap-1">
           <button
-            className="icon-btn"
+            className="icon-btn inline-flex items-center justify-center rounded px-1 py-0.5 text-app-muted hover:bg-app-border hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
             title={allCollapsed ? 'Expand all folders' : 'Collapse all folders'}
             onClick={() => {
               if (allCollapsed) applyCollapsed(new Set())
@@ -144,22 +144,22 @@ export function Sidebar({
           </button>
         </div>
       </div>
-      <div className="sidebar-scroll" ref={scrollRef}>
+      <div className="sidebar-scroll min-h-0 overflow-y-auto p-2" ref={scrollRef}>
         <button
-          className={view.kind === 'all' ? 'active' : ''}
+          className={`mb-0.5 flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-sm text-app-text hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${view.kind === 'all' ? 'active' : ''}`}
           onClick={() => onSelect({ kind: 'all' })}
         >
           <span>All items</span>
         </button>
         <button
-          className={view.kind === 'allUnread' ? 'active' : ''}
+          className={`mb-0.5 flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-sm text-app-text hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${view.kind === 'allUnread' ? 'active' : ''}`}
           onClick={() => onSelect({ kind: 'allUnread' })}
         >
           <span>All unread</span>
           <span className="count">{totalUnread}</span>
         </button>
         <button
-          className={view.kind === 'starred' ? 'active' : ''}
+          className={`mb-0.5 flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-sm text-app-text hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${view.kind === 'starred' ? 'active' : ''}`}
           onClick={() => onSelect({ kind: 'starred' })}
         >
           <span>Starred</span>

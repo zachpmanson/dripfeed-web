@@ -202,7 +202,7 @@ export default function App() {
     : []
 
   return (
-    <div className="app">
+    <div className="app flex h-full flex-col bg-app-bg text-app-text">
       <AppHeader
         showMode={showMode}
         onShowModeChange={setShowMode}
@@ -215,7 +215,7 @@ export default function App() {
         onSettings={() => setShowSettings(true)}
       />
 
-      <main className="app-body">
+      <main className="grid min-h-0 flex-1 grid-cols-[14rem_minmax(16rem,24rem)_1fr]">
         {store.error && <div className="error">{store.error}</div>}
         <Sidebar
           feeds={feeds}
@@ -232,7 +232,7 @@ export default function App() {
             setSelectedId(null)
           }}
         />
-        <div className="list-pane">
+        <div className="flex min-h-0 flex-col">
           <ItemList
             items={visibleItems}
             windowKey={viewKey}

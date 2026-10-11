@@ -206,7 +206,11 @@ export function ItemView({
   }, [item, articleTheme, articleCssMode, articleCss, dimBoilerplate, recentBodies])
 
   if (!item) {
-    return <div className="reader empty muted">Select an item</div>
+    return (
+      <div className="flex min-h-0 flex-col items-center justify-center overflow-y-auto p-6 text-app-muted">
+        Select an item
+      </div>
+    )
   }
 
   const handleExtract = async () => {
@@ -215,7 +219,7 @@ export function ItemView({
   }
 
   return (
-    <article className="reader">
+    <article className="flex min-h-0 flex-col overflow-y-auto p-4 md:px-6">
       <ReaderHeader
         item={item}
         actions={actions}
@@ -224,28 +228,28 @@ export function ItemView({
         autoExtract={autoExtract}
         onExtract={() => void handleExtract()}
       />
-      <div className="item-meta">
+      <div className="mb-4 flex items-baseline gap-2 text-xs text-app-muted">
         <button
-          className="feed-btn"
+          className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-xs text-app-accent hover:underline"
           title={`${feedTitle(item.feedId)} — show this feed`}
           onClick={() => onFeedClick(item.feedId)}
         >
           {feedTitle(item.feedId)}
         </button>
-        {item.author && <span className="muted author">by {item.author}</span>}
-        <span className="muted date">
+        {item.author && <span className="text-app-muted">by {item.author}</span>}
+        <span className="ml-auto text-right text-app-muted">
           {item.pubDate ? new Date(item.pubDate).toLocaleString() : ''}
         </span>
       </div>
       {extractError && (
-        <div className="extract-error" role="alert">
+        <div className="mb-4 text-xs text-[#ff8d8d]" role="alert">
           Full article unavailable — {extractError}
         </div>
       )}
 
       <iframe
         ref={frameRef}
-        className={`reader-frame${articleDark ? ' dark' : ''}`}
+        className={`min-h-[20rem] w-full flex-1 rounded-md border border-app-border ${articleDark ? 'bg-[#16181d]' : 'bg-white'}`}
         sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         srcDoc={srcdoc}
         title={item.title}
