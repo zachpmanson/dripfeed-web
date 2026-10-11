@@ -37,14 +37,12 @@ export default function App() {
 
   const {
     uiTheme,
-    articleTheme,
     articleCssMode,
     articleCss,
     showFavicons,
     singleClickRead,
     dimBoilerplate,
     setUiTheme,
-    setArticleTheme,
     setArticleCssMode,
     setArticleCss,
     setShowFavicons,
@@ -261,7 +259,6 @@ export default function App() {
           item={selected}
           feedTitle={feedTitle}
           actions={store.actions}
-          articleTheme={articleTheme}
           articleCssMode={articleCssMode}
           articleCss={articleCss}
           dimBoilerplate={dimBoilerplate}
@@ -292,14 +289,12 @@ export default function App() {
           feeds={[...store.feeds.values()]}
           folders={store.folders}
           uiTheme={uiTheme}
-          articleTheme={articleTheme}
           articleCssMode={articleCssMode}
           articleCss={articleCss}
           showFavicons={showFavicons}
           singleClickRead={singleClickRead}
           dimBoilerplate={dimBoilerplate}
           onUiTheme={setUiTheme}
-          onArticleTheme={setArticleTheme}
           onArticleCssMode={setArticleCssMode}
           onArticleCss={setArticleCss}
           onShowFavicons={setShowFavicons}

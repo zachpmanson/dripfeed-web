@@ -1,8 +1,6 @@
 export type ThemeSetting = 'light' | 'dark' | 'system'
 
 const UI_KEY = 'dripfeed.uiTheme'
-const ARTICLE_KEY = 'dripfeed.articleTheme'
-
 export function loadThemeSetting(key: string): ThemeSetting {
   try {
     const v = localStorage.getItem(key)
@@ -22,8 +20,6 @@ export function saveThemeSetting(key: string, v: ThemeSetting): void {
 }
 
 export const uiThemeKey = UI_KEY
-
-export const articleThemeKey = ARTICLE_KEY
 
 const ARTICLE_CSS_MODE_KEY = 'dripfeed.articleCssMode'
 const ARTICLE_CSS_KEY = 'dripfeed.articleCss'

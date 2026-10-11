@@ -3,7 +3,7 @@ import { enclosureHtml } from '../../utils'
 import { dimRepeatedChunks } from '../../boilerplate'
 import type { NewsItem } from '../../api/types'
 import type { useStore } from '../../hooks'
-import { effectiveTheme, sanitizeArticleCss, type ThemeSetting } from '../../theme'
+import { sanitizeArticleCss } from '../../theme'
 import ReaderHeader from './ReaderHeader'
 import type { ArticleCssMode } from '../../theme'
 
@@ -34,7 +34,6 @@ interface Props {
   item: NewsItem | null
   feedTitle: (feedId: number) => string
   actions: ReturnType<typeof useStore>['actions']
-  articleTheme: ThemeSetting
   articleCssMode: ArticleCssMode
   articleCss: string
   dimBoilerplate: boolean
@@ -63,7 +62,6 @@ export function ItemView({
   item,
   feedTitle,
   actions,
-  articleTheme,
   articleCssMode,
   articleCss,
   dimBoilerplate,
@@ -73,6 +71,18 @@ export function ItemView({
 }: Props) {
   // Ref to the sandboxed article iframe so we can reach its document.
   const frameRef = useRef<HTMLIFrameElement | null>(null)
+  const [themeRevision, setThemeRevision] = useState(0)
+
+  // The system theme can change without a React render. Watch the app's theme
+  // attribute so the isolated article document receives the updated tokens.
+  useEffect(() => {
+    const observer = new MutationObserver(() => setThemeRevision((revision) => revision + 1))
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    })
+    return () => observer.disconnect()
+  }, [])
 
   // Same-document anchors (e.g. footnotes: href="#fn:1") are blocked by the
   // sandbox — fragment-only navigation is suppressed. Since the frame is
@@ -152,10 +162,6 @@ export function ItemView({
     autoExtracted.set(id, runExtract(item))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item?.id, autoExtract])
-  // Only used for the iframe element's own background while srcdoc loads;
-  // the article colours themselves live in CSS inside the frame (below).
-  const articleDark = effectiveTheme(articleTheme) === 'dark'
-
   const srcdoc = useMemo(() => {
     if (!item) return ''
     // Body comes from the server already rewritten with target=_blank.
@@ -166,44 +172,31 @@ export function ItemView({
     // at the article URL; the server has historically dropped them instead
     // (nextcloud/news #3822), but when they survive this makes them work.
     //
-    // The palette is real CSS, not baked hex, so the frame answers to
-    // `prefers-color-scheme` like any normal page: light tokens are the
-    // default, a media block swaps in the dark tokens, and
-    // `color-scheme: light dark` flips the UA default canvas/widget palette
-    // too. When the user picked an explicit article theme in the app, a
-    // `data-theme` attribute on <html> wins over the media block (attribute
-    // selectors out-rank it), so that choice sticks regardless of the OS
-    // scheme. Both levers are exactly what DevTools' scheme emulation and
-    // the Force Color Scheme extension can reach — the frame no longer needs
-    // the app to re-render to change palette.
+    // srcdoc is a separate document and cannot inherit the app's custom
+    // properties. Resolve the existing theme tokens here and pass their
+    // computed values into the frame, keeping one palette source of truth.
+    const appTheme = getComputedStyle(document.documentElement)
+    const panel = appTheme.getPropertyValue('--panel').trim()
+    const text = appTheme.getPropertyValue('--text').trim()
+    const accent = appTheme.getPropertyValue('--accent').trim()
+    const border = appTheme.getPropertyValue('--border').trim()
+    const colorScheme = appTheme.colorScheme
     const body = dimBoilerplate ? dimRepeatedChunks(item.body, recentBodies) : item.body
-    const explicit = articleTheme !== 'system'
-    const dataTheme = explicit
-      ? articleTheme === 'dark'
-        ? ' data-theme="dark"'
-        : ' data-theme="light"'
-      : ''
-    return `<!doctype html><html${dataTheme}><head><meta charset="utf-8">${baseHrefFor(item.url)}<style>
-      :root { color-scheme: light dark; }
-      :root { --bg: #fff; --fg: #111; --link: #1a4fb8; --border: #d9dce2; }
-      @media (prefers-color-scheme: dark) {
-        :root { --bg: #16181d; --fg: #d8dce3; --link: #7cb2ff; --border: #2a2e37; }
-      }
-      :root[data-theme="light"] { --bg: #fff; --fg: #111; --link: #1a4fb8; --border: #d9dce2; }
-      :root[data-theme="dark"] { --bg: #16181d; --fg: #d8dce3; --link: #7cb2ff; --border: #2a2e37; }
-      body { font-family: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif; font-weight: normal; line-height: 1.55; max-width: 46rem; margin: 0 auto; padding: 0.5rem 1rem; color: var(--fg); background: var(--bg); overflow-wrap: anywhere; word-break: break-word; }
+    return `<!doctype html><html data-theme-revision="${themeRevision}"><head><meta charset="utf-8">${baseHrefFor(item.url)}<style>
+      :root { color-scheme: ${colorScheme}; --panel: ${panel}; --text: ${text}; --accent: ${accent}; --border: ${border}; }
+      body { font-family: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif; font-weight: normal; line-height: 1.55; max-width: 46rem; margin: 0 auto; padding: 0.5rem 1rem; color: var(--text); background: var(--panel); overflow-wrap: anywhere; word-break: break-word; }
       img, video { max-width: 100%; height: auto; }
       .enclosure { display: block; margin: 0.9rem 0 0; max-width: 100%; }
       pre { max-width: 100%; overflow-x: auto; }
       table { display: block; width: max-content; max-width: calc(100vw - 2rem); overflow-x: auto; margin-left: calc(50% - 50vw + 1rem); }
-      table, th, td { border: 1px solid #000; border-collapse: collapse; }
+      table, th, td { border: 1px solid var(--border); border-collapse: collapse; }
       th, td { padding: 0.3rem 0.5rem; }
-      a { color: var(--link); overflow-wrap: anywhere; word-break: break-word; }
-      .footnote-flash { outline: 2px solid var(--link); outline-offset: 2px; }
+      a { color: var(--accent); overflow-wrap: anywhere; word-break: break-word; }
+      .footnote-flash { outline: 2px solid var(--accent); outline-offset: 2px; }
     </style>
     ${articleCssMode === 'custom' && articleCss ? `<style>${sanitizeArticleCss(articleCss)}</style>` : ''}
     ${dimBoilerplate ? '<style>.dim-boilerplate { opacity: 0.15; }</style>' : ''}</head><body>${body}${enclosureHtml(item)}</body></html>`
-  }, [item, articleTheme, articleCssMode, articleCss, dimBoilerplate, recentBodies])
+  }, [item, articleCssMode, articleCss, dimBoilerplate, recentBodies, themeRevision])
 
   if (!item) {
     return (
@@ -242,14 +235,14 @@ export function ItemView({
         </span>
       </div>
       {extractError && (
-        <div className="mb-4 text-xs text-[#ff8d8d]" role="alert">
+        <div className="mb-4 text-xs text-app-danger" role="alert">
           Full article unavailable — {extractError}
         </div>
       )}
 
       <iframe
         ref={frameRef}
-        className={`min-h-[20rem] w-full flex-1 rounded-md border border-app-border ${articleDark ? 'bg-[#16181d]' : 'bg-white'}`}
+        className="min-h-[20rem] w-full flex-1 rounded-md border border-app-border bg-app-panel"
         sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         srcDoc={srcdoc}
         title={item.title}

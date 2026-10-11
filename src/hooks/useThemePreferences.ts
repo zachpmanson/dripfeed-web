@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { loadDimBoilerplate, saveDimBoilerplate } from '../boilerplate'
 import {
   applyUiTheme,
-  articleThemeKey,
   loadArticleCss,
   loadArticleCssMode,
   loadShowFavicons,
@@ -21,9 +20,6 @@ import {
 
 export default function useThemePreferences() {
   const [uiTheme, setUiThemeState] = useState<ThemeSetting>(() => loadThemeSetting(uiThemeKey))
-  const [articleTheme, setArticleThemeState] = useState<ThemeSetting>(() =>
-    loadThemeSetting(articleThemeKey),
-  )
   const [articleCssMode, setArticleCssModeState] = useState<ArticleCssMode>(loadArticleCssMode)
   const [articleCss, setArticleCssState] = useState<string>(loadArticleCss)
   const [showFavicons, setShowFaviconsState] = useState<boolean>(loadShowFavicons)
@@ -40,12 +36,11 @@ export default function useThemePreferences() {
   }, [uiTheme])
 
   const setUiTheme = (value: ThemeSetting) => {
+    // Apply before React rerenders so consumers reading computed CSS tokens see
+    // the selected palette in that render (not the previous theme).
+    applyUiTheme(value)
     setUiThemeState(value)
     saveThemeSetting(uiThemeKey, value)
-  }
-  const setArticleTheme = (value: ThemeSetting) => {
-    setArticleThemeState(value)
-    saveThemeSetting(articleThemeKey, value)
   }
   const setArticleCssMode = (value: ArticleCssMode) => {
     setArticleCssModeState(value)
@@ -71,14 +66,12 @@ export default function useThemePreferences() {
 
   return {
     uiTheme,
-    articleTheme,
     articleCssMode,
     articleCss,
     showFavicons,
     singleClickRead,
     dimBoilerplate,
     setUiTheme,
-    setArticleTheme,
     setArticleCssMode,
     setArticleCss,
     setShowFavicons,

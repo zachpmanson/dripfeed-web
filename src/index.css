@@ -9,6 +9,7 @@
   --color-app-muted: var(--muted);
   --color-app-accent: var(--accent);
   --color-app-on-accent: var(--on-accent);
+  --color-app-danger: var(--danger);
 }
 
 @layer legacy {
@@ -21,6 +22,12 @@
     --muted: #8b93a1;
     --accent: #6ea8fe;
     --on-accent: #0b0d10;
+    --danger: #ff8d8d;
+    --danger-wash: rgba(255, 141, 141, 0.12);
+    --danger-border: rgba(255, 141, 141, 0.35);
+    --scrim: rgba(0, 0, 0, 0.45);
+    --menu-shadow: rgba(0, 0, 0, 0.4);
+    --active-inset: color-mix(in srgb, var(--on-accent) 14%, transparent);
   }
 
   :root[data-theme='light'] {
@@ -32,6 +39,12 @@
     --muted: #5c6470;
     --accent: #2f6fd6;
     --on-accent: #ffffff;
+    --danger: #b3261e;
+    --danger-wash: rgba(179, 38, 30, 0.08);
+    --danger-border: rgba(179, 38, 30, 0.35);
+    --scrim: rgba(0, 0, 0, 0.45);
+    --menu-shadow: rgba(0, 0, 0, 0.4);
+    --active-inset: color-mix(in srgb, var(--on-accent) 14%, transparent);
   }
 
   * {
@@ -105,7 +118,7 @@
     background: var(--accent);
     color: var(--on-accent);
     font-weight: 600;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+    box-shadow: inset 0 0 0 1px var(--active-inset);
     position: relative;
     z-index: 1;
   }
@@ -227,7 +240,7 @@
 
   /* One-line failure note under the reader header when extraction fails. */
   .reader .extract-error {
-    color: #ff8d8d;
+    color: var(--danger);
     font-size: 0.75rem;
     margin: 0 0 0.9rem;
   }
@@ -253,7 +266,7 @@
   }
 
   .modal-backdrop {
-    background: rgba(0, 0, 0, 0.45);
+    background: var(--scrim);
   }
 
   .ctx-backdrop {
@@ -378,9 +391,9 @@
   }
 
   .setting-row .danger-btn {
-    background: rgba(255, 141, 141, 0.12);
-    border-color: rgba(255, 141, 141, 0.35);
-    color: #ff8d8d;
+    background: var(--danger-wash);
+    border-color: var(--danger-border);
+    color: var(--danger);
   }
 
   .css-editor {
@@ -412,9 +425,9 @@
   }
 
   .css-actions .danger-btn {
-    background: rgba(255, 141, 141, 0.12);
-    border-color: rgba(255, 141, 141, 0.35);
-    color: #ff8d8d;
+    background: var(--danger-wash);
+    border-color: var(--danger-border);
+    color: var(--danger);
     padding: 0.35rem 0.7rem;
     font-size: 0.8rem;
     border-radius: 6px;
@@ -436,7 +449,7 @@
     border-radius: 8px;
     padding: 0.35rem;
     min-width: 12rem;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 6px 24px var(--menu-shadow);
   }
 
   .ctx-sub {
@@ -483,11 +496,11 @@
   }
 
   .ctx-item.danger {
-    color: #ff8d8d;
+    color: var(--danger);
   }
 
   .ctx-item.danger:hover {
-    background: rgba(255, 141, 141, 0.12);
+    background: var(--danger-wash);
   }
 
   .ctx-item.muted {
@@ -759,13 +772,9 @@
     width: 100%;
     border: 1px solid var(--border);
     border-radius: 6px;
-    background: #fff;
+    background: var(--panel);
     min-height: 20rem;
     margin-top: 0;
-  }
-
-  .reader-frame.dark {
-    background: #16181d;
   }
 
   button {
@@ -845,7 +854,7 @@
   }
 
   .error {
-    color: #ff8d8d;
+    color: var(--danger);
     font-size: 0.85rem;
     padding: 0.6rem 1rem;
   }
