@@ -22,16 +22,22 @@ export default function ReaderHeader({
   onExtract: () => void
 }) {
   return (
-    <div className="mb-3 flex items-start justify-between gap-3">
-      <h2 className="m-0 text-lg leading-snug">
-        <a href={item.url} target="_blank" rel="noreferrer">
+    <div className="m-0 flex items-start justify-between gap-3">
+      <h2 className="m-0 text-[1.15rem] leading-[1.3]">
+        <a
+          className="text-app-text no-underline hover:underline"
+          href={item.url}
+          target="_blank"
+          rel="noreferrer"
+        >
           {titleFor(item)}
         </a>
       </h2>
-      <div className="m-0 flex shrink-0 gap-2">
+      <div className="m-0 flex shrink-0 gap-[0.4rem]">
         <IconButton
           title={item.starred ? 'Unstar' : 'Star'}
           onClick={() => actions.setStar(item, !item.starred)}
+          className="text-[1.05rem] leading-none"
         >
           {item.starred ? (
             <SolidStarIcon className="btn-icon" aria-hidden="true" />
@@ -49,12 +55,14 @@ export default function ReaderHeader({
           }
           disabled={extracting}
           onClick={onExtract}
+          className="text-[1.05rem] leading-none"
         >
           {extracting ? <Spinner /> : <DocumentTextIcon className="btn-icon" aria-hidden="true" />}
         </IconButton>
         <IconButton
           title={item.unread ? 'Mark read' : 'Mark unread'}
           onClick={() => actions.setRead(item, !item.unread)}
+          className="text-[1.05rem] leading-none"
         >
           {item.unread ? '●' : '○'}
         </IconButton>
