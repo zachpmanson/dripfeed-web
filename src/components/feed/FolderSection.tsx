@@ -34,7 +34,7 @@ export default function FolderSection({
     <div className="folder mb-2">
       <div className="folder-head flex items-center">
         <button
-          className={`folder-name-btn flex min-w-0 flex-1 items-center gap-2 rounded-md border-0 px-2.5 py-1.5 text-left text-sm font-semibold text-app-muted hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${selected ? 'active bg-app-border text-app-text' : ''}`}
+          className={`folder-name-btn flex min-w-0 flex-1 items-center gap-2 rounded-md border-0 px-2.5 py-1.5 text-left text-sm text-app-muted hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${selected ? 'active bg-app-border text-app-text' : ''}`}
           onClick={onSelectFolder}
         >
           <span className="folder-name min-w-0 flex-1 truncate">{folder.name}</span>
@@ -42,7 +42,7 @@ export default function FolderSection({
         </button>
         <span className="folder-right flex items-center">
           <button
-            className="icon-btn caret-btn inline-flex size-7 items-center justify-center rounded border-0 text-app-muted hover:bg-app-border hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
+            className="icon-btn caret-btn inline-flex size-8 items-center justify-center rounded border-0 p-0 text-app-muted hover:bg-app-border hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
             title={collapsed ? 'Expand folder' : 'Collapse folder'}
             onClick={() => onToggle(folder.id)}
             aria-expanded={!collapsed}
