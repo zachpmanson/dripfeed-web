@@ -214,7 +214,22 @@ export default function App() {
       />
 
       <main className="grid min-h-0 flex-1 grid-cols-[14rem_minmax(16rem,24rem)_1fr]">
-        {store.error && <div className="error">{store.error}</div>}
+        {store.error && (
+          <div
+            role="alert"
+            className="error col-span-full flex items-center justify-between gap-3 border-b border-app-border bg-app-panel"
+          >
+            <span>{store.error}</span>
+            <button
+              type="button"
+              className="shrink-0 rounded px-2 py-1 text-app-muted hover:bg-app-border hover:text-app-text"
+              aria-label="Dismiss error"
+              onClick={store.actions.clearError}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
         <Sidebar
           feeds={feeds}
           folders={folders}
