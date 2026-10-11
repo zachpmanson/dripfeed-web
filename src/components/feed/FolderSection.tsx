@@ -34,7 +34,7 @@ export default function FolderSection({
     <div className="folder mb-2">
       <div className="folder-head flex items-center">
         <button
-          className={`folder-name-btn flex min-w-0 flex-1 items-center gap-2 rounded-md border-0 px-2.5 py-1.5 text-left text-sm text-app-muted hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${selected ? 'active rounded-r-md rounded-l-none bg-app-border text-app-text shadow-[inset_2px_0_0_var(--accent)]' : ''}`}
+          className={`folder-name-btn flex min-w-0 flex-1 items-center gap-2 rounded-md border-0 px-2.5 py-1.5 text-left text-sm text-app-muted hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${selected ? 'active rounded-r-md rounded-l-none text-app-text shadow-[inset_2px_0_0_var(--accent)]' : ''}`}
           onClick={onSelectFolder}
         >
           <span className="folder-name min-w-0 flex-1 truncate">{folder.name}</span>
