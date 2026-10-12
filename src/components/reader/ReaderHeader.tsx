@@ -35,6 +35,7 @@ export default function ReaderHeader({
       </h2>
       <div className="m-0 flex shrink-0 gap-[0.4rem]">
         <IconButton
+          variant="ghost"
           title={item.starred ? 'Unstar' : 'Star'}
           onClick={() => actions.setStar(item, !item.starred)}
           className="text-[1.05rem] leading-none"
@@ -46,6 +47,7 @@ export default function ReaderHeader({
           )}
         </IconButton>
         <IconButton
+          variant="ghost"
           title={
             extractError
               ? `Extract full article — ${extractError}`
@@ -60,6 +62,7 @@ export default function ReaderHeader({
           {extracting ? <Spinner /> : <DocumentTextIcon className="btn-icon" aria-hidden="true" />}
         </IconButton>
         <IconButton
+          variant="ghost"
           title={item.unread ? 'Mark read' : 'Mark unread'}
           onClick={() => actions.setRead(item, !item.unread)}
           className="text-[1.05rem] leading-none"
