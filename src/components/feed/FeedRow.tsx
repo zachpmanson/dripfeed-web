@@ -1,6 +1,7 @@
 import type { NewsFeed } from '../../api/types'
 import type { RarityInfo } from '../../rarity'
 import { FeedIcon } from './FeedIcon'
+import { sidebarItemClassName } from './sidebarItemStyle'
 
 export default function FeedRow({
   feed,
@@ -25,7 +26,8 @@ export default function FeedRow({
     <button
       data-feed-id={feed.id}
       title={tooltip}
-      className={`feed-row mb-0.5 flex w-full items-center justify-between rounded-md border-0 bg-transparent px-2.5 py-1.5 text-left text-[0.85rem] text-app-text hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${active ? 'active rounded-r-md rounded-l-none bg-app-border shadow-[inset_2px_0_0_var(--accent)]' : ''}`}
+      className={`feed-row ${sidebarItemClassName(active)}`}
+      aria-current={active ? 'page' : undefined}
       onClick={onSelect}
       onContextMenu={(e) => onCtx(e, feed)}
     >
