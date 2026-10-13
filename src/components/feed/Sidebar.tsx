@@ -6,6 +6,7 @@ import { FeedContextMenu } from './FeedContextMenu'
 import { FeedSettingsModal } from './FeedSettingsModal'
 import FeedRow from './FeedRow'
 import FolderSection from './FolderSection'
+import { sidebarItemClassName } from './sidebarItemStyle'
 import type { Settings } from '../../settings'
 import type { RarityInfo } from '../../rarity'
 import type { View } from '../../views'
@@ -146,20 +147,23 @@ export function Sidebar({
       </div>
       <div className="sidebar-scroll min-h-0 overflow-y-auto p-2" ref={scrollRef}>
         <button
-          className={`mb-0.5 flex w-full items-center justify-between rounded-md border-0 px-2.5 py-1.5 text-left text-sm text-app-text hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${view.kind === 'all' ? 'active' : ''}`}
+          className={sidebarItemClassName(view.kind === 'all')}
+          aria-current={view.kind === 'all' ? 'page' : undefined}
           onClick={() => onSelect({ kind: 'all' })}
         >
           <span>All items</span>
         </button>
         <button
-          className={`mb-0.5 flex w-full items-center justify-between rounded-md border-0 px-2.5 py-1.5 text-left text-sm text-app-text hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${view.kind === 'allUnread' ? 'active' : ''}`}
+          className={sidebarItemClassName(view.kind === 'allUnread')}
+          aria-current={view.kind === 'allUnread' ? 'page' : undefined}
           onClick={() => onSelect({ kind: 'allUnread' })}
         >
           <span>All unread</span>
           <span className="count">{totalUnread}</span>
         </button>
         <button
-          className={`mb-0.5 flex w-full items-center justify-between rounded-md border-0 px-2.5 py-1.5 text-left text-sm text-app-text hover:bg-app-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent ${view.kind === 'starred' ? 'active' : ''}`}
+          className={sidebarItemClassName(view.kind === 'starred')}
+          aria-current={view.kind === 'starred' ? 'page' : undefined}
           onClick={() => onSelect({ kind: 'starred' })}
         >
           <span>Starred</span>
