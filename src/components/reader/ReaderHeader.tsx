@@ -23,7 +23,7 @@ export default function ReaderHeader({
 }) {
   return (
     <div className="m-0 flex items-start justify-between gap-3">
-      <h2 className="m-0 text-[1.15rem] leading-[1.3]">
+      <h2 className="m-0 text-[1.15rem] leading-[1.3] font-bold">
         <a
           className="text-app-text no-underline hover:underline"
           href={item.url}
