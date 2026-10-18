@@ -167,6 +167,34 @@ export async function dbPutItem(item: NewsItem): Promise<void> {
   await dbPutItems([item])
 }
 
+/** Atomically update one stored item and return its previous and next values. */
+export async function dbUpdateItem(
+  id: number,
+  update: (item: NewsItem) => NewsItem,
+): Promise<{ previous: NewsItem | undefined; next: NewsItem | undefined }> {
+  const db = await getDB()
+  const tx = db.transaction('items', 'readwrite')
+  const previous = await tx.store.get(id)
+  const next = previous ? update(previous) : undefined
+  if (next) await tx.store.put(next)
+  await tx.done
+  return { previous, next }
+}
+
+/** Atomically update one stored feed row. */
+export async function dbUpdateFeed(
+  id: number,
+  update: (feed: NewsFeed) => NewsFeed,
+): Promise<{ previous: NewsFeed | undefined; next: NewsFeed | undefined }> {
+  const db = await getDB()
+  const tx = db.transaction('feeds', 'readwrite')
+  const previous = await tx.store.get(id)
+  const next = previous ? update(previous) : undefined
+  if (next) await tx.store.put(next)
+  await tx.done
+  return { previous, next }
+}
+
 export async function dbGetAllItems(): Promise<NewsItem[]> {
   const db = await getDB()
   return db.getAll('items')
