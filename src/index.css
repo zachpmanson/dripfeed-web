@@ -90,7 +90,6 @@
   /* Header icon buttons. Give them a proper target size instead of inheriting
    tiny base font. */
   .header-right .add-btn {
-    border: 1px solid var(--border);
     border-radius: 6px;
     background: transparent;
     color: var(--text);
