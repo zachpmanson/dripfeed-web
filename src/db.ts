@@ -1,6 +1,7 @@
 import { openDB } from 'idb'
 import type { DBSchema, IDBPDatabase } from 'idb'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
+import { ItemMutationVersion, mergeServerItem } from './itemMutationVersion'
 
 const DB_NAME = 'dripfeed'
 // v2: per-feed initial sync now covers EVERY feed (the old worker returned
@@ -61,6 +62,7 @@ function getDB(): Promise<IDBPDatabase<DripfeedDB>> {
 }
 
 export async function dbClear(): Promise<void> {
+  itemMutationVersion.clear()
   const db = await getDB()
   await Promise.all([db.clear('items'), db.clear('feeds'), db.clear('folders'), db.clear('meta')])
 }
@@ -135,10 +137,26 @@ export async function dbPutFolders(folders: NewsFolder[]): Promise<void> {
   await tx.done
 }
 
-export async function dbPutItems(items: NewsItem[]): Promise<void> {
+const itemMutationVersion = new ItemMutationVersion()
+
+/** Version to capture before fetching server rows for stale-response protection. */
+export function dbGetItemMutationVersion(): number {
+  return itemMutationVersion.snapshot()
+}
+
+export async function dbPutItems(
+  items: NewsItem[],
+  preserveLocalMutationsSince?: number,
+): Promise<void> {
   const db = await getDB()
   const tx = db.transaction('items', 'readwrite')
-  await Promise.all(items.map((i) => tx.store.put(i)))
+  for (const item of items) {
+    const preserveLocalState =
+      preserveLocalMutationsSince !== undefined &&
+      itemMutationVersion.changedSince(item.id, preserveLocalMutationsSince)
+    const local = preserveLocalState ? await tx.store.get(item.id) : undefined
+    await tx.store.put(mergeServerItem(item, local, preserveLocalState))
+  }
   await tx.done
 }
 
@@ -178,6 +196,9 @@ export async function dbUpdateItem(
   const next = previous ? update(previous) : undefined
   if (next) await tx.store.put(next)
   await tx.done
+  if (next) {
+    itemMutationVersion.mark(id)
+  }
   return { previous, next }
 }
 
