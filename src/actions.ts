@@ -116,7 +116,14 @@ export async function extractFulltext(settings: Settings, item: NewsItem): Promi
   if (!extracted) {
     throw new Error('Could not extract an article from this URL')
   }
-  await dbPutItem(normalizeItem(extracted))
+  const normalized = normalizeItem(extracted)
+  const { next } = await dbUpdateItem(normalized.id, (current) => ({
+    ...normalized,
+    unread: current.unread,
+    starred: current.starred,
+  }))
+  // The item may have been evicted since the reader was opened.
+  if (!next) await dbPutItem(normalized)
   notifyLocalChange()
 }
 
