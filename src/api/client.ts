@@ -13,7 +13,30 @@ export class ApiError extends Error {
   }
 }
 
-let rateLimitedUntil = 0
+export class RateLimitCooldown {
+  private readonly cooldowns = new Map<string, number>()
+
+  remaining(key: string, now = Date.now()): number {
+    const until = this.cooldowns.get(key) ?? 0
+    if (until <= now) {
+      this.cooldowns.delete(key)
+      return 0
+    }
+    return until - now
+  }
+
+  extend(key: string, delay: number, now = Date.now()): number {
+    const until = Math.max(this.cooldowns.get(key) ?? 0, now + delay)
+    this.cooldowns.set(key, until)
+    return until - now
+  }
+}
+
+const rateLimitCooldown = new RateLimitCooldown()
+
+function rateLimitKey(url: string): string {
+  return new URL(url, globalThis.location?.href ?? 'http://same-origin.invalid').origin
+}
 
 function parseRetryAfter(value: string | null, now = Date.now()): number | undefined {
   if (!value) return undefined
@@ -60,7 +83,8 @@ async function authedFetch(
     headers.set('Content-Type', 'application/json')
   }
 
-  const remainingCooldown = rateLimitedUntil - Date.now()
+  const cooldownKey = rateLimitKey(url)
+  const remainingCooldown = rateLimitCooldown.remaining(cooldownKey)
   if (remainingCooldown > 0) {
     throw new ApiError(rateLimitMessage(remainingCooldown), 429, remainingCooldown)
   }
@@ -73,7 +97,7 @@ async function authedFetch(
   if (!res.ok) {
     if (res.status === 429) {
       const retryAfterMs = parseRetryAfter(res.headers.get('Retry-After')) ?? 60_000
-      rateLimitedUntil = Math.max(rateLimitedUntil, Date.now() + retryAfterMs)
+      rateLimitCooldown.extend(cooldownKey, retryAfterMs)
       throw new ApiError(rateLimitMessage(retryAfterMs), 429, retryAfterMs)
     }
     const message =
