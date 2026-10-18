@@ -1,4 +1,4 @@
-import { dbPutItem, dbGetFeed, dbGetFeedItems, dbPutFeed } from './db'
+import { dbUpdateItem, dbUpdateFeed, dbGetFeed, dbGetFeedItems, dbPutFeed, dbPutItem } from './db'
 import {
   markRead,
   markUnread,
@@ -11,6 +11,36 @@ import { notifyLocalChange, normalizeItem } from './store'
 import { isAuthError } from './api/client'
 import type { NewsItem } from './api/types'
 import type { Settings } from './settings'
+import { SerialOptimisticMutation } from './optimisticMutation'
+
+const readMutations = new Map<number, SerialOptimisticMutation<boolean>>()
+const starMutations = new Map<number, SerialOptimisticMutation<boolean>>()
+
+function getMutation(
+  mutations: Map<number, SerialOptimisticMutation<boolean>>,
+  itemId: number,
+  initialValue: boolean,
+): SerialOptimisticMutation<boolean> {
+  let mutation = mutations.get(itemId)
+  if (!mutation) {
+    mutation = new SerialOptimisticMutation(initialValue)
+    mutations.set(itemId, mutation)
+  }
+  return mutation
+}
+
+async function setItemReadState(item: NewsItem, unread: boolean): Promise<void> {
+  const { previous, next } = await dbUpdateItem(item.id, (current) => ({ ...current, unread }))
+  if (previous && next && previous.unread !== next.unread) {
+    await bumpFeedUnread(item.feedId, next.unread ? 1 : -1)
+  }
+  notifyLocalChange()
+}
+
+async function setItemStarState(item: NewsItem, starred: boolean): Promise<void> {
+  await dbUpdateItem(item.id, (current) => ({ ...current, starred }))
+  notifyLocalChange()
+}
 
 /**
  * Optimistic feed-badge adjustment. The sidebar now reads the server's
@@ -19,9 +49,10 @@ import type { Settings } from './settings'
  * leave the badge stale until the next poll.
  */
 async function bumpFeedUnread(feedId: number, delta: number): Promise<void> {
-  const feed = await dbGetFeed(feedId)
-  if (!feed) return
-  await dbPutFeed({ ...feed, unreadCount: Math.max(0, feed.unreadCount + delta) })
+  await dbUpdateFeed(feedId, (feed) => ({
+    ...feed,
+    unreadCount: Math.max(0, feed.unreadCount + delta),
+  }))
 }
 
 /**
@@ -30,33 +61,28 @@ async function bumpFeedUnread(feedId: number, delta: number): Promise<void> {
  * (success or revert) so the UI reflects the toggle immediately.
  */
 export async function setRead(settings: Settings, item: NewsItem, unread: boolean): Promise<void> {
-  const next: NewsItem = { ...item, unread }
-  await dbPutItem(next) // local first (instant UI)
-  await bumpFeedUnread(item.feedId, unread ? 1 : -1)
-  notifyLocalChange()
-  try {
-    if (unread) await markUnread(settings, item.id)
-    else await markRead(settings, item.id)
-  } catch (e) {
-    // Server failed — revert local so we don't drift.
-    await dbPutItem(item)
-    await bumpFeedUnread(item.feedId, unread ? -1 : 1)
-    notifyLocalChange()
-    throw e
-  }
+  const optimistic = setItemReadState(item, unread)
+  return getMutation(readMutations, item.id, item.unread).enqueue(
+    unread,
+    async () => {
+      await optimistic
+      if (unread) await markUnread(settings, item.id)
+      else await markRead(settings, item.id)
+    },
+    async (confirmed) => setItemReadState(item, confirmed),
+  )
 }
 
 export async function setStar(settings: Settings, item: NewsItem, starred: boolean): Promise<void> {
-  const next: NewsItem = { ...item, starred }
-  await dbPutItem(next)
-  notifyLocalChange()
-  try {
-    await setStarApi(settings, item.id, starred)
-  } catch (e) {
-    await dbPutItem(item)
-    notifyLocalChange()
-    throw e
-  }
+  const optimistic = setItemStarState(item, starred)
+  return getMutation(starMutations, item.id, item.starred).enqueue(
+    starred,
+    async () => {
+      await optimistic
+      await setStarApi(settings, item.id, starred)
+    },
+    async (confirmed) => setItemStarState(item, confirmed),
+  )
 }
 
 /** Only a 401 confirms that the server rejected the stored credentials.
