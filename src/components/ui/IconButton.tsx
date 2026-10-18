@@ -6,7 +6,7 @@ interface Props {
   children: ReactNode
   disabled?: boolean
   className?: string
-  variant?: 'default' | 'ghost'
+  variant?: 'default' | 'bare'
 }
 
 /** A small square header/reader icon button (glyph or SVG child). */
@@ -19,9 +19,7 @@ export function IconButton({
   variant = 'default',
 }: Props) {
   const variantClasses =
-    variant === 'ghost'
-      ? 'border border-transparent bg-transparent'
-      : 'border border-app-border bg-app-panel'
+    variant === 'bare' ? 'bg-transparent' : 'border border-app-border bg-app-panel'
 
   return (
     <button
