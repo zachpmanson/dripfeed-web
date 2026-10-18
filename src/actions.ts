@@ -15,6 +15,7 @@ import { SerialOptimisticMutation } from './optimisticMutation'
 
 const readMutations = new Map<number, SerialOptimisticMutation<boolean>>()
 const starMutations = new Map<number, SerialOptimisticMutation<boolean>>()
+const fullTextMutations = new Map<number, SerialOptimisticMutation<boolean>>()
 
 function getMutation(
   mutations: Map<number, SerialOptimisticMutation<boolean>>,
@@ -122,8 +123,9 @@ export async function extractFulltext(settings: Settings, item: NewsItem): Promi
 /**
  * Per-feed settings write. Optimistic on the local feed row (the sidebar
  * re-render is instant), then the News server's own feed-settings route.
- * On failure the row is restored so the toggle never lies about what the
- * server holds — the caller surfaces the error.
+ * Writes are serialized per feed, and rollback touches only this setting so
+ * an older failed toggle cannot undo a newer choice or another feed field.
+ * The caller surfaces failures.
  *
  * Reached same-origin only, so a feed whose baseUrl points at a DIFFERENT
  * Nextcloud cannot be written (that install is not behind the /apps proxy).
@@ -135,16 +137,21 @@ export async function setFeedFullText(
   feedId: number,
   fullTextEnabled: boolean,
 ): Promise<void> {
-  const prev = await dbGetFeed(feedId)
-  if (prev) await dbPutFeed({ ...prev, fullTextEnabled })
+  const current = await dbGetFeed(feedId)
+  const mutation = getMutation(fullTextMutations, feedId, current?.fullTextEnabled ?? false)
+  const optimistic = dbUpdateFeed(feedId, (feed) => ({ ...feed, fullTextEnabled }))
   notifyLocalChange()
-  try {
-    await setFeedFullTextApi(settings, feedId, fullTextEnabled)
-  } catch (e) {
-    if (prev) await dbPutFeed(prev)
-    notifyLocalChange()
-    throw e
-  }
+  return mutation.enqueue(
+    fullTextEnabled,
+    async () => {
+      await optimistic
+      await setFeedFullTextApi(settings, feedId, fullTextEnabled)
+    },
+    async (confirmed) => {
+      await dbUpdateFeed(feedId, (feed) => ({ ...feed, fullTextEnabled: confirmed }))
+      notifyLocalChange()
+    },
+  )
 }
 
 /**
