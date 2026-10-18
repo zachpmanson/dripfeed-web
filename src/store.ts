@@ -6,6 +6,7 @@ import {
   dbGetAllFolders,
   dbGetAllItems,
   dbGetMeta,
+  dbGetItemMutationVersion,
   dbMergeFeedFullText,
   dbPutFeeds,
   dbPutFolders,
@@ -114,11 +115,12 @@ export async function fullSync(settings: Settings): Promise<void> {
   await hydrateFeedFullText(settings)
   await dbPutFolders(folders)
 
+  const mutationVersion = dbGetItemMutationVersion()
   const { items, feedWindows } = await fetchInitial(settings, feeds, (done) => {
     status = { stage: 'fetching', done }
     emit()
   })
-  await dbPutItems(items.map(normalizeItem))
+  await dbPutItems(items.map(normalizeItem), mutationVersion)
   // Per-feed window cursors: seeds for load-more paging. Starred items are
   // deliberately excluded from cursor positions (they're old and separate).
   for (const [feedId, minId] of feedWindows) await dbSetCursor(feedId, minId)
@@ -153,9 +155,10 @@ export async function ensureUnreadScope(
   type: 0 | 1,
   id: number,
 ): Promise<number> {
+  const mutationVersion = dbGetItemMutationVersion()
   const items = await fetchUnreadScope(settings, type, id)
   if (items.length > 0) {
-    await dbPutItems(items.map(normalizeItem))
+    await dbPutItems(items.map(normalizeItem), mutationVersion)
   }
   return items.length
 }
@@ -167,13 +170,14 @@ export async function incrementalSync(settings: Settings): Promise<void> {
   await hydrateFeedFullText(settings)
   await dbPutFolders(folders)
 
+  const mutationVersion = dbGetItemMutationVersion()
   const resp = await fetchItems(settings, {
     type: LIST_TYPES.ALL,
     getRead: true,
     oldestFirst: false,
     batchSize: 500,
   })
-  await dbPutItems(resp.items.map(normalizeItem))
+  await dbPutItems(resp.items.map(normalizeItem), mutationVersion)
 
   // Server-authoritative pass: pull everything changed since the last poll
   // and overwrite the matching local rows, so read/star flags updated by
@@ -204,9 +208,10 @@ export async function incrementalSync(settings: Settings): Promise<void> {
  */
 export async function reconcileUpdated(settings: Settings): Promise<number> {
   const prev = Number((await dbGetMeta(RECONCILE_MARKER_KEY)) ?? 0)
+  const mutationVersion = dbGetItemMutationVersion()
   const { items, serverTime } = await fetchUpdatedItems(settings, prev)
   if (items.length > 0) {
-    await dbPutItems(items.map(normalizeItem))
+    await dbPutItems(items.map(normalizeItem), mutationVersion)
   }
   const marker = nextReconcileMarker(
     prev,
@@ -281,13 +286,14 @@ export async function loadMoreInto(
     dated.sort((a, b) => b.min - a.min)
     const pick = dated[0]
 
+    const mutationVersion = dbGetItemMutationVersion()
     const items = await fetchFeedWindow(settings, pick.f.id, pick.cursor)
     if (items.length === 0) {
       await dbSetCursor(pick.f.id, -1) // drained
       live = live.filter((x) => x.f.id !== pick.f.id)
       continue
     }
-    await dbPutItems(items.map(normalizeItem))
+    await dbPutItems(items.map(normalizeItem), mutationVersion)
     const nextMin = items.reduce((m, i) => Math.min(m, i.id), items[0].id)
     const drained = items.length < FEED_WINDOW
     await dbSetCursor(pick.f.id, drained ? -1 : nextMin)
@@ -324,13 +330,14 @@ export async function ensureFeedWindow(settings: Settings, feedId: number): Prom
 
   // 1. top up to a full window while the server keeps returning pages
   while (local + added < FEED_WINDOW && cursor !== undefined && cursor >= 0) {
+    const mutationVersion = dbGetItemMutationVersion()
     const items = await fetchFeedWindow(settings, feedId, cursor)
     if (items.length === 0) {
       await dbSetCursor(feedId, -1)
       cursor = -1
       break
     }
-    await dbPutItems(items.map(normalizeItem))
+    await dbPutItems(items.map(normalizeItem), mutationVersion)
     added += items.length
     cursor =
       items.length < FEED_WINDOW ? -1 : items.reduce((m, i) => Math.min(m, i.id), items[0].id)
@@ -340,11 +347,12 @@ export async function ensureFeedWindow(settings: Settings, feedId: number): Prom
   // 2. probe: exactly a full window + live cursor → one 1-item request
   //    decides whether more history actually exists behind the cursor
   if (cursor !== undefined && cursor >= 0 && local + added >= FEED_WINDOW) {
+    const mutationVersion = dbGetItemMutationVersion()
     const probe = await fetchFeedWindow(settings, feedId, cursor, 1)
     if (probe.length === 0) {
       await dbSetCursor(feedId, -1) // truly drained — button hides
     } else {
-      await dbPutItems(probe.map(normalizeItem)) // it exists — keep it
+      await dbPutItems(probe.map(normalizeItem), mutationVersion) // it exists — keep it
       added += probe.length
       const probeMin = probe.reduce((m, i) => Math.min(m, i.id), probe[0].id)
       await dbSetCursor(feedId, probeMin)
