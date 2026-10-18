@@ -53,6 +53,7 @@ export interface SyncStatus {
 }
 
 let dbReady = false
+let resetGeneration = 0
 const listeners = new Set<() => void>()
 let status: SyncStatus = { stage: 'idle', done: 0 }
 
@@ -97,34 +98,45 @@ export async function isInitialized(): Promise<boolean> {
  * previous behaviour instead of firing a request that cannot work (root
  * routes carry no CORS exemption — the write path has the same limit).
  */
-async function hydrateFeedFullText(settings: Settings): Promise<void> {
+async function hydrateFeedFullText(settings: Settings, generation: number): Promise<void> {
   if (settings.baseUrl.trim() !== '') return
   try {
-    await dbMergeFeedFullText(await fetchFeedFullText(settings))
+    const flags = await fetchFeedFullText(settings)
+    if (generation === resetGeneration) await dbMergeFeedFullText(flags)
   } catch (e) {
     console.warn('feed settings read failed', e)
   }
 }
 
 export async function fullSync(settings: Settings): Promise<void> {
+  const generation = resetGeneration
   status = { stage: 'fetching', done: 0 }
   emit()
 
   const { feeds, folders, serverTime } = await fetchMeta(settings)
+  if (generation !== resetGeneration) return
   await dbPutFeeds(feeds)
-  await hydrateFeedFullText(settings)
+  if (generation !== resetGeneration) return
+  await hydrateFeedFullText(settings, generation)
+  if (generation !== resetGeneration) return
   await dbPutFolders(folders)
 
   const mutationVersion = dbGetItemMutationVersion()
   const { items, feedWindows } = await fetchInitial(settings, feeds, (done) => {
+    if (generation !== resetGeneration) return
     status = { stage: 'fetching', done }
     emit()
   })
+  if (generation !== resetGeneration) return
   await dbPutItems(items.map(normalizeItem), mutationVersion)
   // Per-feed window cursors: seeds for load-more paging. Starred items are
   // deliberately excluded from cursor positions (they're old and separate).
-  for (const [feedId, minId] of feedWindows) await dbSetCursor(feedId, minId)
+  for (const [feedId, minId] of feedWindows) {
+    if (generation !== resetGeneration) return
+    await dbSetCursor(feedId, minId)
+  }
 
+  if (generation !== resetGeneration) return
   await dbSetMeta('initialized', '1')
   // Seed the reconcile marker so the first poll's /items/updated delta only
   // carries changes made AFTER hydration — everything the mirror needs has
@@ -132,7 +144,9 @@ export async function fullSync(settings: Settings): Promise<void> {
   // /feeds Date header), not the browser's: a browser clock running behind
   // the server would otherwise seed a marker the server has already passed,
   // and changes in the gap would never be returned (the filter is `>=`).
+  if (generation !== resetGeneration) return
   await dbSetMeta(RECONCILE_MARKER_KEY, String(markerStamp(serverTime)))
+  if (generation !== resetGeneration) return
   dbReady = true
   status = { stage: 'done', done: items.length }
   emit()
@@ -155,8 +169,10 @@ export async function ensureUnreadScope(
   type: 0 | 1,
   id: number,
 ): Promise<number> {
+  const generation = resetGeneration
   const mutationVersion = dbGetItemMutationVersion()
   const items = await fetchUnreadScope(settings, type, id)
+  if (generation !== resetGeneration) return 0
   if (items.length > 0) {
     await dbPutItems(items.map(normalizeItem), mutationVersion)
   }
@@ -165,9 +181,13 @@ export async function ensureUnreadScope(
 
 /** Light refresh: newest-500 window merged + feeds/folders meta. */
 export async function incrementalSync(settings: Settings): Promise<void> {
+  const generation = resetGeneration
   const { feeds, folders } = await fetchMeta(settings)
+  if (generation !== resetGeneration) return
   await dbPutFeeds(feeds)
-  await hydrateFeedFullText(settings)
+  if (generation !== resetGeneration) return
+  await hydrateFeedFullText(settings, generation)
+  if (generation !== resetGeneration) return
   await dbPutFolders(folders)
 
   const mutationVersion = dbGetItemMutationVersion()
@@ -177,13 +197,15 @@ export async function incrementalSync(settings: Settings): Promise<void> {
     oldestFirst: false,
     batchSize: 500,
   })
+  if (generation !== resetGeneration) return
   await dbPutItems(resp.items.map(normalizeItem), mutationVersion)
 
   // Server-authoritative pass: pull everything changed since the last poll
   // and overwrite the matching local rows, so read/star flags updated by
   // other clients converge here (the newest-500 window above never touches
   // older locally-stored items).
-  await reconcileUpdated(settings)
+  if (generation !== resetGeneration) return
+  await reconcileUpdated(settings, generation)
 }
 
 /**
@@ -206,10 +228,15 @@ export async function incrementalSync(settings: Settings): Promise<void> {
  *
  * Returns how many changed items were applied.
  */
-export async function reconcileUpdated(settings: Settings): Promise<number> {
+export async function reconcileUpdated(
+  settings: Settings,
+  generation = resetGeneration,
+): Promise<number> {
   const prev = Number((await dbGetMeta(RECONCILE_MARKER_KEY)) ?? 0)
+  if (generation !== resetGeneration) return 0
   const mutationVersion = dbGetItemMutationVersion()
   const { items, serverTime } = await fetchUpdatedItems(settings, prev)
+  if (generation !== resetGeneration) return 0
   if (items.length > 0) {
     await dbPutItems(items.map(normalizeItem), mutationVersion)
   }
@@ -218,7 +245,9 @@ export async function reconcileUpdated(settings: Settings): Promise<number> {
     serverTime,
     items.map((item) => item.lastModified),
   )
-  if (marker > prev) await dbSetMeta(RECONCILE_MARKER_KEY, String(marker))
+  if (marker > prev && generation === resetGeneration) {
+    await dbSetMeta(RECONCILE_MARKER_KEY, String(marker))
+  }
   return items.length
 }
 
@@ -255,7 +284,9 @@ export async function loadMoreInto(
   step = LOAD_STEP,
   onProgress?: (p: LoadMoreProgress) => void,
 ): Promise<number> {
+  const generation = resetGeneration
   const allFeeds = await dbGetAllFeeds()
+  if (generation !== resetGeneration) return 0
   const targets = feedIds
     .map((id) => allFeeds.find((f) => f.id === id))
     .filter((f): f is NewsFeed => !!f)
@@ -288,12 +319,14 @@ export async function loadMoreInto(
 
     const mutationVersion = dbGetItemMutationVersion()
     const items = await fetchFeedWindow(settings, pick.f.id, pick.cursor)
+    if (generation !== resetGeneration) return added
     if (items.length === 0) {
       await dbSetCursor(pick.f.id, -1) // drained
       live = live.filter((x) => x.f.id !== pick.f.id)
       continue
     }
     await dbPutItems(items.map(normalizeItem), mutationVersion)
+    if (generation !== resetGeneration) return added
     const nextMin = items.reduce((m, i) => Math.min(m, i.id), items[0].id)
     const drained = items.length < FEED_WINDOW
     await dbSetCursor(pick.f.id, drained ? -1 : nextMin)
@@ -320,6 +353,7 @@ export async function loadMoreInto(
  * Returns how many items were added.
  */
 export async function ensureFeedWindow(settings: Settings, feedId: number): Promise<number> {
+  const generation = resetGeneration
   const all = await dbGetAllItems()
   let cursor = await dbGetCursor(feedId)
   // Older starred items are hydrated separately from the newest per-feed
@@ -332,12 +366,14 @@ export async function ensureFeedWindow(settings: Settings, feedId: number): Prom
   while (local + added < FEED_WINDOW && cursor !== undefined && cursor >= 0) {
     const mutationVersion = dbGetItemMutationVersion()
     const items = await fetchFeedWindow(settings, feedId, cursor)
+    if (generation !== resetGeneration) return added
     if (items.length === 0) {
       await dbSetCursor(feedId, -1)
       cursor = -1
       break
     }
     await dbPutItems(items.map(normalizeItem), mutationVersion)
+    if (generation !== resetGeneration) return added
     added += items.length
     cursor =
       items.length < FEED_WINDOW ? -1 : items.reduce((m, i) => Math.min(m, i.id), items[0].id)
@@ -349,10 +385,12 @@ export async function ensureFeedWindow(settings: Settings, feedId: number): Prom
   if (cursor !== undefined && cursor >= 0 && local + added >= FEED_WINDOW) {
     const mutationVersion = dbGetItemMutationVersion()
     const probe = await fetchFeedWindow(settings, feedId, cursor, 1)
+    if (generation !== resetGeneration) return added
     if (probe.length === 0) {
       await dbSetCursor(feedId, -1) // truly drained — button hides
     } else {
       await dbPutItems(probe.map(normalizeItem), mutationVersion) // it exists — keep it
+      if (generation !== resetGeneration) return added
       added += probe.length
       const probeMin = probe.reduce((m, i) => Math.min(m, i.id), probe[0].id)
       await dbSetCursor(feedId, probeMin)
@@ -384,6 +422,9 @@ export function normalizeItem(i: NewsItem): NewsItem {
 }
 
 export async function resetLocal(): Promise<void> {
+  // Invalidate every in-flight sync before the purge starts, so no response
+  // from the signed-out account can repopulate the local database afterward.
+  resetGeneration += 1
   await dbClear()
   dbReady = false
   status = { stage: 'idle', done: 0 }
