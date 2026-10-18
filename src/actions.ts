@@ -1,4 +1,4 @@
-import { dbUpdateItem, dbUpdateFeed, dbGetFeed, dbGetFeedItems, dbPutFeed, dbPutItem } from './db'
+import { dbUpdateItem, dbUpdateFeed, dbGetFeed, dbGetFeedItems, dbPutItem } from './db'
 import {
   markRead,
   markUnread,
@@ -158,27 +158,32 @@ export async function setFeedFullText(
  * Mark every locally-stored item of a feed as read (optimistic), then tell
  * the server to mark the whole feed read via POST /feeds/{id}/read. Passing
  * MAX_SAFE_INTEGER as newestItemId covers items we haven't loaded locally.
- * On server failure the local read flags are reverted.
+ * On server failure the local read flags and badge are reverted without
+ * replacing whole rows, so concurrent star/settings changes survive.
  */
 export async function markFeedAllRead(settings: Settings, feedId: number): Promise<void> {
   const local = await dbGetFeedItems(feedId)
-  const prev = new Map(local.map((i) => [i.id, i]))
-  const next = local.filter((i) => i.unread).map((i) => ({ ...i, unread: false }))
+  const prev = new Map(local.map((i) => [i.id, i.unread]))
+  const next = local.filter((i) => i.unread)
   // Optimistic badge zeroing, alongside the item flags (see bumpFeedUnread).
   // Zeroed even when no locally-stored item flips: the local window is only
   // a slice of the feed, while the badge is the server's whole count — and
   // the server-side mark-feed-read below covers the rest.
   const prevFeed = await dbGetFeed(feedId)
   if (next.length > 0) {
-    for (const it of next) await dbPutItem(it)
+    for (const it of next) await dbUpdateItem(it.id, (current) => ({ ...current, unread: false }))
   }
-  if (prevFeed) await dbPutFeed({ ...prevFeed, unreadCount: 0 })
+  if (prevFeed) await dbUpdateFeed(feedId, (feed) => ({ ...feed, unreadCount: 0 }))
   notifyLocalChange()
   try {
     await markFeedRead(settings, feedId, Number.MAX_SAFE_INTEGER)
   } catch (e) {
-    for (const orig of prev.values()) await dbPutItem(orig)
-    if (prevFeed) await dbPutFeed(prevFeed)
+    for (const [id, unread] of prev) {
+      await dbUpdateItem(id, (current) => ({ ...current, unread }))
+    }
+    if (prevFeed) {
+      await dbUpdateFeed(feedId, (feed) => ({ ...feed, unreadCount: prevFeed.unreadCount }))
+    }
     notifyLocalChange()
     throw e
   }
