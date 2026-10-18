@@ -26,6 +26,7 @@ import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
 import { clearSettings } from './settings'
 import type { Settings } from './settings'
 import { FEED_WINDOW } from './api/sync'
+import { markerStamp, nextReconcileMarker, RECONCILE_MARKER_KEY } from './syncMarker'
 
 /** Target items to add per load-more invocation (≈ a screenful). */
 export const LOAD_STEP = 60
@@ -35,27 +36,6 @@ export const LOAD_STEP = 60
  * reconcile passes the last marker so each tick only pulls items that
  * actually changed on the server. Seeded at the end of fullSync.
  */
-const RECONCILE_MARKER = 'reconcile:lastModified'
-
-/**
- * Seconds to back the reconcile marker off the server's response timestamp,
- * so changes landing between the server running the delta query and stamping
- * the response are re-fetched rather than skipped (see reconcileUpdated).
- */
-const MARKER_SAFETY = 2
-
-/**
- * The next reconcile marker: the server clock minus MARKER_SAFETY, falling
- * back to the local clock only when the server sent no usable `Date` header.
- * The browser's clock is never trusted while the server's is available — a
- * browser running ahead of the server would stamp a marker past changes the
- * delta had not yet returned, and the server's `>=` filter would never
- * surface them again.
- */
-function markerStamp(serverTime: number | null): number {
-  return serverTime === null ? Math.floor(Date.now() / 1000) : serverTime - MARKER_SAFETY
-}
-
 /**
  * IndexedDB-backed mirror. Initial hydration is per-feed: the newest
  * FEED_WINDOW (20) of every feed + the full starred set — the main page only
@@ -149,7 +129,7 @@ export async function fullSync(settings: Settings): Promise<void> {
   // /feeds Date header), not the browser's: a browser clock running behind
   // the server would otherwise seed a marker the server has already passed,
   // and changes in the gap would never be returned (the filter is `>=`).
-  await dbSetMeta(RECONCILE_MARKER, String(markerStamp(serverTime)))
+  await dbSetMeta(RECONCILE_MARKER_KEY, String(markerStamp(serverTime)))
   dbReady = true
   status = { stage: 'done', done: items.length }
   emit()
@@ -222,16 +202,17 @@ export async function incrementalSync(settings: Settings): Promise<void> {
  * Returns how many changed items were applied.
  */
 export async function reconcileUpdated(settings: Settings): Promise<number> {
-  const prev = Number((await dbGetMeta(RECONCILE_MARKER)) ?? 0)
+  const prev = Number((await dbGetMeta(RECONCILE_MARKER_KEY)) ?? 0)
   const { items, serverTime } = await fetchUpdatedItems(settings, prev)
   if (items.length > 0) {
     await dbPutItems(items.map(normalizeItem))
   }
-  let marker = markerStamp(serverTime)
-  for (const i of items) {
-    if (i.lastModified && i.lastModified > marker) marker = i.lastModified
-  }
-  if (marker > prev) await dbSetMeta(RECONCILE_MARKER, String(marker))
+  const marker = nextReconcileMarker(
+    prev,
+    serverTime,
+    items.map((item) => item.lastModified),
+  )
+  if (marker > prev) await dbSetMeta(RECONCILE_MARKER_KEY, String(marker))
   return items.length
 }
 

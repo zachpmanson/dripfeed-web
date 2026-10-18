@@ -14,8 +14,7 @@ import { AddModal } from './components/feed/AddModal'
 import { SettingsModal } from './components/settings/SettingsModal'
 import AppHeader from './components/app/AppHeader'
 import SyncGate from './components/app/SyncGate'
-import { rarityMultipliers, rarityStats } from './rarity'
-import { filterView } from './selectors'
+import { buildAppViewModel } from './appViewModel'
 import type { NewsItem } from './api/types'
 
 export default function App() {
@@ -118,86 +117,29 @@ export default function App() {
 
   const { pool, feeds, folders, loadingMore, paging, cursors } = store
 
-  // folder id -> set of member feed ids (items only know feedId)
-  const feedOfFolder = new Map<number, Set<number>>()
-  for (const f of feeds.values()) {
-    if (f.folderId === null) continue
-    let s = feedOfFolder.get(f.folderId)
-    if (!s) feedOfFolder.set(f.folderId, (s = new Set()))
-    s.add(f.id)
-  }
-
-  // Cursor-aware "server has more" derived PER VIEW: feed view → that
-  // feed's cursor; folder view → any member feed's cursor; all/unread/
-  // starred → any feed with a live cursor. A feed with no cursor yet
-  // (window still unseeded) is treated as having more.
-  let scopeIds: Iterable<number>
-  if (view.kind === 'feed') scopeIds = [view.id]
-  else if (view.kind === 'folder') scopeIds = feedOfFolder.get(view.id) ?? []
-  else scopeIds = cursors.keys()
-  const scope = [...scopeIds]
-  const liveCount = scope.filter((fid) => (cursors.get(fid) ?? -1) >= 0).length
-  // In unread-only mode, a feed/folder scope probed by the native unread
-  // query (getRead=false, no limit) contains ALL its unread items locally —
-  // there is nothing left to page, so suppress the history walk entirely.
-  const unreadScopeProbed =
-    showMode === 'unread' &&
-    (view.kind === 'feed' || view.kind === 'folder') &&
-    store.unreadDrained.has(unreadScopeKey(view.kind === 'feed' ? 0 : 1, view.id))
-  const moreServer = unreadScopeProbed ? false : liveCount > 0
-  // Drained = the view's feeds are all paged to the server end (or the
-  // view has no feeds of its own to page, e.g. an empty folder).
-  const drained = unreadScopeProbed || scope.length === 0 || liveCount === 0
-  // While the native unread probe is in flight the trailing row shows
-  // "Loading…" — never a clickable button, because in only-unread
-  // feed/folder mode the button's only real job is to (re)run that probe
-  // and the pending state would otherwise be a button that no-ops.
-  const unreadProbing =
-    showMode === 'unread' &&
-    (view.kind === 'feed' || view.kind === 'folder') &&
-    store.unreadProbing &&
-    moreServer &&
-    !drained
-
-  // Filter + rank the WHOLE pool, then slice for display. Rarity/selected
-  // operate over the full pool (rarity's 20-item feed sample is stable
-  // regardless of how much history load-more has pulled in).
-  const rarMult = sortMode === 'rarity' ? rarityMultipliers(pool) : undefined
-  const rarStats = rarityStats(pool)
-  const visibleItems = filterView(pool, view, sortMode, showMode, rarMult, feedOfFolder)
-
-  // Identity of the current VIEW, for the item list's render window: feed /
-  // folder / all / starred, the show mode and the sort mode — never the data.
-  // ItemList restarts its 50-row window when this changes and only then; a
-  // sync that appends or removes items leaves the window (and so the reader's
-  // scroll position) where it is. The window is applied inside ItemList, after
-  // this filtering + ordering, so it slices a fully filtered, fully sorted
-  // list.
-  const viewKey =
-    `${view.kind}:${view.kind === 'feed' || view.kind === 'folder' ? view.id : ''}` +
-    `:${showMode}:${sortMode}`
-
+  const model = buildAppViewModel({
+    pool,
+    feeds,
+    cursors,
+    view,
+    showMode,
+    sortMode,
+    selectedId,
+    unreadDrained: store.unreadDrained,
+    unreadProbing: store.unreadProbing,
+  })
+  const {
+    visibleItems,
+    selected,
+    recentBodies,
+    rarityStats: rarStats,
+    moreServer,
+    drained,
+    unreadProbing,
+    viewKey,
+  } = model
   const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
   const feedById = (feedId: number) => feeds.get(feedId)
-  // Selection: prefer the id in the CURRENT view; if the item dropped out of
-  // the filter (e.g. marked read in the unread view) fall back to the same
-  // id in the full pool so the reader stays on it. Only when the item is
-  // gone entirely do we jump to the first visible item.
-  const selected =
-    (selectedId !== null &&
-      (visibleItems.find((i) => i.id === selectedId) ?? pool.find((i) => i.id === selectedId))) ||
-    visibleItems[0] ||
-    null
-  const recentBodies = selected
-    ? (() => {
-        const recent = pool
-          .filter((i) => i.feedId === selected.feedId)
-          .sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
-          .slice(0, 5)
-        if (!recent.some((i) => i.id === selected.id)) recent.push(selected)
-        return recent.map((i) => i.body)
-      })()
-    : []
 
   return (
     <div className="app flex h-full flex-col bg-app-bg text-app-text">
