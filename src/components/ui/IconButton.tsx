@@ -5,6 +5,7 @@ interface Props {
   onClick: () => void
   children: ReactNode
   disabled?: boolean
+  border?: boolean
   className?: string
   variant?: 'default' | 'bare'
 }
@@ -15,15 +16,16 @@ export function IconButton({
   onClick,
   children,
   disabled,
+  border = false,
   className,
   variant = 'default',
 }: Props) {
-  const variantClasses =
-    variant === 'bare' ? 'bg-transparent' : 'border border-app-border bg-app-panel'
+  const variantClasses = variant === 'bare' ? 'bg-transparent' : 'bg-app-panel'
+  const borderClasses = border ? 'border border-app-border' : 'border-0'
 
   return (
     <button
-      className={`inline-flex size-8 shrink-0 items-center justify-center rounded p-0 text-app-muted ${variantClasses} hover:bg-app-border hover:text-app-text disabled:cursor-default disabled:opacity-55 disabled:hover:bg-transparent disabled:hover:text-app-muted [&>svg]:size-6 ${className ?? ''}`}
+      className={`inline-flex size-8 shrink-0 items-center justify-center rounded p-0 text-app-muted ${variantClasses} ${borderClasses} hover:bg-app-border hover:text-app-text disabled:cursor-default disabled:opacity-55 disabled:hover:bg-transparent disabled:hover:text-app-muted [&>svg]:size-6 ${className ?? ''}`}
       title={title}
       aria-label={title}
       disabled={disabled}
