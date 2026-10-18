@@ -27,6 +27,7 @@ import { clearSettings } from './settings'
 import type { Settings } from './settings'
 import { FEED_WINDOW } from './api/sync'
 import { markerStamp, nextReconcileMarker, RECONCILE_MARKER_KEY } from './syncMarker'
+import { countFeedWindowItems } from './feedWindow'
 
 /** Target items to add per load-more invocation (≈ a screenful). */
 export const LOAD_STEP = 60
@@ -314,9 +315,12 @@ export async function loadMoreInto(
  */
 export async function ensureFeedWindow(settings: Settings, feedId: number): Promise<number> {
   const all = await dbGetAllItems()
-  const local = all.reduce((n, i) => (i.feedId === feedId ? n + 1 : n), 0)
-  let added = 0
   let cursor = await dbGetCursor(feedId)
+  // Older starred items are hydrated separately from the newest per-feed
+  // page. They must not satisfy this page's top-up target when a sync was
+  // interrupted before loading the full window.
+  const local = countFeedWindowItems(all, feedId, cursor)
+  let added = 0
 
   // 1. top up to a full window while the server keeps returning pages
   while (local + added < FEED_WINDOW && cursor !== undefined && cursor >= 0) {
