@@ -243,6 +243,17 @@ export async function dbGetCursor(feedId: number): Promise<number | undefined> {
   return v === undefined ? undefined : Number(v)
 }
 
+/** Initialize atomically so overlapping hydration cannot rewind pagination. */
+export async function dbInitCursor(feedId: number, id: number): Promise<void> {
+  const db = await getDB()
+  const tx = db.transaction('meta', 'readwrite')
+  const key = `cursor:${feedId}`
+  if ((await tx.store.get(key)) === undefined) {
+    await tx.store.put({ key, value: String(id) })
+  }
+  await tx.done
+}
+
 export async function dbSetCursor(feedId: number, id: number): Promise<void> {
   await dbSetMeta(`cursor:${feedId}`, String(id))
 }
