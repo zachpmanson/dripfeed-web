@@ -61,7 +61,20 @@ function getDB(): Promise<IDBPDatabase<DripfeedDB>> {
   return dbPromise
 }
 
+let generation = 0
+// Overlapping IndexedDB writers commit in order. Publish bookkeeping only after
+// tx.done, and never republish state invalidated by a reset during that transaction.
+const bulkReadOwners = new Map<number, symbol>()
+const bulkBadgeOwners = new Map<number, symbol>()
+
+export function dbGetGeneration(): number {
+  return generation
+}
+
 export async function dbClear(): Promise<void> {
+  generation += 1
+  bulkReadOwners.clear()
+  bulkBadgeOwners.clear()
   itemMutationVersion.clear()
   const db = await getDB()
   await Promise.all([db.clear('items'), db.clear('feeds'), db.clear('folders'), db.clear('meta')])
@@ -77,6 +90,7 @@ export async function dbClear(): Promise<void> {
  */
 export async function dbPutFeeds(feeds: NewsFeed[]): Promise<void> {
   const db = await getDB()
+  const writeGeneration = generation
   const tx = db.transaction(['feeds', 'items'], 'readwrite')
   const ids = new Set(feeds.map((f) => f.id))
   const existing = await tx.objectStore('feeds').getAll()
@@ -100,6 +114,9 @@ export async function dbPutFeeds(feeds: NewsFeed[]): Promise<void> {
       .put(!hasFullTextFlag && previous ? { ...f, fullTextEnabled: previous.fullTextEnabled } : f)
   }
   await tx.done
+  if (generation === writeGeneration) {
+    for (const f of existing) bulkBadgeOwners.delete(f.id)
+  }
 }
 
 /**
@@ -149,15 +166,23 @@ export async function dbPutItems(
   preserveLocalMutationsSince?: number,
 ): Promise<void> {
   const db = await getDB()
+  const writeGeneration = generation
+  const revoked: number[] = []
   const tx = db.transaction('items', 'readwrite')
   for (const item of items) {
+    // Wait for earlier writers to commit before inspecting their mutation versions.
+    const local =
+      preserveLocalMutationsSince !== undefined ? await tx.store.get(item.id) : undefined
     const preserveLocalState =
       preserveLocalMutationsSince !== undefined &&
       itemMutationVersion.changedSince(item.id, preserveLocalMutationsSince)
-    const local = preserveLocalState ? await tx.store.get(item.id) : undefined
     await tx.store.put(mergeServerItem(item, local, preserveLocalState))
+    if (!preserveLocalState) revoked.push(item.id)
   }
   await tx.done
+  if (generation === writeGeneration) {
+    for (const id of revoked) bulkReadOwners.delete(id)
+  }
 }
 
 export async function dbGetAllFeeds(): Promise<NewsFeed[]> {
@@ -173,7 +198,9 @@ export async function dbGetFeed(id: number): Promise<NewsFeed | undefined> {
 /** Update one feed row (used for the optimistic unread-badge adjustment). */
 export async function dbPutFeed(feed: NewsFeed): Promise<void> {
   const db = await getDB()
+  const writeGeneration = generation
   await db.put('feeds', feed)
+  if (generation === writeGeneration) bulkBadgeOwners.delete(feed.id)
 }
 
 export async function dbGetAllFolders(): Promise<NewsFolder[]> {
@@ -191,12 +218,16 @@ export async function dbUpdateItem(
   update: (item: NewsItem) => NewsItem,
 ): Promise<{ previous: NewsItem | undefined; next: NewsItem | undefined }> {
   const db = await getDB()
+  const writeGeneration = generation
   const tx = db.transaction('items', 'readwrite')
   const previous = await tx.store.get(id)
   const next = previous ? update(previous) : undefined
-  if (next) await tx.store.put(next)
-  await tx.done
   if (next) {
+    await tx.store.put(next)
+  }
+  await tx.done
+  if (next && generation === writeGeneration) {
+    if (previous?.unread !== next.unread) bulkReadOwners.delete(id)
     itemMutationVersion.mark(id)
   }
   return { previous, next }
@@ -208,12 +239,108 @@ export async function dbUpdateFeed(
   update: (feed: NewsFeed) => NewsFeed,
 ): Promise<{ previous: NewsFeed | undefined; next: NewsFeed | undefined }> {
   const db = await getDB()
+  const writeGeneration = generation
   const tx = db.transaction('feeds', 'readwrite')
   const previous = await tx.store.get(id)
   const next = previous ? update(previous) : undefined
-  if (next) await tx.store.put(next)
+  if (next) {
+    await tx.store.put(next)
+  }
   await tx.done
+  if (next && generation === writeGeneration && previous?.unreadCount !== next.unreadCount) {
+    bulkBadgeOwners.delete(id)
+  }
   return { previous, next }
+}
+
+/** Read intent and its badge delta must commit together, even for no-op intent. */
+export async function dbSetItemUnread(id: number, unread: boolean): Promise<void> {
+  const db = await getDB()
+  const writeGeneration = generation
+  const tx = db.transaction(['items', 'feeds'], 'readwrite')
+  const item = await tx.objectStore('items').get(id)
+  if (item) {
+    await tx.objectStore('items').put({ ...item, unread })
+    if (item.unread !== unread) {
+      const feed = await tx.objectStore('feeds').get(item.feedId)
+      if (feed) {
+        await tx.objectStore('feeds').put({
+          ...feed,
+          unreadCount: Math.max(0, feed.unreadCount + (unread ? 1 : -1)),
+        })
+      }
+    }
+  }
+  await tx.done
+  if (item && generation === writeGeneration) {
+    bulkReadOwners.delete(id)
+    itemMutationVersion.mark(id)
+  }
+}
+
+/**
+ * Own only the read flags we flip and the badge contribution we remove.
+ * Explicit read intent (even a no-op) or accepted server state revokes that
+ * ownership; unrelated star/body/settings writes do not. Bulk calls for the
+ * same feed must be serialized by the caller.
+ */
+export async function dbBeginFeedRead(feedId: number, expectedGeneration: number) {
+  const db = await getDB()
+  if (generation !== expectedGeneration) return
+  const owner = Symbol()
+  const tx = db.transaction(['items', 'feeds'], 'readwrite')
+  const items = (await tx.objectStore('items').index('by-feed').getAll(feedId)).filter(
+    (item) => item.unread,
+  )
+  const feed = await tx.objectStore('feeds').get(feedId)
+  for (const item of items) {
+    await tx.objectStore('items').put({ ...item, unread: false })
+  }
+  if (feed) {
+    await tx.objectStore('feeds').put({ ...feed, unreadCount: 0 })
+  }
+  await tx.done
+  if (generation !== expectedGeneration) return
+  for (const item of items) {
+    bulkReadOwners.set(item.id, owner)
+    itemMutationVersion.mark(item.id)
+  }
+  if (feed) bulkBadgeOwners.set(feedId, owner)
+
+  return {
+    finish() {
+      for (const item of items) {
+        if (bulkReadOwners.get(item.id) === owner) bulkReadOwners.delete(item.id)
+      }
+      if (bulkBadgeOwners.get(feedId) === owner) bulkBadgeOwners.delete(feedId)
+    },
+    async rollback() {
+      if (generation !== expectedGeneration) return
+      const rollback = db.transaction(['items', 'feeds'], 'readwrite')
+      const restored: number[] = []
+      for (const item of items) {
+        const current = await rollback.objectStore('items').get(item.id)
+        if (!current || bulkReadOwners.get(item.id) !== owner) continue
+        await rollback.objectStore('items').put({ ...current, unread: true })
+        restored.push(item.id)
+      }
+      const currentFeed = await rollback.objectStore('feeds').get(feedId)
+      if (feed && currentFeed && bulkBadgeOwners.get(feedId) === owner) {
+        // Include unread items outside the mirror, but not superseded local flags.
+        await rollback.objectStore('feeds').put({
+          ...currentFeed,
+          unreadCount: Math.max(
+            0,
+            currentFeed.unreadCount + feed.unreadCount - items.length + restored.length,
+          ),
+        })
+      }
+      await rollback.done
+      if (generation === expectedGeneration) {
+        for (const id of restored) itemMutationVersion.mark(id)
+      }
+    },
+  }
 }
 
 export async function dbGetAllItems(): Promise<NewsItem[]> {
@@ -241,6 +368,17 @@ export async function dbSetMeta(key: string, value: string): Promise<void> {
 export async function dbGetCursor(feedId: number): Promise<number | undefined> {
   const v = await dbGetMeta(`cursor:${feedId}`)
   return v === undefined ? undefined : Number(v)
+}
+
+/** Initialize atomically so overlapping hydration cannot rewind pagination. */
+export async function dbInitCursor(feedId: number, id: number): Promise<void> {
+  const db = await getDB()
+  const tx = db.transaction('meta', 'readwrite')
+  const key = `cursor:${feedId}`
+  if ((await tx.store.get(key)) === undefined) {
+    await tx.store.put({ key, value: String(id) })
+  }
+  await tx.done
 }
 
 export async function dbSetCursor(feedId: number, id: number): Promise<void> {

@@ -1,6 +1,7 @@
 import {
   dbClear,
   dbGetCursor,
+  dbInitCursor,
   dbGetFeedItems,
   dbGetAllFeeds,
   dbGetAllFolders,
@@ -179,7 +180,7 @@ export async function ensureUnreadScope(
   return items.length
 }
 
-/** Light refresh: newest-500 window merged + feeds/folders meta. */
+/** Light refresh: newest-500 window, missing feed windows, and feeds/folders meta. */
 export async function incrementalSync(settings: Settings): Promise<void> {
   const generation = resetGeneration
   const { feeds, folders } = await fetchMeta(settings)
@@ -199,6 +200,22 @@ export async function incrementalSync(settings: Settings): Promise<void> {
   })
   if (generation !== resetGeneration) return
   await dbPutItems(resp.items.map(normalizeItem), mutationVersion)
+
+  // The global poll may contain none of a new subscription's history. A
+  // missing cursor also covers an interrupted hydration; existing cursors
+  // (including drained feeds) must never be rewound by a refresh.
+  for (const feed of feeds) {
+    const cursor = await dbGetCursor(feed.id)
+    if (generation !== resetGeneration) return
+    if (cursor !== undefined) continue
+    const windowVersion = dbGetItemMutationVersion()
+    const items = await fetchFeedWindow(settings, feed.id)
+    if (generation !== resetGeneration) return
+    await dbPutItems(items.map(normalizeItem), windowVersion)
+    if (generation !== resetGeneration) return
+    const nextCursor = items.length < FEED_WINDOW ? -1 : Math.min(...items.map((item) => item.id))
+    await dbInitCursor(feed.id, nextCursor)
+  }
 
   // Server-authoritative pass: pull everything changed since the last poll
   // and overwrite the matching local rows, so read/star flags updated by
@@ -334,6 +351,7 @@ export async function loadMoreInto(
     paged += 1
     onProgress?.({ added, feedsPaged: paged, totalFeeds })
     if (drained) live = live.filter((x) => x.f.id !== pick.f.id)
+    else live = live.map((x) => (x.f.id === pick.f.id ? { ...x, cursor: nextMin } : x))
   }
   return added
 }

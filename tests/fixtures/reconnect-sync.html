@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Reconnect sync regression</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from 'react'
+      import { createRoot } from 'react-dom/client'
+      import { useStore } from '/src/hooks.ts'
+      import { dbSetMeta } from '/src/db.ts'
+
+      // Model a returning reader with a populated local mirror, without credentials.
+      await dbSetMeta('initialized', '1')
+      const settings = {
+        baseUrl: new URLSearchParams(location.search).get('api'),
+        user: 'regression-only',
+        appPassword: 'not-a-real-password',
+      }
+      function Harness() {
+        const store = useStore(settings, { kind: 'all' }, false)
+        return React.createElement('output', { 'data-ready': store.ready }, store.error ?? 'ok')
+      }
+      const root = createRoot(document.getElementById('root'))
+      root.render(React.createElement(Harness))
+      window.unmountHarness = () => root.unmount()
+    </script>
+  </body>
+</html>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>ItemView iframe navigation regression</title>
+    <style>
+      :root {
+        --panel: white;
+        --text: black;
+        --accent: blue;
+        --border: gray;
+      }
+      iframe {
+        width: 700px;
+        height: 320px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from 'react'
+      import { createRoot } from 'react-dom/client'
+      import { ItemView } from '/src/components/reader/ItemView.tsx'
+
+      const item = {
+        id: 1,
+        feedId: 1,
+        title: 'Iframe footnotes',
+        url: 'https://article.example/posts/story',
+        author: null,
+        pubDate: null,
+        starred: false,
+        unread: false,
+        body: `
+          <p id="reference"><a id="footnote-link" href="#fn:1" target="_blank" rel="noreferrer"><sup><span>1</span></sup></a></p>
+          <p><a id="missing-link" href="#missing" target="_blank">Missing footnote</a></p>
+          <p><span id="ordinary">Not a link</span></p>
+          <p><a id="external-link" href="https://article.example/external" target="_blank" rel="noreferrer">External</a></p>
+          <p><a id="relative-link" href="../other" target="_blank" rel="noreferrer">Relative</a></p>
+          <div style="height: 1600px"></div>
+          <p id="fn:1">Footnote <a id="backlink" href="#reference" target="_blank" rel="noreferrer">Back</a></p>
+          <script>document.body.dataset.articleScriptRan = 'yes'<\/script>
+        `,
+      }
+      createRoot(document.getElementById('root')).render(
+        React.createElement(ItemView, {
+          item,
+          feedTitle: () => 'Fixture feed',
+          actions: {},
+          articleCssMode: 'default',
+          articleCss: '',
+          dimBoilerplate: false,
+          recentBodies: [],
+          autoExtract: false,
+          onFeedClick: () => {},
+        }),
+      )
+    </script>
+  </body>
+</html>

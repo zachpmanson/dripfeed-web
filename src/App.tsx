@@ -52,16 +52,20 @@ export default function App() {
   // On navigation to an individual feed: top the local window up to 20 and
   // probe the server for whether more history exists (so a short/partial
   // feed auto-fills and the load-more button reflects reality). In-flight
-  // guard so StrictMode's double effect fires at most one probe/refill.
-  const ensureRef = useRef<Promise<void> | null>(null)
+  // guard per feed so StrictMode/revisits share pending work, without
+  // dropping a destination feed's refill while another feed is loading.
+  const ensureRef = useRef(new Set<number>())
   useEffect(() => {
     if (view.kind !== 'feed' || !settings) return
     // In unread-only mode the native unread query below supersedes the
     // window top-up for THIS visit; the window/cursor probe still runs so
     // toggling to "all" pages instantly.
-    if (ensureRef.current) return
-    ensureRef.current = store.actions.ensureFeed(view.id).finally(() => {
-      ensureRef.current = null
+    const feedId = view.id
+    const inFlight = ensureRef.current
+    if (inFlight.has(feedId)) return
+    inFlight.add(feedId)
+    void store.actions.ensureFeed(feedId).finally(() => {
+      inFlight.delete(feedId)
     })
   }, [view, settings, store.actions])
 
