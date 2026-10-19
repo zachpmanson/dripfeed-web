@@ -74,10 +74,13 @@ async function authedFetch(
   url: string,
   init: RequestInit = {},
 ): Promise<Response> {
+  // Basic auth uses the first colon as the separator, so usernames cannot contain it.
+  if (settings.user.includes(':')) {
+    throw new Error('Username cannot contain a colon for Basic authentication')
+  }
   const headers = new Headers(init.headers)
-  const token = btoa(
-    `${encodeURIComponent(settings.user)}:${encodeURIComponent(settings.appPassword)}`,
-  )
+  const bytes = new TextEncoder().encode(`${settings.user}:${settings.appPassword}`)
+  const token = btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(''))
   headers.set('Authorization', `Basic ${token}`)
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
@@ -142,8 +145,9 @@ export async function apiGet<T>(settings: Settings, path: string): Promise<T> {
 /**
  * GET whose response headers matter as much as the body. The reconcile
  * marker needs the server's own wall clock (`Date`), and that is only
- * readable from the response object — `Date` is a CORS-safelisted response
- * header, so this works cross-origin too.
+ * readable from the response object. `Date` is NOT a CORS-safelisted response
+ * header: cross-origin servers must expose it via Access-Control-Expose-Headers,
+ * otherwise callers see it as missing and must keep a conservative marker.
  */
 export async function apiGetWithHeaders<T>(
   settings: Settings,

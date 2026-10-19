@@ -139,12 +139,9 @@ export async function fullSync(settings: Settings): Promise<void> {
 
   if (generation !== resetGeneration) return
   await dbSetMeta('initialized', '1')
-  // Seed the reconcile marker so the first poll's /items/updated delta only
-  // carries changes made AFTER hydration — everything the mirror needs has
-  // just been pulled by fetchInitial. Seeded from the SERVER's clock (the
-  // /feeds Date header), not the browser's: a browser clock running behind
-  // the server would otherwise seed a marker the server has already passed,
-  // and changes in the gap would never be returned (the filter is `>=`).
+  // Seed from the /feeds Date captured BEFORE hydration, with an overlap,
+  // so changes during hydration are reconciled too. Without a readable Date,
+  // start at zero and replay history rather than trust browser or row clocks.
   if (generation !== resetGeneration) return
   await dbSetMeta(RECONCILE_MARKER_KEY, String(markerStamp(serverTime)))
   if (generation !== resetGeneration) return
@@ -239,9 +236,12 @@ export async function incrementalSync(settings: Settings): Promise<void> {
  * unread here until a full re-sync. MARKER_SAFETY (2s) backs the stamp off
  * to cover the window between the server running the query and stamping the
  * response: items changed in there are re-fetched next tick (an idempotent
- * overwrite) instead of being skipped. The marker still never moves
- * backwards, and `Date` is absent only if the response was cached oddly —
- * then we fall back to the local clock as before.
+ * overwrite) instead of being skipped. Missing/unreadable Date retains the
+ * existing marker, potentially replaying a growing delta until Date returns.
+ * If Date proves the marker ahead (old client/row poison or clock rollback),
+ * reset it to zero: the next poll replays history to repair skipped changes.
+ * This may be expensive, but merely rolling back to Date would leave old
+ * gaps permanent. Without Date, an already-poisoned marker cannot be detected.
  *
  * Returns how many changed items were applied.
  */
@@ -257,12 +257,8 @@ export async function reconcileUpdated(
   if (items.length > 0) {
     await dbPutItems(items.map(normalizeItem), mutationVersion)
   }
-  const marker = nextReconcileMarker(
-    prev,
-    serverTime,
-    items.map((item) => item.lastModified),
-  )
-  if (marker > prev && generation === resetGeneration) {
+  const marker = nextReconcileMarker(prev, serverTime)
+  if (marker !== prev && generation === resetGeneration) {
     await dbSetMeta(RECONCILE_MARKER_KEY, String(marker))
   }
   return items.length
