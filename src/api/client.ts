@@ -142,8 +142,9 @@ export async function apiGet<T>(settings: Settings, path: string): Promise<T> {
 /**
  * GET whose response headers matter as much as the body. The reconcile
  * marker needs the server's own wall clock (`Date`), and that is only
- * readable from the response object — `Date` is a CORS-safelisted response
- * header, so this works cross-origin too.
+ * readable from the response object. `Date` is NOT a CORS-safelisted response
+ * header: cross-origin servers must expose it via Access-Control-Expose-Headers,
+ * otherwise callers see it as missing and must keep a conservative marker.
  */
 export async function apiGetWithHeaders<T>(
   settings: Settings,
