@@ -1,4 +1,12 @@
-import { dbUpdateItem, dbUpdateFeed, dbGetFeed, dbGetFeedItems, dbPutItem } from './db'
+import {
+  dbUpdateItem,
+  dbUpdateFeed,
+  dbGetFeed,
+  dbPutItem,
+  dbSetItemUnread,
+  dbBeginFeedRead,
+  dbGetGeneration,
+} from './db'
 import {
   markRead,
   markUnread,
@@ -16,6 +24,7 @@ import { SerialOptimisticMutation } from './optimisticMutation'
 const readMutations = new Map<number, SerialOptimisticMutation<boolean>>()
 const starMutations = new Map<number, SerialOptimisticMutation<boolean>>()
 const fullTextMutations = new Map<number, SerialOptimisticMutation<boolean>>()
+const bulkReadTails = new Map<number, Promise<void>>()
 
 function getMutation(
   mutations: Map<number, SerialOptimisticMutation<boolean>>,
@@ -31,29 +40,13 @@ function getMutation(
 }
 
 async function setItemReadState(item: NewsItem, unread: boolean): Promise<void> {
-  const { previous, next } = await dbUpdateItem(item.id, (current) => ({ ...current, unread }))
-  if (previous && next && previous.unread !== next.unread) {
-    await bumpFeedUnread(item.feedId, next.unread ? 1 : -1)
-  }
+  await dbSetItemUnread(item.id, unread)
   notifyLocalChange()
 }
 
 async function setItemStarState(item: NewsItem, starred: boolean): Promise<void> {
   await dbUpdateItem(item.id, (current) => ({ ...current, starred }))
   notifyLocalChange()
-}
-
-/**
- * Optimistic feed-badge adjustment. The sidebar now reads the server's
- * exact `feed.unreadCount` rather than counting the (partial) local mirror,
- * so our own toggle has to move that number too — otherwise a click would
- * leave the badge stale until the next poll.
- */
-async function bumpFeedUnread(feedId: number, delta: number): Promise<void> {
-  await dbUpdateFeed(feedId, (feed) => ({
-    ...feed,
-    unreadCount: Math.max(0, feed.unreadCount + delta),
-  }))
 }
 
 /**
@@ -165,33 +158,31 @@ export async function setFeedFullText(
  * Mark every locally-stored item of a feed as read (optimistic), then tell
  * the server to mark the whole feed read via POST /feeds/{id}/read. Passing
  * MAX_SAFE_INTEGER as newestItemId covers items we haven't loaded locally.
- * On server failure the local read flags and badge are reverted without
- * replacing whole rows, so concurrent star/settings changes survive.
+ * Failed writes restore only read state still owned by that operation.
+ * Queue bulk calls per feed so a second snapshot cannot inherit a failed
+ * first operation's optimistic state. Individual toggles and sync stay live.
  */
 export async function markFeedAllRead(settings: Settings, feedId: number): Promise<void> {
-  const local = await dbGetFeedItems(feedId)
-  const prev = new Map(local.map((i) => [i.id, i.unread]))
-  const next = local.filter((i) => i.unread)
-  // Optimistic badge zeroing, alongside the item flags (see bumpFeedUnread).
-  // Zeroed even when no locally-stored item flips: the local window is only
-  // a slice of the feed, while the badge is the server's whole count — and
-  // the server-side mark-feed-read below covers the rest.
-  const prevFeed = await dbGetFeed(feedId)
-  if (next.length > 0) {
-    for (const it of next) await dbUpdateItem(it.id, (current) => ({ ...current, unread: false }))
-  }
-  if (prevFeed) await dbUpdateFeed(feedId, (feed) => ({ ...feed, unreadCount: 0 }))
-  notifyLocalChange()
-  try {
-    await markFeedRead(settings, feedId, Number.MAX_SAFE_INTEGER)
-  } catch (e) {
-    for (const [id, unread] of prev) {
-      await dbUpdateItem(id, (current) => ({ ...current, unread }))
-    }
-    if (prevFeed) {
-      await dbUpdateFeed(feedId, (feed) => ({ ...feed, unreadCount: prevFeed.unreadCount }))
-    }
+  const generation = dbGetGeneration()
+  const operation = (bulkReadTails.get(feedId) ?? Promise.resolve()).then(async () => {
+    const optimistic = await dbBeginFeedRead(feedId, generation)
+    if (!optimistic) return
     notifyLocalChange()
-    throw e
+    try {
+      await markFeedRead(settings, feedId, Number.MAX_SAFE_INTEGER)
+    } catch (error) {
+      await optimistic.rollback()
+      notifyLocalChange()
+      throw error
+    } finally {
+      optimistic.finish()
+    }
+  })
+  const tail = operation.catch(() => {})
+  bulkReadTails.set(feedId, tail)
+  try {
+    await operation
+  } finally {
+    if (bulkReadTails.get(feedId) === tail) bulkReadTails.delete(feedId)
   }
 }
