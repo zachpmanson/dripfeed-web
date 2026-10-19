@@ -74,10 +74,13 @@ async function authedFetch(
   url: string,
   init: RequestInit = {},
 ): Promise<Response> {
+  // Basic auth uses the first colon as the separator, so usernames cannot contain it.
+  if (settings.user.includes(':')) {
+    throw new Error('Username cannot contain a colon for Basic authentication')
+  }
   const headers = new Headers(init.headers)
-  const token = btoa(
-    `${encodeURIComponent(settings.user)}:${encodeURIComponent(settings.appPassword)}`,
-  )
+  const bytes = new TextEncoder().encode(`${settings.user}:${settings.appPassword}`)
+  const token = btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(''))
   headers.set('Authorization', `Basic ${token}`)
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
