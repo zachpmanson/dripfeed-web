@@ -23,7 +23,9 @@ function getMutation(
   initialValue: boolean,
 ): SerialOptimisticMutation<boolean> {
   let mutation = mutations.get(itemId)
-  if (!mutation) {
+  // A settled queue's confirmed value may predate an authoritative refresh.
+  // Keep active queues intact: their initialValue may already be optimistic.
+  if (!mutation || mutation.isIdle) {
     mutation = new SerialOptimisticMutation(initialValue)
     mutations.set(itemId, mutation)
   }
