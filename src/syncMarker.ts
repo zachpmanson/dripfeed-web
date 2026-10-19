@@ -4,25 +4,23 @@ const MARKER_SAFETY_SECONDS = 2
 export const RECONCILE_MARKER_KEY = 'reconcile:lastModified'
 
 /**
- * Stamp a delta request using the server clock, backing off to safely re-fetch
- * changes that could land between the delta query and its response timestamp.
+ * Seed from the server clock with an overlap for changes between the query
+ * and response. Without a readable Date, start at zero: replaying history is
+ * safer than skipping changes based on a browser clock or item timestamp.
  */
-export function markerStamp(
-  serverTime: number | null,
-  nowSeconds = Math.floor(Date.now() / 1000),
-): number {
-  return serverTime === null ? nowSeconds : serverTime - MARKER_SAFETY_SECONDS
+export function markerStamp(serverTime: number | null): number {
+  return serverTime === null ? 0 : Math.max(0, serverTime - MARKER_SAFETY_SECONDS)
 }
 
-/** Advance without moving backwards, including timestamps from returned rows. */
-export function nextReconcileMarker(
-  previous: number,
-  serverTime: number | null,
-  itemLastModified: Iterable<number>,
-): number {
-  let marker = markerStamp(serverTime)
-  for (const modified of itemLastModified) {
-    if (modified && modified > marker) marker = modified
-  }
-  return Math.max(previous, marker)
+/**
+ * Missing Date retains the marker (and re-fetches the same overlap). Only a
+ * server Date can advance it; returned item timestamps are not a safe clock.
+ * A marker ahead of Date is poisoned or the server clock moved backwards:
+ * reset to zero so the NEXT poll replays skipped history before advancing.
+ * This can be a large replay, but resetting only to Date would lose old gaps.
+ */
+export function nextReconcileMarker(previous: number, serverTime: number | null): number {
+  if (serverTime === null) return previous
+  if (previous > serverTime) return 0
+  return Math.max(previous, markerStamp(serverTime))
 }

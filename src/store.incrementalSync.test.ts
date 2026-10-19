@@ -1,15 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NewsFeed, NewsItem } from './api/types'
 import { ItemMutationVersion, mergeServerItem } from './itemMutationVersion'
+import { RECONCILE_MARKER_KEY } from './syncMarker'
 
 const mocks = vi.hoisted(() => ({
   feeds: [] as NewsFeed[],
   items: new Map<number, NewsItem>(),
   cursors: new Map<number, number>(),
+  meta: new Map<string, string>(),
+  dbSetMeta: vi.fn(),
   dbPutItems: vi.fn(),
   dbSetCursor: vi.fn(),
   dbInitCursor: vi.fn(),
   fetchMeta: vi.fn(),
+  fetchInitial: vi.fn(),
   fetchItems: vi.fn(),
   fetchFeedWindow: vi.fn(),
   fetchUpdatedItems: vi.fn(),
@@ -37,12 +41,13 @@ vi.mock('./db', () => ({
     mocks.feeds = feeds
   }),
   dbPutFolders: vi.fn(async () => {}),
-  dbGetMeta: vi.fn(async () => '100'),
-  dbSetMeta: vi.fn(async () => {}),
+  dbGetMeta: vi.fn(async (key: string) => mocks.meta.get(key)),
+  dbSetMeta: mocks.dbSetMeta,
 }))
 
 vi.mock('./api/sync', () => ({
   fetchMeta: mocks.fetchMeta,
+  fetchInitial: mocks.fetchInitial,
   fetchFeedWindow: mocks.fetchFeedWindow,
   fetchUpdatedItems: mocks.fetchUpdatedItems,
   FEED_WINDOW: 20,
@@ -106,15 +111,24 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
 
 beforeEach(() => {
   vi.resetAllMocks()
   mocks.feeds = []
   mocks.items.clear()
   mocks.cursors.clear()
+  mocks.meta.clear()
+  mocks.meta.set(RECONCILE_MARKER_KEY, '100')
+  mocks.dbSetMeta.mockImplementation(async (key: string, value: string) => {
+    mocks.meta.set(key, value)
+  })
   versions.clear()
-  mocks.fetchMeta.mockResolvedValue({ feeds: [feed], folders: [] })
+  mocks.fetchMeta.mockResolvedValue({ feeds: [feed], folders: [], serverTime: 100 })
+  mocks.fetchInitial.mockResolvedValue({ items: window, feedWindows: new Map([[feed.id, 81]]) })
   mocks.fetchItems.mockResolvedValue({ items: [] })
   mocks.fetchUpdatedItems.mockResolvedValue({ items: [], serverTime: 100 })
   mocks.fetchFeedWindow.mockResolvedValue(window)
@@ -303,5 +317,88 @@ describe('incremental sync feed history', () => {
     )
     expect(mocks.items.get(100)).toMatchObject({ unread: false, starred: true })
     expect(mocks.cursors.get(feed.id)).toBe(81)
+  })
+})
+
+describe('safe delta watermarks', () => {
+  it.each([
+    { serverTime: 100, expected: 98 },
+    { serverTime: null, expected: 0 },
+  ])(
+    'seeds hydration from Date=$serverTime, never browser or row times',
+    async ({ serverTime, expected }) => {
+      vi.spyOn(Date, 'now').mockReturnValue(9_000_000_000_000)
+      mocks.fetchMeta.mockResolvedValue({ feeds: [feed], folders: [], serverTime })
+      mocks.fetchInitial.mockResolvedValue({
+        items: [{ ...item(1), lastModified: 9_000_000_000 }],
+        feedWindows: new Map(),
+      })
+      const { fullSync, reconcileUpdated } = await import('./store')
+
+      await fullSync(settings)
+      expect(mocks.meta.get(RECONCILE_MARKER_KEY)).toBe(String(expected))
+      await reconcileUpdated(settings)
+      expect(mocks.fetchUpdatedItems).toHaveBeenCalledWith(settings, expected)
+    },
+  )
+
+  it('retains the marker without Date despite an ahead browser and future rows', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(9_000_000_000_000)
+    mocks.meta.set(RECONCILE_MARKER_KEY, '90')
+    mocks.fetchUpdatedItems.mockResolvedValue({
+      items: [{ ...item(1), lastModified: 9_000_000_000 }],
+      serverTime: null,
+    })
+    const { reconcileUpdated } = await import('./store')
+
+    await reconcileUpdated(settings)
+    await reconcileUpdated(settings)
+
+    expect(mocks.fetchUpdatedItems).toHaveBeenNthCalledWith(1, settings, 90)
+    expect(mocks.fetchUpdatedItems).toHaveBeenNthCalledWith(2, settings, 90)
+    expect(mocks.meta.get(RECONCILE_MARKER_KEY)).toBe('90')
+    expect(mocks.dbSetMeta).not.toHaveBeenCalled()
+    expect(mocks.items.has(1)).toBe(true)
+  })
+
+  it('does not let a future row skip an ordinary change on the next poll', async () => {
+    mocks.meta.set(RECONCILE_MARKER_KEY, '90')
+    mocks.fetchUpdatedItems.mockResolvedValueOnce({
+      items: [{ ...item(1), lastModified: 9_000_000_000 }],
+      serverTime: 100,
+    })
+    mocks.fetchUpdatedItems.mockImplementation(async (_settings, since: number) => ({
+      items: since <= 99 ? [{ ...item(2), lastModified: 99, unread: false }] : [],
+      serverTime: 101,
+    }))
+    const { reconcileUpdated } = await import('./store')
+
+    await reconcileUpdated(settings)
+    expect(mocks.meta.get(RECONCILE_MARKER_KEY)).toBe('98')
+    await reconcileUpdated(settings)
+
+    expect(mocks.fetchUpdatedItems).toHaveBeenLastCalledWith(settings, 98)
+    expect(mocks.items.get(2)).toMatchObject({ unread: false, lastModified: 99000 })
+    expect(mocks.meta.get(RECONCILE_MARKER_KEY)).toBe('99')
+  })
+
+  it('persists a poisoned marker reset and replays missed history before advancing', async () => {
+    mocks.meta.set(RECONCILE_MARKER_KEY, '200')
+    mocks.fetchUpdatedItems.mockResolvedValueOnce({ items: [], serverTime: 100 })
+    mocks.fetchUpdatedItems.mockImplementation(async (_settings, since: number) => ({
+      items: since <= 50 ? [{ ...item(2), lastModified: 50, unread: false }] : [],
+      serverTime: 101,
+    }))
+    const { reconcileUpdated } = await import('./store')
+
+    await reconcileUpdated(settings)
+    expect(mocks.meta.get(RECONCILE_MARKER_KEY)).toBe('0')
+    expect(mocks.dbSetMeta).toHaveBeenCalledWith(RECONCILE_MARKER_KEY, '0')
+    await reconcileUpdated(settings)
+
+    expect(mocks.fetchUpdatedItems).toHaveBeenNthCalledWith(1, settings, 200)
+    expect(mocks.fetchUpdatedItems).toHaveBeenNthCalledWith(2, settings, 0)
+    expect(mocks.items.get(2)).toMatchObject({ unread: false, lastModified: 50000 })
+    expect(mocks.meta.get(RECONCILE_MARKER_KEY)).toBe('99')
   })
 })
