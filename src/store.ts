@@ -334,6 +334,7 @@ export async function loadMoreInto(
     paged += 1
     onProgress?.({ added, feedsPaged: paged, totalFeeds })
     if (drained) live = live.filter((x) => x.f.id !== pick.f.id)
+    else live = live.map((x) => (x.f.id === pick.f.id ? { ...x, cursor: nextMin } : x))
   }
   return added
 }
