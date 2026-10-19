@@ -19,6 +19,18 @@ vi.mock('./db', () => ({
     if (next) mocks.items.set(id, next)
     return { previous, next }
   }),
+  dbSetItemUnread: vi.fn(async (id: number, unread: boolean) => {
+    const item = mocks.items.get(id)
+    if (!item) return
+    mocks.items.set(id, { ...item, unread })
+    const feed = mocks.feeds.get(item.feedId)
+    if (feed && item.unread !== unread) {
+      mocks.feeds.set(feed.id, {
+        ...feed,
+        unreadCount: Math.max(0, feed.unreadCount + (unread ? 1 : -1)),
+      })
+    }
+  }),
   dbUpdateFeed: vi.fn(async (id: number, update: (feed: NewsFeed) => NewsFeed) => {
     const previous = mocks.feeds.get(id)
     const next = previous ? update(previous) : undefined
