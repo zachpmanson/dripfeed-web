@@ -92,10 +92,12 @@ export function ItemView({
     const doc = frameRef.current?.contentDocument
     if (!doc) return
     const onClick = (e: MouseEvent) => {
-      // Walk up from the click target to the enclosing anchor, if any.
-      let node: Element | null = e.target instanceof Element ? e.target : null
-      while (node && !(node instanceof HTMLAnchorElement)) node = node.parentElement
-      const a = node as HTMLAnchorElement | null
+      // Iframe elements belong to a different realm, so parent-window
+      // instanceof checks fail. Use DOM properties to find the HTML anchor.
+      const clicked = e.target as Element | null
+      let node = clicked?.nodeType === 1 ? clicked : null
+      while (node && node.tagName !== 'A') node = node.parentElement
+      const a = node
       if (!a) return
       const href = a.getAttribute('href') ?? ''
       if (!href.startsWith('#')) return // external links already target=_blank
