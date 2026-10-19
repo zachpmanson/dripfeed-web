@@ -20,15 +20,19 @@ import {
 import { setRead, setStar, extractFulltext } from './actions'
 import { apiErrorMessage, isAuthError } from './api/client'
 import { dbGetCursor } from './db'
+import {
+  createSyncRetryState,
+  recordSyncFailure,
+  recordSyncSuccess,
+  retryAfterOnline,
+  WAKE_THROTTLE_MS,
+} from './syncRetry'
 import type { NewsFeed, NewsFolder, NewsItem } from './api/types'
 import type { Settings } from './settings'
 import type { View } from './views'
 
 /** Background reconcile interval for the local mirror. */
 const POLL_MS = 3 * 60_000
-
-/** Floor between two background syncs, however they were triggered. */
-const WAKE_THROTTLE_MS = 30_000
 
 export interface AppData {
   ready: boolean
@@ -149,6 +153,9 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
   useEffect(() => {
     if (!settings) return
     let cancelled = false
+    // A slow hydration or reconcile must not overlap a later wake/poll tick.
+    let syncInFlight = true
+    const retryState = createSyncRetryState(Date.now())
 
     const off = onStoreChange(() => {
       if (!cancelled) void refreshPool()
@@ -165,8 +172,10 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
         markDbReady()
         try {
           await incrementalSync(settings)
+          recordSyncSuccess(retryState)
           if (!cancelled) await refreshPool()
         } catch (e) {
+          recordSyncFailure(retryState, e, Date.now())
           await reportError(e)
           console.warn('incremental sync failed', e)
         }
@@ -181,7 +190,9 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
           await reportError(e)
         }
       }
-    })()
+    })().finally(() => {
+      syncInFlight = false
+    })
 
     // Background reconcile. Runs on the interval AND on focus / a visibility
     // flip, so a tab left open (or backgrounded) catches up the moment you
@@ -189,35 +200,42 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
     // throttle: an interval tick, a focus and a visibilitychange arriving
     // together must not stack three round-trips. The hydrating sync above
     // counts as the first one, so the window starts now.
-    let nextSyncAt = Date.now() + WAKE_THROTTLE_MS
-    let failureBackoff = WAKE_THROTTLE_MS
     const tick = () => {
-      if (!isDbReady() || !settingsRef.current) return
-      if (Date.now() < nextSyncAt) return
-      nextSyncAt = Date.now() + WAKE_THROTTLE_MS
+      if (cancelled || syncInFlight || !isDbReady() || !settingsRef.current) return
+      const now = Date.now()
+      if (now < retryState.nextSyncAt) return
+      retryState.nextSyncAt = now + WAKE_THROTTLE_MS
+      syncInFlight = true
       incrementalSync(settingsRef.current)
         .then(() => {
-          failureBackoff = WAKE_THROTTLE_MS
+          recordSyncSuccess(retryState)
           if (!cancelled) void refreshPool()
         })
         .catch((e) => {
-          failureBackoff = Math.min(failureBackoff * 2, 15 * 60_000)
-          nextSyncAt = Date.now() + failureBackoff
+          recordSyncFailure(retryState, e, Date.now())
           void reportError(e)
           console.warn('poll sync failed', e)
+        })
+        .finally(() => {
+          syncInFlight = false
         })
     }
     const poll = setInterval(tick, POLL_MS)
     const onWake = () => {
       if (document.visibilityState === 'visible') tick()
     }
+    const onOnline = () => {
+      if (!syncInFlight && retryAfterOnline(retryState, Date.now())) tick()
+    }
     window.addEventListener('focus', onWake)
+    window.addEventListener('online', onOnline)
     document.addEventListener('visibilitychange', onWake)
 
     return () => {
       cancelled = true
       clearInterval(poll)
       window.removeEventListener('focus', onWake)
+      window.removeEventListener('online', onOnline)
       document.removeEventListener('visibilitychange', onWake)
       off()
     }
