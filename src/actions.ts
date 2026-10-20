@@ -129,8 +129,8 @@ export async function extractFulltext(settings: Settings, item: NewsItem): Promi
  * an older failed toggle cannot undo a newer choice or another feed field.
  * The caller surfaces failures.
  *
- * Reached same-origin only, so a feed whose baseUrl points at a DIFFERENT
- * Nextcloud cannot be written (that install is not behind the /apps proxy).
+ * Only instances at the app-root /apps proxy are supported; remote origins
+ * and same-origin Nextcloud subpaths are rejected by the API client.
  * The error is deliberately left to bubble rather than being swallowed:
  * a toggle that silently did nothing would be worse than a visible failure.
  */
