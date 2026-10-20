@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
-import { createPortal } from 'react-dom'
+import { Dialog } from '../ui/Dialog'
 import type { NewsFeed } from '../../api/types'
 import type { Settings } from '../../settings'
 import { setFeedFullText } from '../../actions'
@@ -25,18 +25,14 @@ interface Props {
  * first) and reverted on failure, so this only has to own its own in-flight
  * and error state.
  *
- * Portalled to <body>: it is opened from a sidebar feed row, so rendered in
- * place it would sit inside the sidebar's <nav> — where `.sidebar button`
- * (the feed-row rule) claims its close button and stretches it across the
- * whole modal head. The other modals are already App-level; a portal keeps
- * this one out of that subtree instead of adding another width patch to the
- * row rule (the folder caret carries one of those already).
+ * The shared dialog portals to <body> to avoid sidebar navigation styles.
  */
 export function FeedSettingsModal({ feed, settings, onClose, onChanged }: Props) {
   // Seeded from the feed row, then owned locally: the row object is replaced
   // by every poll reconcile, and re-seeding from it would fight the toggle.
   // `?? false` covers rows mirrored before this field existed (IndexedDB
   // persists across deploys, so older rows lack it until the next /feeds).
+  const titleId = useId()
   const [enabled, setEnabled] = useState(feed.fullTextEnabled ?? false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,39 +54,38 @@ export function FeedSettingsModal({ feed, settings, onClose, onChanged }: Props)
     }
   }
 
-  return createPortal(
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <span className="muted">Feed settings — {feed.title}</span>
-          <button className="icon-btn" onClick={onClose} aria-label="close">
-            <XMarkIcon className="btn-icon" aria-hidden="true" />
-          </button>
-        </div>
-        <div className="settings-form">
-          <div className="setting-row">
-            <label className="setting-label checkbox">
-              <input
-                type="checkbox"
-                checked={enabled}
-                disabled={busy}
-                onChange={(e) => void toggle(e.target.checked)}
-              />
-              Default to extracting full article
-            </label>
-          </div>
-          <div className="setting-row">
-            <span className="muted hint">
-              Items from this feed open as the full article. Also asks the server to scrape new
-              items when the feed updates, so other clients show full text too. Existing items are
-              extracted as you open them.
-            </span>
-          </div>
-          {error && <div className="error">{error}</div>}
-          {busy && <div className="muted hint">Working…</div>}
-        </div>
+  return (
+    <Dialog labelledBy={titleId} onClose={onClose} restoreFocusTo={`[data-feed-id="${feed.id}"]`}>
+      <div className="modal-head">
+        <span id={titleId} className="muted">
+          Feed settings — {feed.title}
+        </span>
+        <button className="icon-btn" onClick={onClose} aria-label="close">
+          <XMarkIcon className="btn-icon" aria-hidden="true" />
+        </button>
       </div>
-    </div>,
-    document.body,
+      <div className="settings-form">
+        <div className="setting-row">
+          <label className="setting-label checkbox">
+            <input
+              type="checkbox"
+              checked={enabled}
+              disabled={busy}
+              onChange={(e) => void toggle(e.target.checked)}
+            />
+            Default to extracting full article
+          </label>
+        </div>
+        <div className="setting-row">
+          <span className="muted hint">
+            Items from this feed open as the full article. Also asks the server to scrape new items
+            when the feed updates, so other clients show full text too. Existing items are extracted
+            as you open them.
+          </span>
+        </div>
+        {error && <div className="error">{error}</div>}
+        {busy && <div className="muted hint">Working…</div>}
+      </div>
+    </Dialog>
   )
 }
