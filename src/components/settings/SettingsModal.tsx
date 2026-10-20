@@ -83,7 +83,7 @@ export function SettingsModal({
                 value={articleCss}
                 onChange={(e) => onArticleCss(e.target.value)}
                 placeholder={
-                  '/* Custom CSS, applied on top of the default.\n   url() and @import are stripped. */'
+                  '/* Typography CSS with math/color functions and @media/@supports.\n   Entire sheet ignored for resources, var/env, custom properties,\n   other functions/at-rules, invalid syntax, or < characters. */'
                 }
                 spellCheck={false}
               />

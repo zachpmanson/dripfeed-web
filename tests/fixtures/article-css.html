@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>ItemView custom CSS boundary regression</title>
+    <style>
+      :root {
+        --panel: white;
+        --text: black;
+        --accent: blue;
+        --border: gray;
+      }
+      iframe {
+        width: 700px;
+        height: 320px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from 'react'
+      import { createRoot } from 'react-dom/client'
+      import { ItemView } from '/src/components/reader/ItemView.tsx'
+
+      const root = createRoot(document.getElementById('root'))
+      let revision = 0
+      let mount = 0
+      window.renderArticleCss = ({
+        css = '',
+        body = '<p id="sample">Article typography</p>',
+        mode = 'custom',
+        fresh = true,
+      }) => {
+        revision++
+        if (fresh) mount++
+        root.render(
+          React.createElement(ItemView, {
+            key: mount,
+            item: {
+              id: revision,
+              feedId: 1,
+              title: 'CSS boundary',
+              url: 'https://article.example/posts/story',
+              author: null,
+              pubDate: null,
+              starred: false,
+              unread: false,
+              body: `${body}<span id="revision">${revision}</span>`,
+            },
+            feedTitle: () => 'Fixture feed',
+            actions: {},
+            articleCssMode: mode,
+            articleCss: css,
+            dimBoilerplate: false,
+            recentBodies: [],
+            autoExtract: false,
+            onFeedClick: () => {},
+          }),
+        )
+        return revision
+      }
+      window.renderArticleCss({})
+    </script>
+  </body>
+</html>
