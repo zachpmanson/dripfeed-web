@@ -94,13 +94,13 @@ export function SettingsModal({
               value={articleCss}
               onChange={(e) => onArticleCss(e.target.value)}
               placeholder={
-                '/* Custom CSS, applied on top of the default.\n   url() and @import are stripped. */'
+                '/* Typography CSS with math/color functions and @media/@supports.\n   Entire sheet ignored for resources, var/env, custom properties,\n   other functions/at-rules, invalid syntax, or < characters. */'
               }
               spellCheck={false}
             />
             <div className="css-actions">
               <span id={cssHintId} className="muted hint">
-                Applied live to the open article. url() and @import are stripped.
+                Applied live to the open article. Unsupported or resource-loading CSS is ignored.
               </span>
               <button
                 className="danger-btn"

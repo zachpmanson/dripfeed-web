@@ -184,6 +184,7 @@ export function ItemView({
     const border = appTheme.getPropertyValue('--border').trim()
     const colorScheme = appTheme.colorScheme
     const body = dimBoilerplate ? dimRepeatedChunks(item.body, recentBodies) : item.body
+    // Custom CSS must be resource-free AND HTML-raw-text-safe at this style sink.
     return `<!doctype html><html data-theme-revision="${themeRevision}"><head><meta charset="utf-8">${baseHrefFor(item.url)}<style>
       :root { color-scheme: ${colorScheme}; --panel: ${panel}; --text: ${text}; --accent: ${accent}; --border: ${border}; }
       body { font-family: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif; font-weight: normal; line-height: 1.55; max-width: 46rem; margin: 0 auto; padding: 0.5rem 1rem; color: var(--text); background: var(--panel); overflow-wrap: anywhere; word-break: break-word; }
