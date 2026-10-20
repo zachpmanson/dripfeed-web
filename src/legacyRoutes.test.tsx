@@ -62,6 +62,21 @@ let root: Root
 beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('location', new URL('https://reader.example/reader/'))
+  // jsdom does not implement native dialog modality; Chromium covers that.
+  Object.defineProperties(HTMLDialogElement.prototype, {
+    showModal: {
+      configurable: true,
+      value(this: HTMLDialogElement) {
+        this.open = true
+      },
+    },
+    close: {
+      configurable: true,
+      value(this: HTMLDialogElement) {
+        this.open = false
+      },
+    },
+  })
   await dbClear()
   await dbPutFeed(feed)
   container = document.createElement('div')
@@ -72,6 +87,8 @@ beforeEach(async () => {
 afterEach(async () => {
   await act(async () => root.unmount())
   container.remove()
+  Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal')
+  Reflect.deleteProperty(HTMLDialogElement.prototype, 'close')
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
