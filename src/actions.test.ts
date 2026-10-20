@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NewsFeed, NewsItem } from './api/types'
 
 const api = vi.hoisted(() => ({
@@ -70,6 +70,11 @@ beforeEach(async () => {
   await db.dbClear()
   await db.dbPutFeed(feed)
   await db.dbPutItems([item(1), item(2, false), item(3)])
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 async function pendingBulk() {
@@ -361,5 +366,138 @@ describe('failed bulk-read rollback', () => {
       body: 'Extracted body',
     })
     expect(await db.dbGetFeed(feed.id)).toMatchObject({ unreadCount: 8, fullTextEnabled: true })
+  })
+})
+
+describe('fulltext response persistence', () => {
+  function pendingExtraction() {
+    let resolve!: (row: NewsItem) => void
+    api.fetchFulltext.mockReturnValueOnce(
+      new Promise<NewsItem>((resolveRequest) => {
+        resolve = resolveRequest
+      }),
+    )
+    const result = actions.extractFulltext(settings, item(1))
+    expect(api.fetchFulltext).toHaveBeenCalledOnce()
+    return { result, resolve }
+  }
+
+  async function reset() {
+    vi.stubGlobal('localStorage', { removeItem: vi.fn() })
+    await (await import('./store')).resetLocal()
+  }
+
+  const extracted = { ...item(1), body: 'Extracted body', pubDate: 123, lastModified: 456 }
+
+  it('does not repopulate any store when a response arrives after resetLocal', async () => {
+    const request = pendingExtraction()
+    await reset()
+    request.resolve(extracted)
+    await request.result
+    expect(await db.dbGetAllItems()).toEqual([])
+    expect(await db.dbGetAllFeeds()).toEqual([])
+    expect(await db.dbGetAllFolders()).toEqual([])
+  })
+
+  it('leaves a replacement-account row with the same ID entirely untouched', async () => {
+    const request = pendingExtraction()
+    await reset()
+    const replacement = { ...item(1, false), title: 'Replacement account', body: 'Private body' }
+    await db.dbPutFeed({ ...feed, title: 'Replacement feed' })
+    await db.dbPutItem(replacement)
+    request.resolve(extracted)
+    await request.result
+    expect(await db.dbGetAllItems()).toEqual([replacement])
+    expect(await db.dbGetFeed(feed.id)).toEqual({ ...feed, title: 'Replacement feed' })
+  })
+
+  it('does not resurrect an item removed with its feed while HTTP is pending', async () => {
+    const request = pendingExtraction()
+    await db.dbPutFeeds([])
+    request.resolve(extracted)
+    await request.result
+    expect(await db.dbGetAllItems()).toEqual([])
+    expect(await db.dbGetAllFeeds()).toEqual([])
+  })
+
+  it('serializes extraction behind an already queued feed deletion', async () => {
+    const request = pendingExtraction()
+    const deletion = db.dbPutFeeds([])
+    request.resolve(extracted)
+    await Promise.all([deletion, request.result])
+    expect(await db.dbGetAllItems()).toEqual([])
+    expect(await db.dbGetAllFeeds()).toEqual([])
+  })
+
+  it('stores normalized extraction while preserving the latest local read/star flags', async () => {
+    const request = pendingExtraction()
+    await actions.setRead(settings, item(1), false)
+    await actions.setStar(settings, item(1, false), true)
+    request.resolve(extracted)
+    await request.result
+    expect((await db.dbGetAllItems()).find((row) => row.id === 1)).toEqual({
+      ...extracted,
+      unread: false,
+      starred: true,
+      pubDate: 123000,
+      lastModified: 456000,
+    })
+    expect((await db.dbGetFeed(feed.id))?.unreadCount).toBe(7)
+  })
+
+  it('still inserts an evicted item when its feed remains subscribed', async () => {
+    const request = pendingExtraction()
+    // Evict just this row, without deleting its feed or resetting the session.
+    const { openDB } = await import('idb')
+    const connection = await openDB('dripfeed')
+    await connection.delete('items', 1)
+    connection.close()
+    request.resolve(extracted)
+    await request.result
+    expect((await db.dbGetAllItems()).find((row) => row.id === 1)).toEqual({
+      ...extracted,
+      pubDate: 123000,
+      lastModified: 456000,
+    })
+  })
+
+  it('discards a response if reset interleaves the database-open await', async () => {
+    const request = pendingExtraction()
+    const writes = vi.spyOn(IDBObjectStore.prototype, 'put')
+    request.resolve(extracted)
+    // Run the HTTP continuation, leaving persistence suspended at getDB().
+    await Promise.resolve()
+    await db.dbClear()
+    await request.result
+    expect(writes).not.toHaveBeenCalled()
+    expect(await db.dbGetAllItems()).toEqual([])
+  })
+
+  it('discards a response if reset interleaves transactional reads', async () => {
+    const request = pendingExtraction()
+    const writes = vi.spyOn(IDBObjectStore.prototype, 'put')
+    let resetDone!: Promise<void>
+    const original = IDBObjectStore.prototype.get
+    const spy = vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementation(function (
+      this: IDBObjectStore,
+      ...args: Parameters<IDBObjectStore['get']>
+    ) {
+      const read = original.apply(this, args)
+      if (this.name === 'items') {
+        spy.mockRestore()
+        read.addEventListener('success', () => {
+          resetDone = db.dbClear()
+        })
+      }
+      return read
+    })
+    request.resolve(extracted)
+    await request.result
+    expect(resetDone).toBeDefined()
+    await resetDone
+    expect(writes).not.toHaveBeenCalled()
+    expect(await db.dbGetAllItems()).toEqual([])
+    expect(await db.dbGetAllFeeds()).toEqual([])
+    expect(db.dbGetItemMutationVersion()).toBe(0)
   })
 })
