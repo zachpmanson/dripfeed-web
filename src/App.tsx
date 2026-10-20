@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { dbGetGeneration } from './db'
 import useUrlState from './hooks/useUrlState'
 import useListPreferences from './hooks/useListPreferences'
 import useThemePreferences from './hooks/useThemePreferences'
@@ -19,6 +20,9 @@ import type { NewsItem } from './api/types'
 
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(loadSettings)
+  // Bind the reader to the login that supplies its items, not to arbitrary
+  // rerenders while an asynchronous reset still leaves the old pool visible.
+  const readerGeneration = useMemo(dbGetGeneration, [settings])
   const { view, setView, selectedId, setSelectedId } = useUrlState()
   // Bumped when the reader header's feed name is clicked, so the sidebar
   // knows to reveal (expand folder + scroll) that feed in sync.
@@ -217,6 +221,7 @@ export default function App() {
           />
         </div>
         <ItemView
+          key={readerGeneration}
           item={selected}
           feedTitle={feedTitle}
           actions={store.actions}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { enclosureHtml } from '../../utils'
+import { dbGetGeneration } from '../../db'
 import { dimRepeatedChunks } from '../../boilerplate'
 import type { NewsItem } from '../../api/types'
 import type { useStore } from '../../hooks'
@@ -48,7 +49,7 @@ interface Props {
 }
 
 /**
- * Items this session has already auto-extracted, keyed by item id, holding
+ * Items this database generation has already auto-extracted, keyed by item id, holding
  * the in-flight promise. Module-level rather than component state for three
  * reasons: the poll replaces the item OBJECT every few minutes, so effect
  * state keyed on the object would re-scrape forever; re-selecting an item
@@ -57,6 +58,7 @@ interface Props {
  * of stacking one request per item.
  */
 const autoExtracted = new Map<number, Promise<void>>()
+let autoExtractGeneration = dbGetGeneration()
 
 export function ItemView({
   item,
@@ -69,6 +71,17 @@ export function ItemView({
   autoExtract,
   onFeedClick,
 }: Props) {
+  // A render caused by an old request must not adopt a reset database with
+  // the old item's props. App remounts this lifetime for a new login session.
+  const [dbGeneration] = useState(dbGetGeneration)
+  const mountedRef = useRef(false)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
   // Ref to the sandboxed article iframe so we can reach its document.
   const frameRef = useRef<HTMLIFrameElement | null>(null)
   const [themeRevision, setThemeRevision] = useState(0)
@@ -121,7 +134,10 @@ export function ItemView({
   // its error onto a different article.
   const currentItemIdRef = useRef<number | null>(null)
   useEffect(() => {
-    currentItemIdRef.current = item?.id ?? null
+    const id = item?.id ?? null
+    // StrictMode effect replay is not a selection change: retain an active run.
+    if (currentItemIdRef.current === id) return
+    currentItemIdRef.current = id
     setExtracting(false)
     setExtractError(null)
   }, [item?.id])
@@ -131,17 +147,21 @@ export function ItemView({
   // the spinner's off state.
   const extractSeq = useRef(0)
   const runExtract = async (target: NewsItem) => {
+    if (!mountedRef.current || dbGeneration !== dbGetGeneration()) return
     const seq = ++extractSeq.current
+    const ownsRun = () =>
+      mountedRef.current &&
+      dbGeneration === dbGetGeneration() &&
+      extractSeq.current === seq &&
+      currentItemIdRef.current === target.id
     setExtracting(true)
     setExtractError(null)
     try {
       await actions.extractFulltext(target)
     } catch (e) {
-      if (currentItemIdRef.current === target.id) {
-        setExtractError(e instanceof Error ? e.message : String(e))
-      }
+      if (ownsRun()) setExtractError(e instanceof Error ? e.message : String(e))
     } finally {
-      if (extractSeq.current === seq) setExtracting(false)
+      if (ownsRun()) setExtracting(false)
     }
   }
 
@@ -158,12 +178,20 @@ export function ItemView({
   // fetch of the article URL per item opened, and the body swap is invisible
   // when the content is the same.
   useEffect(() => {
+    // A reset invalidates this entire mounted lifetime, including its item.
+    if (dbGeneration !== dbGetGeneration()) return
+    if (autoExtractGeneration !== dbGeneration) {
+      // Keep only one generation, not an ever-growing map of logged-out sessions.
+      // Only a current lifetime can enter here; old settlements cannot adopt it.
+      autoExtracted.clear()
+      autoExtractGeneration = dbGeneration
+    }
     if (!item || !autoExtract) return
     const { id } = item
     if (autoExtracted.has(id)) return
     autoExtracted.set(id, runExtract(item))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item?.id, autoExtract])
+  }, [item?.id, autoExtract, dbGeneration])
   const srcdoc = useMemo(() => {
     if (!item) return ''
     // Body comes from the server already rewritten with target=_blank.
