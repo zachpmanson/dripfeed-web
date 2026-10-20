@@ -343,6 +343,35 @@ export async function dbBeginFeedRead(feedId: number, expectedGeneration: number
   }
 }
 
+export interface ReaderSnapshot {
+  items: NewsItem[]
+  feeds: NewsFeed[]
+  folders: NewsFolder[]
+  cursors: Map<number, number>
+}
+
+/** One committed local view, including only cursors for feeds in that view. */
+export async function dbGetReaderSnapshot(): Promise<ReaderSnapshot> {
+  const db = await getDB()
+  const tx = db.transaction(['items', 'feeds', 'folders', 'meta'], 'readonly')
+  const [items, feeds, folders] = await Promise.all([
+    tx.objectStore('items').getAll(),
+    tx.objectStore('feeds').getAll(),
+    tx.objectStore('folders').getAll(),
+  ])
+  // Queue these reads together while the same transaction is still active.
+  // Missing cursors stay absent; -1 remains the explicit drained sentinel.
+  const rows = await Promise.all(
+    feeds.map((feed) => tx.objectStore('meta').get(`cursor:${feed.id}`)),
+  )
+  const cursors = new Map<number, number>()
+  rows.forEach((row, index) => {
+    if (row !== undefined) cursors.set(feeds[index].id, Number(row.value))
+  })
+  await tx.done
+  return { items, feeds, folders, cursors }
+}
+
 export async function dbGetAllItems(): Promise<NewsItem[]> {
   const db = await getDB()
   return db.getAll('items')
