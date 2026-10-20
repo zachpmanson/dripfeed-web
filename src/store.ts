@@ -94,13 +94,11 @@ export async function isInitialized(): Promise<boolean> {
  * api/news.ts for why the root /feeds route is the one that has it).
  *
  * Best-effort by design: the meta sync is the load-bearing part, so a
- * failure here only leaves the stored flags as they were. Same-origin only,
- * so an install whose `baseUrl` points at a different Nextcloud keeps the
- * previous behaviour instead of firing a request that cannot work (root
- * routes carry no CORS exemption — the write path has the same limit).
+ * failure here only leaves the stored flags as they were. The API client
+ * rejects instances outside the app-root /apps proxy before sending a request;
+ * that unsupported feature must not prevent regular versioned API sync.
  */
 async function hydrateFeedFullText(settings: Settings, generation: number): Promise<void> {
-  if (settings.baseUrl.trim() !== '') return
   try {
     const flags = await fetchFeedFullText(settings)
     if (generation === resetGeneration) await dbMergeFeedFullText(flags)

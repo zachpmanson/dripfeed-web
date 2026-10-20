@@ -8,9 +8,10 @@ afterEach(() => {
 })
 
 describe.each([
-  { name: 'apiFetch', request: apiFetch },
-  { name: 'apiFetchSameOrigin', request: apiFetchSameOrigin },
-])('$name Basic authentication', ({ request }) => {
+  { name: 'apiFetch', request: apiFetch, baseUrl: settings.baseUrl },
+  { name: 'apiFetchSameOrigin', request: apiFetchSameOrigin, baseUrl: '' },
+])('$name Basic authentication', ({ request, baseUrl }) => {
+  const requestSettings = { ...settings, baseUrl }
   it.each([
     { user: 'reader@example.com+/%', appPassword: ' p@ss+word/%:with:colons ' },
     { user: '读者é😀', appPassword: '密碼🔑:café+/%@' },
@@ -18,7 +19,7 @@ describe.each([
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await request({ ...settings, user, appPassword }, '/items')
+    await request({ ...requestSettings, user, appPassword }, '/items')
 
     expect(fetchMock).toHaveBeenCalledOnce()
     const headers = new Headers(fetchMock.mock.calls[0][1]?.headers)
@@ -40,7 +41,11 @@ describe.each([
       Authorization: 'old token',
     })
 
-    await request(settings, '/items', { method: 'POST', body: 'payload', headers: callerHeaders })
+    await request(requestSettings, '/items', {
+      method: 'POST',
+      body: 'payload',
+      headers: callerHeaders,
+    })
 
     const headers = new Headers(fetchMock.mock.calls[0][1]?.headers)
     expect(headers.get('OCS-APIREQUEST')).toBe('true')
@@ -53,7 +58,7 @@ describe.each([
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await request(settings, '/items', {
+    await request(requestSettings, '/items', {
       method: 'POST',
       body: '{}',
       headers: { 'OCS-APIREQUEST': 'true' },
@@ -68,7 +73,7 @@ describe.each([
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(request({ ...settings, user: 'reader:name' }, '/items')).rejects.toThrow(
+    await expect(request({ ...requestSettings, user: 'reader:name' }, '/items')).rejects.toThrow(
       'Username cannot contain a colon for Basic authentication',
     )
     expect(fetchMock).not.toHaveBeenCalled()

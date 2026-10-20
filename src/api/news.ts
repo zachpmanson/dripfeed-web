@@ -54,7 +54,9 @@ export function setStar(settings: Settings, itemId: number, starred: boolean): P
  * This route has no CORS support and no CSRF exemption, so it is fetched
  * SAME-ORIGIN (relative — both the vite dev proxy and the prod caddy
  * vhost proxy /apps/*) with the OCS-APIREQUEST header that Nextcloud's
- * CSRF check accepts. Resolves with the updated item, or null when the
+ * CSRF check accepts. The client rejects configured remote origins and
+ * non-root Nextcloud base paths before sending credentials or item IDs.
+ * Resolves with the updated item, or null when the
  * server couldn't extract anything (204 / empty body).
  */
 export async function fetchFulltext(settings: Settings, itemId: number): Promise<NewsItem | null> {
@@ -120,7 +122,8 @@ export function moveFeed(
  * further per-feed settings need no new plumbing. Any subset of fields left
  * out is simply not touched by the server (null = leave alone).
  *
- * Same-origin only and no CORS: the route carries no @NoCSRFRequired, so it
+ * App-root /apps proxy only (remote origins and non-root base paths are
+ * rejected before fetching). The route carries no @NoCSRFRequired, so it
  * is reached exactly like /items/{id}/fulltext — relative fetch + the
  * OCS-APIREQUEST header, which short-circuits Nextcloud's CSRF check
  * (Request::passesCSRFCheck() returns true when that header is present).

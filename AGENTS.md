@@ -41,7 +41,8 @@ CSS v4 utilities for component presentation.
 
 - Comments should explain a non-obvious constraint, invariant, or gotcha—not
   restate the code.
-- Before finishing, run the narrowest relevant check. Available project checks
-  include `pnpm typecheck` and `pnpm build` (or their Makefile equivalents).
-  There is currently no test or lint script in `package.json`; don't claim either
-  was run unless one is added.
+- Before finishing, run the narrowest relevant check through `nix develop`.
+  Project checks include `pnpm test`, `pnpm typecheck`, `pnpm lint`,
+  `pnpm format:check`, and `pnpm build` (or their Makefile equivalents).
+  Browser regression setup and commands are documented in `tests/README.md`.
+  Report only checks actually run, and distinguish mocked tests from live checks.

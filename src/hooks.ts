@@ -5,9 +5,6 @@ import {
   isInitialized,
   isDbReady,
   markDbReady,
-  loadAllItems,
-  loadFeeds,
-  loadFolders,
   loadMoreInto,
   ensureFeedWindow,
   ensureUnreadScope,
@@ -19,7 +16,7 @@ import {
 } from './store'
 import { setRead, setStar, extractFulltext } from './actions'
 import { apiErrorMessage, isAuthError } from './api/client'
-import { dbGetCursor } from './db'
+import { dbGetReaderSnapshot } from './db'
 import {
   createSyncRetryState,
   recordSyncFailure,
@@ -71,17 +68,26 @@ export interface AppData {
   }
 }
 
+function emptyReaderState() {
+  return {
+    ready: false,
+    pool: [] as NewsItem[],
+    feeds: new Map<number, NewsFeed>(),
+    folders: [] as NewsFolder[],
+    cursors: new Map<number, number>(),
+  }
+}
+
 /**
  * Owns the whole data lifecycle: per-feed hydration into IndexedDB on first
  * run, instant reads from the DB, growing server pool + render window via
  * loadMore, background poll.
  */
 export function useStore(settings: Settings | null, view: View, unreadOnly: boolean): AppData {
-  const [ready, setReady] = useState(false)
-  const [pool, setPool] = useState<NewsItem[]>([])
-  const [feeds, setFeeds] = useState<Map<number, NewsFeed>>(new Map())
-  const [folders, setFolders] = useState<NewsFolder[]>([])
-  const [cursors, setCursors] = useState<Map<number, number>>(new Map())
+  const [{ ready, pool, feeds, folders, cursors }, setReader] = useState(emptyReaderState)
+  const refreshVersionRef = useRef(0)
+  const readerActiveRef = useRef(false)
+  const readerReadyRef = useRef(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [paging, setPaging] = useState<LoadMoreProgress | null>(null)
   const [progress, setProgress] = useState<{ done: number } | null>(null)
@@ -109,34 +115,40 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
   const [unreadProbing, setUnreadProbing] = useState(false)
 
   const refreshPool = useCallback(async () => {
-    const [all, fs, fo] = await Promise.all([loadAllItems(), loadFeeds(), loadFolders()])
-    all.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
-    setPool(all)
-    setFeeds(new Map(fs.map((f) => [f.id, f])))
-    setFolders(fo)
-    // Cache every feed's cursor so the UI can derive per-view moreServer
-    // synchronously (a stale boolean computed under another view hid the
-    // load-more button on all-read feeds after switching views).
-    const cm = new Map<number, number>()
-    for (const f of fs) {
-      const c = await dbGetCursor(f.id)
-      if (c !== undefined) cm.set(f.id, c)
-    }
-    setCursors(cm)
+    if (!readerActiveRef.current) return
+    const version = ++refreshVersionRef.current
+    const snapshot = await dbGetReaderSnapshot()
+    // Only the newest request in the current lifecycle may publish. A reset
+    // also disables reads, including refreshes requested by old async work.
+    if (!readerActiveRef.current || version !== refreshVersionRef.current) return
+    snapshot.items.sort((a, b) => (b.pubDate ?? 0) - (a.pubDate ?? 0))
+    setReader({
+      ready: readerReadyRef.current,
+      pool: snapshot.items,
+      feeds: new Map(snapshot.feeds.map((f) => [f.id, f])),
+      folders: snapshot.folders,
+      cursors: snapshot.cursors,
+    })
+  }, [])
+
+  const invalidateReader = useCallback(() => {
+    readerActiveRef.current = false
+    readerReadyRef.current = false
+    refreshVersionRef.current += 1
   }, [])
 
   // Invalidate credentials permanently: wipe local state AND stored
   // settings, then flag authFailed so App drops back to the settings form.
   const resetToSettings = useCallback(async () => {
+    invalidateReader()
     await resetLocal()
-    setReady(false)
-    setPool([])
+    setReader(emptyReaderState())
     setUnreadDrained(new Set())
     setUnreadProbing(false)
     probeOwnerRef.current = null
     unreadProbesRef.current.clear()
     setAuthFailed(true)
-  }, [])
+  }, [invalidateReader])
 
   const reportError = useCallback(
     async (e: unknown) => {
@@ -152,6 +164,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
   // hydrate / poll
   useEffect(() => {
     if (!settings) return
+    readerActiveRef.current = true
     let cancelled = false
     // A slow hydration or reconcile must not overlap a later wake/poll tick.
     let syncInFlight = true
@@ -162,9 +175,12 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
     })
 
     ;(async () => {
-      if (await isInitialized()) {
+      const initialized = await isInitialized()
+      if (cancelled || !readerActiveRef.current) return
+      if (initialized) {
+        readerReadyRef.current = true
         await refreshPool()
-        setReady(true)
+        if (cancelled || !readerActiveRef.current) return
         // The poll is gated on isDbReady(); fullSync sets it, but this
         // branch (an already-populated DB on a later page load) never runs
         // fullSync — without this the 3-minute reconcile never fired again
@@ -182,9 +198,9 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
       } else {
         try {
           await fullSync(settings)
-          if (cancelled) return
+          if (cancelled || !readerActiveRef.current) return
+          readerReadyRef.current = true
           await refreshPool()
-          setReady(true)
         } catch (e) {
           if (cancelled) return
           await reportError(e)
@@ -233,13 +249,14 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
 
     return () => {
       cancelled = true
+      invalidateReader()
       clearInterval(poll)
       window.removeEventListener('focus', onWake)
       window.removeEventListener('online', onOnline)
       document.removeEventListener('visibilitychange', onWake)
       off()
     }
-  }, [settings, refreshPool, reportError])
+  }, [settings, refreshPool, reportError, invalidateReader])
 
   // Run (or reuse) the native unread probe for one feed/folder scope.
   // Success marks the scope drained — the query returned EVERY unread item,
@@ -393,9 +410,9 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
       },
       clearError: () => setError(null),
       reset: async () => {
+        invalidateReader()
         await resetLocal()
-        setReady(false)
-        setPool([])
+        setReader(emptyReaderState())
         setUnreadDrained(new Set())
         setUnreadProbing(false)
         probeOwnerRef.current = null
@@ -404,7 +421,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
         setError(null)
       },
     }),
-    [refreshPool, reportError, probeUnread],
+    [refreshPool, reportError, probeUnread, invalidateReader],
   )
 
   // Snapshot the actions object once. Its closures only depend on the

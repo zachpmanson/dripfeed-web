@@ -43,4 +43,4 @@ The repo's flake builds a static bundle (`nix build .#default`, output in `dist/
 
 ## Configuration
 
-Point it at your own Nextcloud by leaving the URL blank when served behind a proxy, or set a full base URL in the login form (versioned API routes support CORS; full-article extraction needs same-origin).
+Point it at your own Nextcloud by leaving the URL blank when served behind a matching `/apps/*` proxy, or set a full base URL in the login form. Versioned API routes support configured remote instances (with CORS) and Nextcloud subpaths. Full-article extraction and per-feed full-text settings (reading and writing) only support the app-root `/apps/*` proxy: leave the URL blank or use this app's origin with no Nextcloud subpath. These legacy features reject remote origins and same-origin non-root base paths before sending any request or credentials; regular API sync remains available.

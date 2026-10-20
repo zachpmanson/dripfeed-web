@@ -212,6 +212,32 @@ export async function dbPutItem(item: NewsItem): Promise<void> {
   await dbPutItems([item])
 }
 
+/** Apply extraction only in its original session and while its feed still exists. */
+export async function dbApplyFulltext(
+  item: NewsItem,
+  expectedGeneration: number,
+): Promise<boolean> {
+  const db = await getDB()
+  if (generation !== expectedGeneration) return false
+  // Serialize feed deletion and the missing-item fallback in the same transaction.
+  const tx = db.transaction(['items', 'feeds'], 'readwrite')
+  const feed = await tx.objectStore('feeds').get(item.feedId)
+  const current = await tx.objectStore('items').get(item.id)
+  const accepted = !!feed && generation === expectedGeneration
+  if (accepted) {
+    await tx
+      .objectStore('items')
+      .put(current ? { ...item, unread: current.unread, starred: current.starred } : item)
+  }
+  // A reset during the reads is rejected above. A reset after put() is queued
+  // clears this transaction's write before any replacement-session rows can land.
+  await tx.done
+  if (!accepted || generation !== expectedGeneration) return false
+  if (current) itemMutationVersion.mark(item.id)
+  else bulkReadOwners.delete(item.id)
+  return true
+}
+
 /** Atomically update one stored item and return its previous and next values. */
 export async function dbUpdateItem(
   id: number,
@@ -341,6 +367,35 @@ export async function dbBeginFeedRead(feedId: number, expectedGeneration: number
       }
     },
   }
+}
+
+export interface ReaderSnapshot {
+  items: NewsItem[]
+  feeds: NewsFeed[]
+  folders: NewsFolder[]
+  cursors: Map<number, number>
+}
+
+/** One committed local view, including only cursors for feeds in that view. */
+export async function dbGetReaderSnapshot(): Promise<ReaderSnapshot> {
+  const db = await getDB()
+  const tx = db.transaction(['items', 'feeds', 'folders', 'meta'], 'readonly')
+  const [items, feeds, folders] = await Promise.all([
+    tx.objectStore('items').getAll(),
+    tx.objectStore('feeds').getAll(),
+    tx.objectStore('folders').getAll(),
+  ])
+  // Queue these reads together while the same transaction is still active.
+  // Missing cursors stay absent; -1 remains the explicit drained sentinel.
+  const rows = await Promise.all(
+    feeds.map((feed) => tx.objectStore('meta').get(`cursor:${feed.id}`)),
+  )
+  const cursors = new Map<number, number>()
+  rows.forEach((row, index) => {
+    if (row !== undefined) cursors.set(feeds[index].id, Number(row.value))
+  })
+  await tx.done
+  return { items, feeds, folders, cursors }
 }
 
 export async function dbGetAllItems(): Promise<NewsItem[]> {

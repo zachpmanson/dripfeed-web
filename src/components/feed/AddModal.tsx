@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { Dialog } from '../ui/Dialog'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import type { NewsFolder } from '../../api/types'
 import type { Settings } from '../../settings'
@@ -19,6 +20,8 @@ type Tab = 'feed' | 'folder'
  * refresh so the sidebar picks up the new item.
  */
 export function AddModal({ folders, settings, onClose, onCreated }: Props) {
+  const titleId = useId()
+  const inputRef = useRef<HTMLInputElement>(null)
   const [tab, setTab] = useState<Tab>('feed')
   const [url, setUrl] = useState('')
   const [folderId, setFolderId] = useState<number | null>(null)
@@ -26,6 +29,10 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [tab])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,86 +62,89 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-[1000] bg-black/45" onClick={onClose}>
-      <div
-        className="fixed left-1/2 top-1/2 z-[1001] w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-[10px] border border-app-border bg-app-panel p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-3 flex items-center justify-between uppercase tracking-[0.06em]">
-          <span className="text-app-muted">Add</span>
-          <button
-            className="inline-flex items-center justify-center rounded p-1 text-app-muted hover:bg-app-border hover:text-app-text"
-            onClick={onClose}
-            aria-label="close"
-          >
-            <XMarkIcon className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
-        <div className="mb-4 flex overflow-hidden rounded-md border border-app-border">
-          <button
-            className={`rounded-none border-0 px-2.5 py-1.5 text-sm ${tab === 'feed' ? 'bg-app-accent font-semibold text-app-on-accent' : 'bg-transparent text-app-muted'}`}
-            onClick={() => setTab('feed')}
-          >
-            Feed
-          </button>
-          <button
-            className={`rounded-none border-0 px-2.5 py-1.5 text-sm ${tab === 'folder' ? 'bg-app-accent font-semibold text-app-on-accent' : 'bg-transparent text-app-muted'}`}
-            onClick={() => setTab('folder')}
-          >
-            Folder
-          </button>
-        </div>
-        <form onSubmit={submit} className="flex flex-col gap-3">
-          {tab === 'feed' ? (
-            <>
-              <label className="field">
-                URL
-                <input
-                  autoFocus
-                  type="url"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com/feed.xml"
-                />
-              </label>
-              <label className="field">
-                Folder
-                <select
-                  value={folderId ?? 0}
-                  onChange={(e) => setFolderId(Number(e.target.value) || null)}
-                >
-                  <option value={0}>No folder</option>
-                  {folders.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </>
-          ) : (
+    <Dialog
+      labelledBy={titleId}
+      onClose={onClose}
+      className="fixed left-1/2 top-1/2 z-[1001] w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-[10px] border border-app-border bg-app-panel p-5"
+    >
+      <div className="mb-3 flex items-center justify-between uppercase tracking-[0.06em]">
+        <span id={titleId} className="text-app-muted">
+          Add
+        </span>
+        <button
+          className="inline-flex items-center justify-center rounded p-1 text-app-muted hover:bg-app-border hover:text-app-text"
+          onClick={onClose}
+          aria-label="close"
+        >
+          <XMarkIcon className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+      <div className="mb-4 flex overflow-hidden rounded-md border border-app-border">
+        <button
+          className={`rounded-none border-0 px-2.5 py-1.5 text-sm ${tab === 'feed' ? 'bg-app-accent font-semibold text-app-on-accent' : 'bg-transparent text-app-muted'}`}
+          onClick={() => setTab('feed')}
+        >
+          Feed
+        </button>
+        <button
+          className={`rounded-none border-0 px-2.5 py-1.5 text-sm ${tab === 'folder' ? 'bg-app-accent font-semibold text-app-on-accent' : 'bg-transparent text-app-muted'}`}
+          onClick={() => setTab('folder')}
+        >
+          Folder
+        </button>
+      </div>
+      <form onSubmit={submit} className="flex flex-col gap-3">
+        {tab === 'feed' ? (
+          <>
             <label className="field">
-              Name
+              URL
               <input
-                autoFocus
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="My folder"
+                ref={inputRef}
+                data-dialog-autofocus
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://example.com/feed.xml"
               />
             </label>
-          )}
-          {error && <div className="error">{error}</div>}
-          {done && <div className="ok">{done}</div>}
-          <button
-            className="cursor-pointer rounded-md border-0 bg-app-accent p-2.5 font-semibold text-app-on-accent disabled:cursor-default disabled:opacity-60"
-            type="submit"
-            disabled={busy}
-          >
-            {busy ? 'Adding…' : tab === 'feed' ? 'Add feed' : 'Create folder'}
-          </button>
-        </form>
-      </div>
-    </div>
+            <label className="field">
+              Folder
+              <select
+                value={folderId ?? 0}
+                onChange={(e) => setFolderId(Number(e.target.value) || null)}
+              >
+                <option value={0}>No folder</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : (
+          <label className="field">
+            Name
+            <input
+              ref={inputRef}
+              data-dialog-autofocus
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="My folder"
+            />
+          </label>
+        )}
+        {error && <div className="error">{error}</div>}
+        {done && <div className="ok">{done}</div>}
+        <button
+          className="cursor-pointer rounded-md border-0 bg-app-accent p-2.5 font-semibold text-app-on-accent disabled:cursor-default disabled:opacity-60"
+          type="submit"
+          disabled={busy}
+        >
+          {busy ? 'Adding…' : tab === 'feed' ? 'Add feed' : 'Create folder'}
+        </button>
+      </form>
+    </Dialog>
   )
 }

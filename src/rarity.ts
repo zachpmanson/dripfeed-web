@@ -37,18 +37,24 @@ export function feedGaps(items: Iterable<NewsItem>): Map<number, number> {
     if (!it.pubDate) continue
     let arr = dates.get(it.feedId)
     if (!arr) dates.set(it.feedId, (arr = []))
-    arr.push(it.pubDate)
+    const date = it.pubDate
+    // Keep only the newest window, ascending. Evict before insertion so even
+    // transient storage stays bounded when older history is loaded.
+    if (arr.length === FEED_WINDOW) {
+      if (date <= arr[0]) continue
+      arr.shift()
+    }
+    let index = arr.length
+    while (index > 0 && arr[index - 1] > date) index--
+    arr.splice(index, 0, date)
   }
 
   const gaps = new Map<number, number>()
   for (const [feedId, arr] of dates) {
     if (arr.length < 2) continue
-    arr.sort((a, b) => a - b)
-    const newest = arr.slice(-FEED_WINDOW) // most recent 20 by pubDate
-    if (newest.length < 2) continue
     let sum = 0
-    for (let i = 1; i < newest.length; i++) sum += (newest[i] - newest[i - 1]) / 3_600_000
-    gaps.set(feedId, sum / (newest.length - 1))
+    for (let i = 1; i < arr.length; i++) sum += (arr[i] - arr[i - 1]) / 3_600_000
+    gaps.set(feedId, sum / (arr.length - 1))
   }
   return gaps
 }

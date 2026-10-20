@@ -2,7 +2,7 @@ import {
   dbUpdateItem,
   dbUpdateFeed,
   dbGetFeed,
-  dbPutItem,
+  dbApplyFulltext,
   dbSetItemUnread,
   dbBeginFeedRead,
   dbGetGeneration,
@@ -96,6 +96,7 @@ export function isAuthFailure(e: unknown): boolean {
  * clients. Throws a friendly error when nothing could be extracted.
  */
 export async function extractFulltext(settings: Settings, item: NewsItem): Promise<void> {
+  const generation = dbGetGeneration()
   let extracted: NewsItem | null
   try {
     extracted = await fetchFulltext(settings, item.id)
@@ -111,15 +112,7 @@ export async function extractFulltext(settings: Settings, item: NewsItem): Promi
   if (!extracted) {
     throw new Error('Could not extract an article from this URL')
   }
-  const normalized = normalizeItem(extracted)
-  const { next } = await dbUpdateItem(normalized.id, (current) => ({
-    ...normalized,
-    unread: current.unread,
-    starred: current.starred,
-  }))
-  // The item may have been evicted since the reader was opened.
-  if (!next) await dbPutItem(normalized)
-  notifyLocalChange()
+  if (await dbApplyFulltext(normalizeItem(extracted), generation)) notifyLocalChange()
 }
 
 /**
@@ -129,8 +122,8 @@ export async function extractFulltext(settings: Settings, item: NewsItem): Promi
  * an older failed toggle cannot undo a newer choice or another feed field.
  * The caller surfaces failures.
  *
- * Reached same-origin only, so a feed whose baseUrl points at a DIFFERENT
- * Nextcloud cannot be written (that install is not behind the /apps proxy).
+ * Only instances at the app-root /apps proxy are supported; remote origins
+ * and same-origin Nextcloud subpaths are rejected by the API client.
  * The error is deliberately left to bubble rather than being swallowed:
  * a toggle that silently did nothing would be worse than a visible failure.
  */

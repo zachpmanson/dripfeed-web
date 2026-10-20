@@ -257,14 +257,22 @@
     transform: rotate(90deg); /* points left (collapsed content is below) */
   }
 
-  .modal-backdrop,
   .ctx-backdrop {
     position: fixed;
     inset: 0;
     z-index: 1000;
   }
 
-  .modal-backdrop {
+  /* Only app chrome dialogs: article content and user CSS remain isolated. */
+  .app-dialog {
+    margin: 0;
+    color: var(--text);
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100dvh - 2rem);
+    overflow: auto;
+  }
+
+  .app-dialog::backdrop {
     background: var(--scrim);
   }
 
