@@ -121,19 +121,37 @@ export async function apiFetch(
 }
 
 /**
- * Fetch a route SAME-ORIGIN, ignoring settings.baseUrl. The legacy scraper
- * routes (e.g. /apps/news/items/{id}/fulltext) live outside /api/v1-3 and
- * carry no CORS/CSRF exemption (@NoCSRFRequired), so cross-origin calls are
- * blocked (preflight 405 + CSRF 412). Both the dev vite proxy and the prod
- * caddy vhost proxy /apps/* same-origin, so a relative fetch works there
- * and only needs the OCS-APIREQUEST header to satisfy Nextcloud's CSRF
- * check.
+ * Legacy News routes have no CORS/CSRF exemption and use the app's /apps
+ * proxy. Only an empty base URL or this origin's root maps to that proxy;
+ * never send another instance's credentials or IDs to these relative routes.
+ * Callers still need OCS-APIREQUEST for Nextcloud's CSRF check.
  */
 export async function apiFetchSameOrigin(
   settings: Settings,
   path: string,
   init: RequestInit = {},
 ): Promise<Response> {
+  const base = settings.baseUrl.trim().replace(/\/+$/, '')
+  if (base) {
+    let matchesProxy = false
+    try {
+      const url = new URL(base)
+      matchesProxy =
+        url.origin === globalThis.location?.origin &&
+        url.pathname === '/' &&
+        !url.search &&
+        !url.hash &&
+        !url.username &&
+        !url.password
+    } catch {
+      // Invalid base URLs cannot establish that this is the proxied instance.
+    }
+    if (!matchesProxy) {
+      throw new Error(
+        'Full-article extraction and per-feed full-text settings are unsupported for this Nextcloud URL. Use the app-root /apps proxy with a blank URL or this app’s origin (no Nextcloud subpath). Regular News API features remain available.',
+      )
+    }
+  }
   return authedFetch(settings, path, init)
 }
 
