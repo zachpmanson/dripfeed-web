@@ -212,6 +212,32 @@ export async function dbPutItem(item: NewsItem): Promise<void> {
   await dbPutItems([item])
 }
 
+/** Apply extraction only in its original session and while its feed still exists. */
+export async function dbApplyFulltext(
+  item: NewsItem,
+  expectedGeneration: number,
+): Promise<boolean> {
+  const db = await getDB()
+  if (generation !== expectedGeneration) return false
+  // Serialize feed deletion and the missing-item fallback in the same transaction.
+  const tx = db.transaction(['items', 'feeds'], 'readwrite')
+  const feed = await tx.objectStore('feeds').get(item.feedId)
+  const current = await tx.objectStore('items').get(item.id)
+  const accepted = !!feed && generation === expectedGeneration
+  if (accepted) {
+    await tx
+      .objectStore('items')
+      .put(current ? { ...item, unread: current.unread, starred: current.starred } : item)
+  }
+  // A reset during the reads is rejected above. A reset after put() is queued
+  // clears this transaction's write before any replacement-session rows can land.
+  await tx.done
+  if (!accepted || generation !== expectedGeneration) return false
+  if (current) itemMutationVersion.mark(item.id)
+  else bulkReadOwners.delete(item.id)
+  return true
+}
+
 /** Atomically update one stored item and return its previous and next values. */
 export async function dbUpdateItem(
   id: number,
