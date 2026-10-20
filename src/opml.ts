@@ -30,16 +30,26 @@ function feedOutline(feed: NewsFeed): string {
   return `<outline ${attrs.join(' ')} />`
 }
 
-export function downloadOpml(feeds: NewsFeed[], folders: NewsFolder[]): void {
-  const ungrouped = feeds.filter((feed) => feed.folderId === null)
+export function serializeOpml(feeds: NewsFeed[], folders: NewsFolder[]): string {
+  const remainingFolderIds = new Set(folders.map((folder) => folder.id))
+  const ungrouped = feeds.filter(
+    (feed) => feed.folderId === null || !remainingFolderIds.has(feed.folderId),
+  )
   const outlines = [
     ...folders.map((folder) => {
-      const children = feeds.filter((feed) => feed.folderId === folder.id).map(feedOutline)
+      // Only the first outline for a repeated folder ID owns its feeds.
+      const children = remainingFolderIds.delete(folder.id)
+        ? feeds.filter((feed) => feed.folderId === folder.id).map(feedOutline)
+        : []
       return `<outline text="${escapeXml(folder.name)}" title="${escapeXml(folder.name)}">${children.join('')}</outline>`
     }),
     ...ungrouped.map(feedOutline),
   ].join('')
-  const opmlXml = `<?xml version="1.0" encoding="UTF-8"?>\n<opml version="2.0"><head><title>Dripfeed subscriptions</title><dateCreated>${new Date().toUTCString()}</dateCreated></head><body>${outlines}</body></opml>`
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<opml version="2.0"><head><title>Dripfeed subscriptions</title><dateCreated>${new Date().toUTCString()}</dateCreated></head><body>${outlines}</body></opml>`
+}
+
+export function downloadOpml(feeds: NewsFeed[], folders: NewsFolder[]): void {
+  const opmlXml = serializeOpml(feeds, folders)
   const url = URL.createObjectURL(new Blob([opmlXml], { type: 'text/x-opml; charset=utf-8' }))
   const link = document.createElement('a')
   link.href = url
