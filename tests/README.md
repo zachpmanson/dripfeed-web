@@ -29,3 +29,30 @@ The original parent-window `instanceof Element` / `HTMLAnchorElement` checks
 fail this regression: the span and anchor are instances of the iframe's
 constructors, not the parent's. The footnote click is not prevented, leaves the
 frame at scroll position zero, adds no highlight, and opens an unwanted popup.
+
+# Dialog accessibility regression
+
+`dialogs.browser.mjs` starts a temporary Vite server and drives the real Settings,
+Add and Feed settings components via Chromium's raw CDP protocol and Node's
+built-in WebSocket. No Playwright installation, API credentials or new dependency
+is required. The fixture never submits API writes.
+
+```sh
+CHROMIUM_PATH=/path/to/chromium \
+TEST_ARTIFACT_DIR=/tmp/dialog-accessibility \
+nix develop --command node tests/dialogs.browser.mjs
+```
+
+It exercises real Enter/Tab/Shift-Tab/Escape input, edge wrapping, initial and
+restored focus, all dismissal paths, backdrop-vs-content/drag clicks, blocked
+background article clicks, accessible dialog names and CSS field description,
+and small-viewport scrolling in both themes. Optional artifacts include JSON
+results and dark/light screenshots. The fixture uses StrictMode, like the app.
+
+The five React/jsdom tests in `src/components/ui/Dialog.test.tsx` cover lifecycle,
+cancel handling, Tab handler wiring, backdrop decisions, custom CSS callbacks,
+and existing Add/feed settings busy/error/success flows. jsdom has no native
+`showModal`, inertness, layout or default Tab navigation: those are explicitly
+shimmed, not claimed as browser evidence. Native modality and user keyboard
+behavior are verified by the separate Chromium run. Scripted focus into an
+inert iframe is not an adversarial-security guarantee of this correction.
