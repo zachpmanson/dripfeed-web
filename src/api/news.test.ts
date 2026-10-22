@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchFeedFullText, fetchFeeds, fetchFulltext, setFeedFullText } from './news'
+import { createFeed, fetchFeedFullText, fetchFeeds, fetchFulltext, setFeedFullText } from './news'
 import type { Settings } from '../settings'
 
 const settings = { baseUrl: '', user: 'remote-reader', appPassword: 'remote-secret' }
@@ -18,6 +18,17 @@ const rejectedBases = [
 ]
 const supportedBases = ['', '  ', '/', 'https://reader.example', ' https://reader.example/// ']
 const legacyOperations = [
+  {
+    name: 'authenticated feed subscription',
+    request: (s: Settings) =>
+      createFeed(s, 'https://feed.example/rss', 456, {
+        user: 'feed-reader',
+        password: ' secret:päss ',
+      }),
+    path: '/apps/news/feeds',
+    method: 'POST',
+    response: '{"feeds":[]}',
+  },
   {
     name: 'article extraction',
     request: (s: Settings) => fetchFulltext(s, 123),
@@ -78,6 +89,15 @@ describe.each(legacyOperations)('$name proxy boundary', ({ request, path, method
     if (method === 'PATCH') {
       expect(init.body).toBe('{"fullTextEnabled":true}')
       expect(headers.get('Content-Type')).toBe('application/json')
+    } else if (method === 'POST') {
+      expect(JSON.parse(init.body as string)).toEqual({
+        url: 'https://feed.example/rss',
+        parentFolderId: 456,
+        user: 'feed-reader',
+        password: ' secret:päss ',
+      })
+      expect(headers.get('Content-Type')).toBe('application/json')
+      expect(result).toEqual({ feeds: [] })
     } else if (path.endsWith('/fulltext')) {
       expect(result).toEqual({ id: 123, body: 'Extracted' })
     } else {
@@ -161,6 +181,62 @@ it.each(['https://other-cloud.example', 'https://nextcloud.zachmanson.com/nextcl
     expect(fetchMock.mock.calls[0][0]).toBe(`${baseUrl}/apps/news/api/v1-3/feeds`)
   },
 )
+
+describe('feed subscription credentials', () => {
+  it.each([
+    ['', null],
+    ['', 456],
+    ['https://other-cloud.example/nextcloud', null],
+    ['https://other-cloud.example/nextcloud', 456],
+  ] as const)(
+    'keeps ordinary subscriptions versioned at %j (folder=%s)',
+    async (baseUrl, folderId) => {
+      const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('{"feeds":[]}'))
+      vi.stubGlobal('fetch', fetchMock)
+
+      await expect(
+        createFeed({ ...settings, baseUrl }, 'https://feed.example/rss', folderId),
+      ).resolves.toEqual({ feeds: [] })
+
+      expect(fetchMock).toHaveBeenCalledOnce()
+      const [url, init] = fetchMock.mock.calls[0]
+      expect(url).toBe(`${baseUrl}/apps/news/api/v1-3/feeds`)
+      expect(init?.method).toBe('POST')
+      expect(JSON.parse(init?.body as string)).toEqual({
+        url: 'https://feed.example/rss',
+        folderId: folderId ?? 0,
+      })
+    },
+  )
+
+  it('supports no folder and an empty feed password without dropping authentication', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('{"feeds":[]}'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await createFeed(settings, 'https://feed.example/rss', null, { user: 'reader', password: '' })
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/apps/news/feeds')
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toEqual({
+      url: 'https://feed.example/rss',
+      parentFolderId: 0,
+      user: 'reader',
+      password: '',
+    })
+  })
+
+  it.each(['', 'invalid:reader'])(
+    'rejects invalid feed username %j without fetching',
+    async (user) => {
+      const fetchMock = vi.fn<typeof fetch>()
+      vi.stubGlobal('fetch', fetchMock)
+
+      await expect(
+        createFeed(settings, 'https://feed.example/rss', null, { user, password: 'secret' }),
+      ).rejects.toThrow(/feed username/i)
+      expect(fetchMock).not.toHaveBeenCalled()
+    },
+  )
+})
 
 it('rejects unsupported settings before even validating credentials', async () => {
   const fetchMock = vi.fn<typeof fetch>()

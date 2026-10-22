@@ -153,31 +153,34 @@ export async function apiFetch(
  * IDs to these relative routes.
  * Callers still need OCS-APIREQUEST for Nextcloud's CSRF check.
  */
+export function supportsAppProxy(settings: Settings): boolean {
+  const base = apiBase(settings)
+  if (!base) return true
+  try {
+    const url = new URL(base)
+    return (
+      url.origin === globalThis.location?.origin &&
+      url.pathname === '/' &&
+      !url.search &&
+      !url.hash &&
+      !url.username &&
+      !url.password
+    )
+  } catch {
+    // Invalid base URLs cannot establish that this is the proxied instance.
+    return false
+  }
+}
+
 export async function apiFetchSameOrigin(
   settings: Settings,
   path: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  const base = apiBase(settings)
-  if (base) {
-    let matchesProxy = false
-    try {
-      const url = new URL(base)
-      matchesProxy =
-        url.origin === globalThis.location?.origin &&
-        url.pathname === '/' &&
-        !url.search &&
-        !url.hash &&
-        !url.username &&
-        !url.password
-    } catch {
-      // Invalid base URLs cannot establish that this is the proxied instance.
-    }
-    if (!matchesProxy) {
-      throw new Error(
-        'Full-article extraction and per-feed full-text settings are unsupported for this Nextcloud URL. Use the app-root /apps proxy with a blank URL or this app’s origin (no Nextcloud subpath). Regular News API features remain available.',
-      )
-    }
+  if (!supportsAppProxy(settings)) {
+    throw new Error(
+      'Full-article extraction, per-feed full-text settings, and password-protected feed subscriptions are unsupported for this Nextcloud URL. Use the app-root /apps proxy with a blank URL or this app’s origin (no Nextcloud subpath). Regular News API features remain available.',
+    )
   }
   return authedFetch(settings, path, init)
 }

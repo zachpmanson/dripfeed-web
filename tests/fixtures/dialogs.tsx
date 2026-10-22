@@ -7,7 +7,7 @@ import type { NewsFeed } from '../../src/api/types'
 import '../../src/index.css'
 
 const noop = () => {}
-const settings = { baseUrl: 'http://invalid.test', user: 'test', appPassword: 'test' }
+const settings = { baseUrl: '', user: 'test', appPassword: 'test' }
 const feed = { id: 42, title: 'Example feed', fullTextEnabled: false } as NewsFeed
 function Harness() {
   const [open, setOpen] = useState('')

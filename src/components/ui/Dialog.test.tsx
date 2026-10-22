@@ -207,7 +207,7 @@ it('preserves Add feed/folder submission, busy, errors and switch focus', async 
   expect(document.activeElement).toBe(url)
   await input(url, 'https://example.com/feed')
   await submit()
-  expect(createFeed).toHaveBeenCalledWith(settings, 'https://example.com/feed', null)
+  expect(createFeed).toHaveBeenCalledWith(settings, 'https://example.com/feed', null, undefined)
   expect(button('Adding…').disabled).toBe(true)
   await submit()
   expect(createFeed).toHaveBeenCalledOnce()
@@ -223,6 +223,115 @@ it('preserves Add feed/folder submission, busy, errors and switch focus', async 
   expect(created).toHaveBeenCalledWith('folder')
   expect(folder.value).toBe('')
   expect(document.querySelector('.ok')!.textContent).toBe('Folder created.')
+})
+
+it('submits optional feed credentials separately, locks busy controls and clears them after success', async () => {
+  const request = pending()
+  vi.mocked(createFeed).mockReturnValue(request.promise as never)
+  const stored = vi.spyOn(Storage.prototype, 'setItem')
+  const created = vi.fn()
+  await act(async () =>
+    root.render(
+      <AddModal
+        settings={settings}
+        folders={[{ id: 9, parentId: null, name: 'Private feeds', opened: true }]}
+        onClose={vi.fn()}
+        onCreated={created}
+      />,
+    ),
+  )
+  await input(document.querySelector('input[type=url]')!, 'https://example.com/private.rss')
+  const toggle = document.querySelector<HTMLInputElement>('input[type=checkbox]')!
+  expect(document.querySelector('input[type=password]')).toBeNull()
+  await click(toggle)
+  const user = document.querySelector<HTMLInputElement>('input[type=text]')!
+  const password = document.querySelector<HTMLInputElement>('input[type=password]')!
+  expect(user.closest('label')?.textContent).toBe('Feed username')
+  expect(password.closest('label')?.textContent).toBe('Feed password')
+  await input(user, 'private-reader')
+  await input(password, ' secret:päss ')
+  await act(async () => {
+    const select = document.querySelector('select')!
+    select.value = '9'
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  await submit()
+  expect(createFeed).toHaveBeenCalledWith(settings, 'https://example.com/private.rss', 9, {
+    user: 'private-reader',
+    password: ' secret:päss ',
+  })
+  expect(user.disabled).toBe(true)
+  expect(password.disabled).toBe(true)
+  expect(button('Folder').disabled).toBe(true)
+  await submit()
+  expect(createFeed).toHaveBeenCalledOnce()
+  await act(async () => request.resolve())
+  expect(created).toHaveBeenCalledWith('feed')
+  expect(toggle.checked).toBe(false)
+  expect(document.querySelector('input[type=password]')).toBeNull()
+  await click(toggle)
+  expect(document.querySelector<HTMLInputElement>('input[type=text]')!.value).toBe('')
+  expect(document.querySelector<HTMLInputElement>('input[type=password]')!.value).toBe('')
+  expect(stored).not.toHaveBeenCalled()
+})
+
+it('retains feed credentials for retry but clears them when disabled, switching tabs or reopening', async () => {
+  vi.mocked(createFeed).mockRejectedValue(new Error('Feed failed'))
+  const render = () =>
+    act(async () =>
+      root.render(
+        <AddModal settings={settings} folders={[]} onClose={vi.fn()} onCreated={vi.fn()} />,
+      ),
+    )
+  await render()
+  const fillCredentials = async () => {
+    await click(document.querySelector<HTMLInputElement>('input[type=checkbox]')!)
+    await input(document.querySelector('input[type=text]')!, 'private-reader')
+    await input(document.querySelector('input[type=password]')!, 'secret')
+  }
+  const expectEmpty = async () => {
+    await click(document.querySelector<HTMLInputElement>('input[type=checkbox]')!)
+    expect(document.querySelector<HTMLInputElement>('input[type=text]')!.value).toBe('')
+    expect(document.querySelector<HTMLInputElement>('input[type=password]')!.value).toBe('')
+  }
+  await input(document.querySelector('input[type=url]')!, 'https://example.com/private.rss')
+  await fillCredentials()
+  await submit()
+  expect(document.querySelector('.error')!.textContent).toBe('Feed failed')
+  expect(document.querySelector<HTMLInputElement>('input[type=password]')!.value).toBe('secret')
+  await click(document.querySelector<HTMLInputElement>('input[type=checkbox]')!)
+  await expectEmpty()
+  await input(document.querySelector('input[type=password]')!, 'secret-again')
+  await click(button('Folder'))
+  await click(button('Feed'))
+  await expectEmpty()
+  await input(document.querySelector('input[type=password]')!, 'secret-before-close')
+  await act(async () => root.render(null))
+  await render()
+  await expectEmpty()
+})
+
+it('explains the proxy limitation without blocking ordinary remote subscriptions', async () => {
+  const remoteSettings = { ...settings, baseUrl: 'https://other-cloud.example/nextcloud' }
+  vi.mocked(createFeed).mockResolvedValue({ feeds: [] })
+  await act(async () =>
+    root.render(
+      <AddModal settings={remoteSettings} folders={[]} onClose={vi.fn()} onCreated={vi.fn()} />,
+    ),
+  )
+  const toggle = document.querySelector<HTMLInputElement>('input[type=checkbox]')!
+  expect(toggle.disabled).toBe(true)
+  expect(document.getElementById(toggle.getAttribute('aria-describedby')!)?.textContent).toContain(
+    'ordinary feeds can still be added',
+  )
+  await input(document.querySelector('input[type=url]')!, 'https://example.com/feed')
+  await submit()
+  expect(createFeed).toHaveBeenCalledWith(
+    remoteSettings,
+    'https://example.com/feed',
+    null,
+    undefined,
+  )
 })
 
 it('preserves feed toggle busy/rollback/success and restores its persistent row instead of the removed menu', async () => {
