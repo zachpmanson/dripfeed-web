@@ -38,7 +38,8 @@ export function SettingsForm({ initial, onSave, notice }: Props) {
             placeholder="Same origin (leave empty)"
           />
           <span className="muted hint">
-            Leave empty when served from dripfeed.zachmanson.com — the /apps proxy handles it.
+            On dripfeed.zachmanson.com, leave empty or use https://nextcloud.zachmanson.com — both
+            use the /apps proxy. Other servers need CORS and do not support full-text features.
           </span>
         </label>
         <label>

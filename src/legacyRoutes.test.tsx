@@ -126,7 +126,12 @@ describe('legacy feature callers', () => {
     },
   )
 
-  it('hydrates full-text flags with an explicit same-origin root base URL', async () => {
+  it.each([
+    ['https://reader.example/', 'https://reader.example/'],
+    ['https://dripfeed.zachmanson.com/', 'https://nextcloud.zachmanson.com'],
+    ['https://dripfeed.zachmanson.com/', ''],
+  ])('hydrates full-text flags at %s with configured URL %j', async (origin, baseUrl) => {
+    vi.stubGlobal('location', new URL(origin))
     const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input) => {
       const url = String(input)
       if (url === '/apps/news/feeds') {
@@ -138,7 +143,7 @@ describe('legacy feature callers', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    await fullSync({ ...settings, baseUrl: 'https://reader.example/' })
+    await fullSync({ ...settings, baseUrl })
 
     expect((await dbGetFeed(feed.id))?.fullTextEnabled).toBe(true)
     expect(fetchMock.mock.calls.some(([url]) => url === '/apps/news/feeds')).toBe(true)

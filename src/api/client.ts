@@ -63,10 +63,36 @@ export function isAuthError(e: unknown): e is ApiError {
   return e instanceof ApiError && e.status === 401
 }
 
+/** Resolve the one known production backend to its same-origin proxy.
+ * Keep this tied to BOTH origins: another deployment may proxy a different
+ * instance, and a subpath on this host may identify a different Nextcloud.
+ * Resolve at request time so existing saved logins need no migration.
+ */
+function apiBase(settings: Settings): string {
+  const base = settings.baseUrl.trim().replace(/\/+$/, '')
+  if (globalThis.location?.origin === 'https://dripfeed.zachmanson.com' && base) {
+    try {
+      const url = new URL(base)
+      if (
+        url.origin === 'https://nextcloud.zachmanson.com' &&
+        url.pathname === '/' &&
+        !url.search &&
+        !url.hash &&
+        !url.username &&
+        !url.password
+      ) {
+        return ''
+      }
+    } catch {
+      // Leave invalid URLs to the normal API validation/error path.
+    }
+  }
+  return base
+}
+
 export function apiUrl(settings: Settings, path: string): string {
   // Empty baseUrl = same origin (deployed behind the caddy /apps proxy).
-  const base = settings.baseUrl.trim().replace(/\/+$/, '')
-  return `${base}${NEWS_API_PREFIX}${path}`
+  return `${apiBase(settings)}${NEWS_API_PREFIX}${path}`
 }
 
 async function authedFetch(
@@ -122,8 +148,9 @@ export async function apiFetch(
 
 /**
  * Legacy News routes have no CORS/CSRF exemption and use the app's /apps
- * proxy. Only an empty base URL or this origin's root maps to that proxy;
- * never send another instance's credentials or IDs to these relative routes.
+ * proxy. An empty base URL, this origin's root, or the exact known production
+ * backend maps to that proxy; never send another instance's credentials or
+ * IDs to these relative routes.
  * Callers still need OCS-APIREQUEST for Nextcloud's CSRF check.
  */
 export async function apiFetchSameOrigin(
@@ -131,7 +158,7 @@ export async function apiFetchSameOrigin(
   path: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  const base = settings.baseUrl.trim().replace(/\/+$/, '')
+  const base = apiBase(settings)
   if (base) {
     let matchesProxy = false
     try {
