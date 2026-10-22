@@ -52,9 +52,6 @@ export default function ItemRow({
       <div
         className={`item-title mb-0.5 line-clamp-2 text-[0.9rem] leading-[1.3] ${item.unread ? '' : 'text-app-muted'}`}
       >
-        {item.unread && (
-          <span className="unread-dot mr-1.5 inline-block size-2 rounded-full bg-app-accent align-middle" />
-        )}
         {titleFor(item)}
       </div>
       <div className="item-meta flex items-center gap-2 text-xs text-app-muted">
