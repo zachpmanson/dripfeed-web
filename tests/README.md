@@ -46,12 +46,15 @@ nix develop --command node tests/dialogs.browser.mjs
 It exercises real Enter/Tab/Shift-Tab/Escape input, edge wrapping, initial and
 restored focus, all dismissal paths, backdrop-vs-content/drag clicks, blocked
 background article clicks, accessible dialog names and CSS field description,
-and small-viewport scrolling in both themes. Optional artifacts include JSON
+and small-viewport scrolling in both themes. The expanded feed-auth form also checks
+labelled/masked optional credentials, clearing on reopen, small-viewport containment
+and keyboard wrapping without submitting an API write. Optional artifacts include JSON
 results and dark/light screenshots. The fixture uses StrictMode, like the app.
 
-The five React/jsdom tests in `src/components/ui/Dialog.test.tsx` cover lifecycle,
+The React/jsdom tests in `src/components/ui/Dialog.test.tsx` cover lifecycle,
 cancel handling, Tab handler wiring, backdrop decisions, custom CSS callbacks,
-and existing Add/feed settings busy/error/success flows. jsdom has no native
+existing Add/feed settings busy/error/success flows, feed-credential submission,
+retry/clearing behavior, and the unsupported-instance hint. jsdom has no native
 `showModal`, inertness, layout or default Tab navigation: those are explicitly
 shimmed, not claimed as browser evidence. Native modality and user keyboard
 behavior are verified by the separate Chromium run. Scripted focus into an

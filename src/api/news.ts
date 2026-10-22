@@ -87,12 +87,42 @@ export function createFolder(settings: Settings, name: string): Promise<FoldersR
   return apiPost<FoldersResponse>(settings, '/folders', { name })
 }
 
-/** Add a feed. Body: { url, folderId? } (folderId 0 = no folder). */
-export function createFeed(
+export interface FeedCredentials {
+  user: string
+  password: string
+}
+
+/** The versioned create route ignores feed credentials; use the News web
+ * route only when they are supplied. These are the FEED's credentials, not
+ * the Nextcloud login used for the Authorization header. Never persist them
+ * in the client or embed them in the feed URL.
+ */
+export async function createFeed(
   settings: Settings,
   url: string,
   folderId: number | null,
+  credentials?: FeedCredentials,
 ): Promise<FeedsResponse> {
+  if (credentials) {
+    if (!credentials.user) throw new Error('Enter a feed username')
+    if (credentials.user.includes(':')) {
+      throw new Error('Feed username cannot contain a colon for Basic authentication')
+    }
+    const res = await apiFetchSameOrigin(settings, '/apps/news/feeds', {
+      method: 'POST',
+      headers: {
+        'OCS-APIREQUEST': 'true',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        url,
+        parentFolderId: folderId ?? 0,
+        user: credentials.user,
+        password: credentials.password,
+      }),
+    })
+    return (await res.json()) as FeedsResponse
+  }
   return apiPost<FeedsResponse>(settings, '/feeds', {
     url,
     folderId: folderId ?? 0,

@@ -244,6 +244,51 @@ try {
       `${kind}: AX name, initial focus, Tab/Shift-Tab, inert app/iframe, padding/drag, Escape/close/backdrop, restored trigger`,
     )
   }
+  await open('add')
+  await click('dialog input[type=checkbox]')
+  await eventually(() => evaluate(`!!document.querySelector('dialog input[type=password]')`))
+  assert.equal(
+    await evaluate(
+      `document.querySelector('dialog input[type=password]').closest('label').textContent`,
+    ),
+    'Feed password',
+  )
+  await evaluate(`document.querySelector('dialog input[type=password]').focus()`)
+  await send('Input.insertText', { text: 'dummy-feed-password' })
+  await send('Emulation.setDeviceMetricsOverride', {
+    width: 360,
+    height: 450,
+    deviceScaleFactor: 1,
+    mobile: false,
+  })
+  for (const theme of ['dark', 'light']) {
+    await evaluate(`document.documentElement.dataset.theme = '${theme}'`)
+    const metrics = await evaluate(
+      `(() => {const d=document.querySelector('dialog'); const r=d.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,scrolls:d.scrollHeight>d.clientHeight}})()`,
+    )
+    assert.ok(
+      metrics.left >= 0 && metrics.right <= 360 && metrics.top >= 0 && metrics.bottom <= 450,
+    )
+    assert.equal(metrics.scrolls, true, 'expanded feed auth form scrolls within small viewport')
+    await evaluate(`document.querySelector('dialog button[type=submit]').focus()`)
+    await key('Tab')
+    assert.equal(
+      await evaluate(`document.activeElement.matches('dialog button[aria-label=close]')`),
+      true,
+    )
+  }
+  await key('Escape')
+  await closed('add')
+  await open('add')
+  assert.equal(await evaluate(`!!document.querySelector('dialog input[type=password]')`), false)
+  await evaluate(`document.querySelector('dialog input[type=checkbox]').click()`)
+  assert.equal(await evaluate(`document.querySelector('dialog input[type=password]').value`), '')
+  await key('Escape')
+  await closed('add')
+  evidence.checks.push(
+    'feed auth: labelled masked password; optional controls reset on reopen; expanded form fits/scrolls at 360x450 in both themes; Tab wraps; no API submission',
+  )
+
   await open('settings')
   await send('Emulation.setDeviceMetricsOverride', {
     width: 360,

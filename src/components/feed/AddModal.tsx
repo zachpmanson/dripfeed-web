@@ -4,6 +4,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline'
 import type { NewsFolder } from '../../api/types'
 import type { Settings } from '../../settings'
 import { createFeed, createFolder } from '../../api/news'
+import { supportsAppProxy } from '../../api/client'
 
 interface Props {
   folders: NewsFolder[]
@@ -21,10 +22,15 @@ type Tab = 'feed' | 'folder'
  */
 export function AddModal({ folders, settings, onClose, onCreated }: Props) {
   const titleId = useId()
+  const authHintId = useId()
+  const canUseFeedAuth = supportsAppProxy(settings)
   const inputRef = useRef<HTMLInputElement>(null)
   const [tab, setTab] = useState<Tab>('feed')
   const [url, setUrl] = useState('')
   const [folderId, setFolderId] = useState<number | null>(null)
+  const [useFeedAuth, setUseFeedAuth] = useState(false)
+  const [feedUser, setFeedUser] = useState('')
+  const [feedPassword, setFeedPassword] = useState('')
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -33,6 +39,12 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
   useEffect(() => {
     inputRef.current?.focus()
   }, [tab])
+
+  const clearFeedAuth = () => {
+    setUseFeedAuth(false)
+    setFeedUser('')
+    setFeedPassword('')
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,7 +55,13 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
     try {
       if (tab === 'feed') {
         if (!url.trim()) throw new Error('Enter a feed URL')
-        await createFeed(settings, url.trim(), folderId)
+        await createFeed(
+          settings,
+          url.trim(),
+          folderId,
+          useFeedAuth ? { user: feedUser, password: feedPassword } : undefined,
+        )
+        clearFeedAuth()
         setDone('Feed added.')
         onCreated('feed')
       } else {
@@ -83,12 +101,17 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
         <button
           className={`rounded-none border-0 px-2.5 py-1.5 text-sm ${tab === 'feed' ? 'bg-app-accent font-semibold text-app-on-accent' : 'bg-transparent text-app-muted'}`}
           onClick={() => setTab('feed')}
+          disabled={busy}
         >
           Feed
         </button>
         <button
           className={`rounded-none border-0 px-2.5 py-1.5 text-sm ${tab === 'folder' ? 'bg-app-accent font-semibold text-app-on-accent' : 'bg-transparent text-app-muted'}`}
-          onClick={() => setTab('folder')}
+          onClick={() => {
+            setTab('folder')
+            clearFeedAuth()
+          }}
+          disabled={busy}
         >
           Folder
         </button>
@@ -105,6 +128,7 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://example.com/feed.xml"
+                disabled={busy}
               />
             </label>
             <label className="field">
@@ -112,6 +136,7 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
               <select
                 value={folderId ?? 0}
                 onChange={(e) => setFolderId(Number(e.target.value) || null)}
+                disabled={busy}
               >
                 <option value={0}>No folder</option>
                 {folders.map((f) => (
@@ -121,6 +146,49 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
                 ))}
               </select>
             </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={useFeedAuth}
+                disabled={busy || !canUseFeedAuth}
+                aria-describedby={authHintId}
+                onChange={(e) => {
+                  if (e.target.checked) setUseFeedAuth(true)
+                  else clearFeedAuth()
+                }}
+              />
+              Use HTTP Basic Auth
+            </label>
+            <p id={authHintId} className="text-xs text-app-muted">
+              {canUseFeedAuth
+                ? 'Optional feed credentials, not your Nextcloud login. Nextcloud stores them to fetch this feed.'
+                : 'Password-protected feeds require the app-root /apps proxy. This Nextcloud URL is unsupported; ordinary feeds can still be added.'}
+            </p>
+            {useFeedAuth && (
+              <>
+                <label className="field">
+                  Feed username
+                  <input
+                    type="text"
+                    value={feedUser}
+                    onChange={(e) => setFeedUser(e.target.value)}
+                    autoComplete="off"
+                    required
+                    disabled={busy}
+                  />
+                </label>
+                <label className="field">
+                  Feed password
+                  <input
+                    type="password"
+                    value={feedPassword}
+                    onChange={(e) => setFeedPassword(e.target.value)}
+                    autoComplete="new-password"
+                    disabled={busy}
+                  />
+                </label>
+              </>
+            )}
           </>
         ) : (
           <label className="field">
@@ -132,6 +200,7 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="My folder"
+              disabled={busy}
             />
           </label>
         )}
