@@ -14,6 +14,7 @@ const rejectedBases = [
   'https://reader.example/?instance=other',
   'https://reader.example/#other',
   'not a URL',
+  'https://nextcloud.zachmanson.com',
 ]
 const supportedBases = ['', '  ', '/', 'https://reader.example', ' https://reader.example/// ']
 const legacyOperations = [
@@ -100,6 +101,66 @@ it.each([
   const headers = new Headers(fetchMock.mock.calls[0][1]?.headers)
   expect(headers.get('Authorization')).toBe(`Basic ${btoa('remote-reader:remote-secret')}`)
 })
+
+describe.each(legacyOperations)('$name production proxy alias', ({ request, path, response }) => {
+  it.each(['https://nextcloud.zachmanson.com', ' https://nextcloud.zachmanson.com/// '])(
+    'routes a saved production URL %j through the same-origin proxy',
+    async (baseUrl) => {
+      vi.stubGlobal('location', new URL('https://dripfeed.zachmanson.com/'))
+      const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(response))
+      vi.stubGlobal('fetch', fetchMock)
+
+      await request({ ...settings, baseUrl })
+
+      expect(fetchMock).toHaveBeenCalledOnce()
+      expect(fetchMock.mock.calls[0][0]).toBe(path)
+      expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('Authorization')).toBe(
+        `Basic ${btoa('remote-reader:remote-secret')}`,
+      )
+    },
+  )
+
+  it.each([
+    'https://nextcloud.zachmanson.com/nextcloud',
+    'https://nextcloud.zachmanson.com/?instance=other',
+    'https://nextcloud.zachmanson.com/#other',
+    'https://user:pass@nextcloud.zachmanson.com',
+    'https://nextcloud.zachmanson.com:8443',
+    'http://nextcloud.zachmanson.com',
+    'https://nextcloud.zachmanson.com.evil.example',
+    'https://other-cloud.example',
+  ])('does not alias a different instance %s on production', async (baseUrl) => {
+    vi.stubGlobal('location', new URL('https://dripfeed.zachmanson.com/'))
+    const fetchMock = vi.fn<typeof fetch>()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(request({ ...settings, baseUrl })).rejects.toThrow('unsupported')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+it('uses the same production proxy for versioned API requests from saved logins', async () => {
+  vi.stubGlobal('location', new URL('https://dripfeed.zachmanson.com/'))
+  const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('{"feeds":[]}'))
+  vi.stubGlobal('fetch', fetchMock)
+
+  await fetchFeeds({ ...settings, baseUrl: 'https://nextcloud.zachmanson.com' })
+
+  expect(fetchMock.mock.calls[0][0]).toBe('/apps/news/api/v1-3/feeds')
+})
+
+it.each(['https://other-cloud.example', 'https://nextcloud.zachmanson.com/nextcloud'])(
+  'does not redirect versioned requests for %s to the production proxy',
+  async (baseUrl) => {
+    vi.stubGlobal('location', new URL('https://dripfeed.zachmanson.com/'))
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('{"feeds":[]}'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchFeeds({ ...settings, baseUrl })
+
+    expect(fetchMock.mock.calls[0][0]).toBe(`${baseUrl}/apps/news/api/v1-3/feeds`)
+  },
+)
 
 it('rejects unsupported settings before even validating credentials', async () => {
   const fetchMock = vi.fn<typeof fetch>()
