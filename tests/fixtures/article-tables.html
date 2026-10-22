@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Article table layout regression</title>
+    <style>
+      :root {
+        --panel: white;
+        --text: black;
+        --accent: blue;
+        --border: gray;
+      }
+      body {
+        margin: 0;
+      }
+      iframe {
+        width: 100%;
+        height: 600px;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from 'react'
+      import { createRoot } from 'react-dom/client'
+      import { ItemView } from '/src/components/reader/ItemView.tsx'
+      import wideTable from './wide-article-table.html?raw'
+
+      const item = {
+        id: 1,
+        feedId: 1,
+        title: 'Article tables',
+        url: 'https://article.example/story',
+        author: null,
+        pubDate: null,
+        starred: false,
+        unread: false,
+        body: `<p id="prose">Article prose stays in its text column.</p>
+          <table id="narrow"><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>
+          ${wideTable.replace('<table>', '<table id="wide">')}
+          <table id="overflow"><tr><td style="white-space: nowrap">${'Unbreakable'.repeat(100)}</td></tr></table>`,
+      }
+      createRoot(document.getElementById('root')).render(
+        React.createElement(ItemView, {
+          item,
+          feedTitle: () => 'Fixture feed',
+          actions: {},
+          articleCssMode: 'default',
+          articleCss: '',
+          dimBoilerplate: false,
+          recentBodies: [],
+          autoExtract: false,
+          onFeedClick: () => {},
+        }),
+      )
+    </script>
+  </body>
+</html>

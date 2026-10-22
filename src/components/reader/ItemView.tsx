@@ -219,7 +219,7 @@ export function ItemView({
       img, video { max-width: 100%; height: auto; }
       .enclosure { display: block; margin: 0.9rem 0 0; max-width: 100%; }
       pre { max-width: 100%; overflow-x: auto; }
-      table { display: block; width: max-content; max-width: calc(100vw - 2rem); overflow-x: auto; margin-left: calc(50% - 50vw + 1rem); }
+      table { display: block; width: max-content; max-width: calc(100vw - 2rem); overflow-x: auto; margin-left: 50%; transform: translateX(-50%); }
       table, th, td { border: 1px solid var(--border); border-collapse: collapse; }
       th, td { padding: 0.3rem 0.5rem; }
       a { color: var(--accent); overflow-wrap: anywhere; word-break: break-word; }

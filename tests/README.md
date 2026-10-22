@@ -1,3 +1,20 @@
+# Browser regression: article table centering
+
+`article-tables.mjs` renders the real `ItemView` with narrow, multi-column and
+non-wrapping tables. Chromium checks centering at 360px, 1000px and 1600px,
+viewport gutters, constrained prose, no page-level horizontal overflow, and
+reachable content through a wide table's own scrollbar.
+
+```sh
+PLAYWRIGHT_MODULE=/path/to/node_modules/playwright \
+CHROMIUM_PATH=/path/to/chromium \
+TEST_ARTIFACT_DIR=/tmp/article-tables \
+nix develop --command node tests/article-tables.mjs
+```
+
+No API credentials or live feed requests are needed. Optional artifacts include
+layout metrics and screenshots for each viewport.
+
 # Browser regression: iframe footnotes
 
 `iframe-footnotes.mjs` starts a temporary Vite server and renders the real
