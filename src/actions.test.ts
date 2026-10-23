@@ -389,6 +389,31 @@ describe('fulltext response persistence', () => {
 
   const extracted = { ...item(1), body: 'Extracted body', pubDate: 123, lastModified: 456 }
 
+  it('rejects an empty extraction with reader feedback and leaves the summary intact', async () => {
+    api.fetchFulltext.mockResolvedValueOnce(null)
+    await expect(actions.extractFulltext(settings, item(1))).rejects.toThrow(
+      'Could not extract an article from this URL',
+    )
+    expect((await db.dbGetAllItems()).find((row) => row.id === 1)).toEqual(item(1))
+  })
+
+  it('preserves an extraction 401 for authentication handling', async () => {
+    const { ApiError } = await import('./api/client')
+    const failure = new ApiError('Unauthorized', 401)
+    api.fetchFulltext.mockRejectedValueOnce(failure)
+    await expect(actions.extractFulltext(settings, item(1))).rejects.toBe(failure)
+    expect(actions.isAuthFailure(failure)).toBe(true)
+  })
+
+  it('rejects network extraction failures with a friendly message and the original cause', async () => {
+    const cause = new TypeError('Failed to fetch')
+    api.fetchFulltext.mockRejectedValueOnce(cause)
+    await expect(actions.extractFulltext(settings, item(1))).rejects.toMatchObject({
+      message: 'network error — could not reach the server',
+      cause,
+    })
+  })
+
   it('does not repopulate any store when a response arrives after resetLocal', async () => {
     const request = pendingExtraction()
     await reset()

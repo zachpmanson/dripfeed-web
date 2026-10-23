@@ -111,3 +111,27 @@ Unknown syntax/functions, resources, all other at-rules, custom properties and
 var/env substitution reject the whole sheet. `<` is rejected both before parsing
 and after serialization to protect the HTML style boundary; stored CSS is not
 rewritten. Built-in theme CSS and article HTML/image handling are unaffected.
+
+# Browser regression: global error toast
+
+`error-toast.browser.mjs` renders the real toast and app CSS with local fixture
+state in StrictMode; it does not contact the News API. Chromium checks 360px,
+768px and 1600px viewports in both themes, long-message containment and scrolling,
+unchanged reader geometry, no focus theft, a usable dismiss target, keyboard
+Tab/Enter dismissal and background interaction while the toast is visible. All
+non-fixture requests are blocked. Screenshots and JSON metrics are optional.
+
+```sh
+PLAYWRIGHT_MODULE=/path/to/node_modules/playwright \
+CHROMIUM_PATH=/path/to/chromium \
+TEST_ARTIFACT_DIR=/tmp/error-toast \
+nix develop --command node tests/error-toast.browser.mjs
+```
+
+This is a bounded component/browser regression, not a live account check or a
+screen-reader announcement test. `src/hooks.errors.test.tsx` separately exercises
+the real store hook, reader and toast with mocked API/data operations: extraction
+rejections stay local, 401 still invalidates authentication, stale-session
+failures cannot report, and dismissed consecutive errors stay deduplicated
+through background polling. The toast has no auto-dismiss timer; reset/logout
+and unmount invalidate its session and clear the error/dedup state.
