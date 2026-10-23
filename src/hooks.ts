@@ -92,6 +92,8 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
   const [paging, setPaging] = useState<LoadMoreProgress | null>(null)
   const [progress, setProgress] = useState<{ done: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const errorSessionRef = useRef(0)
+  const lastErrorRef = useRef<string | null>(null)
   const [authFailed, setAuthFailed] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const syncingRef = useRef(false)
@@ -135,13 +137,18 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
     readerActiveRef.current = false
     readerReadyRef.current = false
     refreshVersionRef.current += 1
+    errorSessionRef.current += 1
+    lastErrorRef.current = null
+    setError(null)
   }, [])
 
   // Invalidate credentials permanently: wipe local state AND stored
   // settings, then flag authFailed so App drops back to the settings form.
   const resetToSettings = useCallback(async () => {
     invalidateReader()
+    const session = errorSessionRef.current
     await resetLocal()
+    if (session !== errorSessionRef.current) return
     setReader(emptyReaderState())
     setUnreadDrained(new Set())
     setUnreadProbing(false)
@@ -151,12 +158,23 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
   }, [invalidateReader])
 
   const reportError = useCallback(
-    async (e: unknown) => {
+    async (e: unknown, session: number, credentials: Settings | null) => {
+      if (
+        !readerActiveRef.current ||
+        session !== errorSessionRef.current ||
+        credentials !== settingsRef.current
+      )
+        return
       if (isAuthError(e)) {
         await resetToSettings()
         return
       }
-      setError(apiErrorMessage(e))
+      const message = apiErrorMessage(e)
+      // Dismissal silences consecutive repeats (including background polls),
+      // until a different error or a new session needs attention.
+      if (lastErrorRef.current === message) return
+      lastErrorRef.current = message
+      setError(message)
     },
     [resetToSettings],
   )
@@ -165,6 +183,8 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
   useEffect(() => {
     if (!settings) return
     readerActiveRef.current = true
+    setAuthFailed(false)
+    const session = errorSessionRef.current
     let cancelled = false
     // A slow hydration or reconcile must not overlap a later wake/poll tick.
     let syncInFlight = true
@@ -192,7 +212,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
           if (!cancelled) await refreshPool()
         } catch (e) {
           recordSyncFailure(retryState, e, Date.now())
-          await reportError(e)
+          await reportError(e, session, settings)
           console.warn('incremental sync failed', e)
         }
       } else {
@@ -203,7 +223,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
           await refreshPool()
         } catch (e) {
           if (cancelled) return
-          await reportError(e)
+          await reportError(e, session, settings)
         }
       }
     })().finally(() => {
@@ -229,7 +249,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
         })
         .catch((e) => {
           recordSyncFailure(retryState, e, Date.now())
-          void reportError(e)
+          void reportError(e, session, settings)
           console.warn('poll sync failed', e)
         })
         .finally(() => {
@@ -267,6 +287,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
   const probeUnread = useCallback(
     async (type: 0 | 1, id: number): Promise<number> => {
       const s = settingsRef.current
+      const session = errorSessionRef.current
       if (!s) return 0
       const key = unreadScopeKey(type, id)
       const existing = unreadProbesRef.current.get(key)
@@ -282,7 +303,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
           // Not drained: the row turns back into a "Load more" button whose
           // click calls this again. A transient failure must not hide the
           // unread items nor wedge the button.
-          await reportError(e)
+          await reportError(e, session, s)
           console.warn('unread probe failed', e)
           return 0
         } finally {
@@ -302,6 +323,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
 
   const loadMore = useCallback(async () => {
     const s = settingsRef.current
+    const session = errorSessionRef.current
     if (!s || loadingMore) return
     const v = viewRef.current
     // In unread-only mode, feed/folder scopes are served by the native
@@ -328,9 +350,9 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
       setPaging({ added: 0, feedsPaged: 0, totalFeeds: 0 })
       await loadMoreInto(s, scope, undefined, (p) => setPaging(p))
       await refreshPool()
-      setError(null)
+      if (session === errorSessionRef.current && s === settingsRef.current) setError(null)
     } catch (e) {
-      await reportError(e)
+      await reportError(e, session, s)
     } finally {
       setLoadingMore(false)
       setPaging(null)
@@ -340,37 +362,46 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
   const actions = useCallback(
     () => ({
       setRead: async (item: NewsItem, unread: boolean) => {
+        const s = settingsRef.current
+        const session = errorSessionRef.current
         try {
-          await setRead(settingsRef.current!, item, unread)
+          await setRead(s!, item, unread)
         } catch (e) {
-          await reportError(e)
+          await reportError(e, session, s)
           throw e
         }
       },
       setStar: async (item: NewsItem, starred: boolean) => {
+        const s = settingsRef.current
+        const session = errorSessionRef.current
         try {
-          await setStar(settingsRef.current!, item, starred)
+          await setStar(s!, item, starred)
         } catch (e) {
-          await reportError(e)
+          await reportError(e, session, s)
           throw e
         }
       },
       extractFulltext: async (item: NewsItem) => {
+        const s = settingsRef.current
+        const session = errorSessionRef.current
         try {
-          await extractFulltext(settingsRef.current!, item)
+          await extractFulltext(s!, item)
         } catch (e) {
-          await reportError(e)
+          // The reader owns manual and automatic extraction feedback. A real
+          // 401 must still invalidate credentials, while the failure rejects.
+          if (isAuthError(e)) await reportError(e, session, s)
           throw e
         }
       },
       ensureFeed: async (feedId: number) => {
         const s = settingsRef.current
+        const session = errorSessionRef.current
         if (!s) return
         try {
           await ensureFeedWindow(s, feedId)
           await refreshPool()
         } catch (e) {
-          await reportError(e)
+          await reportError(e, session, s)
         }
       },
       /**
@@ -384,16 +415,18 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
       },
       refreshMeta: async () => {
         const s = settingsRef.current
+        const session = errorSessionRef.current
         if (!s) return
         try {
           await incrementalSync(s)
           await refreshPool()
         } catch (e) {
-          await reportError(e)
+          await reportError(e, session, s)
         }
       },
       syncNow: async () => {
         const s = settingsRef.current
+        const session = errorSessionRef.current
         if (!s || syncingRef.current) return
         syncingRef.current = true
         setSyncing(true)
@@ -401,7 +434,7 @@ export function useStore(settings: Settings | null, view: View, unreadOnly: bool
           await incrementalSync(s)
           await refreshPool()
         } catch (e) {
-          await reportError(e)
+          await reportError(e, session, s)
           console.warn('manual sync failed', e)
         } finally {
           syncingRef.current = false

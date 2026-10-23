@@ -15,6 +15,7 @@ import { AddModal } from './components/feed/AddModal'
 import { SettingsModal } from './components/settings/SettingsModal'
 import AppHeader from './components/app/AppHeader'
 import SyncGate from './components/app/SyncGate'
+import ErrorToast from './components/app/ErrorToast'
 import { buildAppViewModel } from './appViewModel'
 import type { NewsItem } from './api/types'
 
@@ -163,23 +164,9 @@ export default function App() {
         onSettings={() => setShowSettings(true)}
       />
 
+      <ErrorToast error={store.error} onDismiss={store.actions.clearError} />
+
       <main className="grid min-h-0 flex-1 grid-cols-[14rem_minmax(16rem,24rem)_1fr]">
-        {store.error && (
-          <div
-            role="alert"
-            className="error col-span-full flex items-center justify-between gap-3 border-b border-app-border bg-app-panel"
-          >
-            <span>{store.error}</span>
-            <button
-              type="button"
-              className="shrink-0 rounded px-2 py-1 text-app-muted hover:bg-app-border hover:text-app-text"
-              aria-label="Dismiss error"
-              onClick={store.actions.clearError}
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
         <Sidebar
           feeds={feeds}
           folders={folders}

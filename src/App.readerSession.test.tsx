@@ -31,10 +31,13 @@ vi.mock('./components/app/AppHeader', () => ({
   ),
 }))
 vi.mock('./components/settings/SettingsForm', () => ({
-  SettingsForm: ({ onSave }: ComponentProps<typeof SettingsForm>) => (
-    <button onClick={() => onSave({ baseUrl: '', user: 'new reader', appPassword: 'password' })}>
-      Sign in
-    </button>
+  SettingsForm: ({ onSave, notice }: ComponentProps<typeof SettingsForm>) => (
+    <>
+      {notice && <p className="error">{notice}</p>}
+      <button onClick={() => onSave({ baseUrl: '', user: 'new reader', appPassword: 'password' })}>
+        Sign in
+      </button>
+    </>
   ),
 }))
 vi.mock('./components/settings/SettingsModal', () => ({
@@ -217,4 +220,43 @@ it('remounts the same selected ID for new-session props and ignores an old-sessi
   expect(container.querySelector('[role="alert"]')?.textContent).toContain('new session failure')
   await render()
   expect(extract).toHaveBeenCalledTimes(2)
+})
+
+it('renders the global toast outside the reader grid and wires dismissal', async () => {
+  mocks.store!.error = 'Sync failed'
+  await render()
+  const toast = container.querySelector('[role="alert"]')!
+  expect(toast.textContent).toContain('Sync failed')
+  expect(toast.className).toContain('fixed')
+  expect(toast.closest('main')).toBeNull()
+  await act(async () =>
+    container.querySelector<HTMLButtonElement>('[aria-label="Dismiss error"]')!.click(),
+  )
+  expect(mocks.store!.actions.clearError).toHaveBeenCalledOnce()
+  mocks.store!.error = null
+  await render()
+  expect(container.querySelector('[role="alert"]')).toBeNull()
+})
+
+it('keeps the persistent authentication notice on the sign-in form, not a toast', async () => {
+  mocks.store!.authFailed = true
+  mocks.store!.error = 'Previous global failure'
+  await render()
+  expect(container.querySelector('.error')?.textContent).toBe(
+    'Your credentials were rejected by the server — please sign in again.',
+  )
+  expect(container.querySelector('[role="alert"]')).toBeNull()
+  await render()
+  expect(container.textContent).toContain('please sign in again')
+})
+
+it('preserves the initial-sync inline error and start-over flow', async () => {
+  mocks.store!.ready = false
+  mocks.store!.error = 'Initial sync failed'
+  await render()
+  expect(container.querySelector('.sync-card .error')?.textContent).toBe('Initial sync failed')
+  expect(container.querySelector('[role="alert"]')).toBeNull()
+  await click('start over')
+  await resetRequest
+  expect(container.textContent).toContain('Sign in')
 })

@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Error toast regression</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React, { StrictMode, useState } from 'react'
+      import { createRoot } from 'react-dom/client'
+      import ErrorToast from '/src/components/app/ErrorToast.tsx'
+      import '/src/index.css'
+
+      function Fixture() {
+        const [error, setError] = useState(null)
+        const [clicks, setClicks] = useState(0)
+        window.showError = setError
+        return React.createElement(
+          'div',
+          { className: 'flex h-full flex-col bg-app-bg text-app-text' },
+          React.createElement(
+            'button',
+            {
+              id: 'background',
+              onClick: () => setClicks((n) => n + 1),
+            },
+            `Background control: ${clicks}`,
+          ),
+          React.createElement(
+            'main',
+            {
+              id: 'reader',
+              className: 'min-h-0 flex-1 bg-app-panel p-4',
+            },
+            'Local reader content remains in place.',
+          ),
+          React.createElement(ErrorToast, { error, onDismiss: () => setError(null) }),
+        )
+      }
+      createRoot(document.getElementById('root')).render(
+        React.createElement(StrictMode, null, React.createElement(Fixture)),
+      )
+    </script>
+  </body>
+</html>
