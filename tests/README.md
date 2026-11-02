@@ -63,10 +63,22 @@ nix develop --command node tests/dialogs.browser.mjs
 It exercises real Enter/Tab/Shift-Tab/Escape input, edge wrapping, initial and
 restored focus, all dismissal paths, backdrop-vs-content/drag clicks, blocked
 background article clicks, accessible dialog names and CSS field description,
-and small-viewport scrolling in both themes. The expanded feed-auth form also checks
+and small-viewport scrolling in both themes. It additionally checks dynamic Settings
+editor/reset transitions, pointer opening, rapid reopen, reverse backdrop drags,
+restored iframe interaction, and all four Settings↔Add/feed-settings mixed-owner
+Escape cases. Mixed checks are mandatory, not opt-in. The expanded feed-auth form also checks
 labelled/masked optional credentials, clearing on reopen, small-viewport containment
-and keyboard wrapping without submitting an API write. Optional artifacts include JSON
-results and dark/light screenshots. The fixture uses StrictMode, like the app.
+and keyboard wrapping without submitting an API write. All non-fixture requests
+are blocked before navigation, including same-origin `/apps` GETs that Vite would
+otherwise proxy to the real News server. A synthetic fulltext request verifies
+that block. Optional artifacts include JSON results and desktop/dark/light
+screenshots. The fixture uses StrictMode, like the app. Parent-side scripted iframe
+focus is recorded as a diagnostic only: Chromium permits it in the unchanged native
+baseline too; it is not an adversarial inertness or sandbox guarantee.
+
+The rejected Settings-only Base UI pilot and paired browser evidence are recorded
+in [settings-base-ui-pilot.md](settings-base-ui-pilot.md). The final tree keeps
+native dialogs; the candidate survives only in the documented experiment commit.
 
 The React/jsdom tests in `src/components/ui/Dialog.test.tsx` cover lifecycle,
 cancel handling, Tab handler wiring, backdrop decisions, custom CSS callbacks,

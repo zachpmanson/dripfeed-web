@@ -175,11 +175,7 @@ it('names Settings and labels/describes custom CSS without changing its live val
       />,
     ),
   )
-  const popup = document.querySelector('[role="dialog"]')!
-  expect(document.getElementById(popup.getAttribute('aria-labelledby')!)!.textContent).toBe(
-    'Settings',
-  )
-  expect(document.querySelector('dialog')).toBeNull()
+  expect(name()).toBe('Settings')
   const textarea = document.querySelector('textarea')!
   expect(textarea.labels![0].textContent).toBe('Custom article CSS')
   expect(

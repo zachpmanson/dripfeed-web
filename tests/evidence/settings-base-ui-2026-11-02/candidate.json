@@ -1,0 +1,102 @@
+{
+  "checks": [
+    [
+      {
+        "role": "dialog",
+        "name": "SETTINGS"
+      }
+    ],
+    {
+      "desktopSettings": {
+        "width": 352,
+        "height": 629.34375,
+        "left": 324,
+        "top": 85.328125
+      }
+    },
+    "settings: AX name, initial focus, Tab/Shift-Tab, inert app/iframe, padding/drag, Escape/close/backdrop, restored trigger",
+    [
+      {
+        "role": "dialog",
+        "name": "ADD"
+      }
+    ],
+    "add: AX name, initial focus, Tab/Shift-Tab, inert app/iframe, padding/drag, Escape/close/backdrop, restored trigger",
+    [
+      {
+        "role": "dialog",
+        "name": "FEED SETTINGS — EXAMPLE FEED"
+      }
+    ],
+    "feed: AX name, initial focus, Tab/Shift-Tab, inert app/iframe, padding/drag, Escape/close/backdrop, restored trigger",
+    "feed auth: labelled masked password; optional controls reset on reopen; expanded form fits/scrolls at 360x450 in both themes; Tab wraps; no API submission",
+    "Settings: pointer opening, dynamic editor/reset, current Tab edges, rapid reopen",
+    "dark: small viewport contained/scrollable; text rgb(216, 220, 227); original scrim preserved",
+    "light: small viewport contained/scrollable; text rgb(28, 31, 38); original scrim preserved"
+  ],
+  "pageErrors": [],
+  "blockedRequests": [
+    "http://127.0.0.1:5173/apps/news/api/v1-3/items/fixture/fulltext"
+  ],
+  "iframeFocus": [
+    {
+      "kind": "settings",
+      "inside": false,
+      "activeTag": "IFRAME",
+      "frameActiveTag": "BUTTON"
+    },
+    {
+      "kind": "add",
+      "inside": false,
+      "activeTag": "IFRAME",
+      "frameActiveTag": "BUTTON"
+    },
+    {
+      "kind": "feed",
+      "inside": false,
+      "activeTag": "IFRAME",
+      "frameActiveTag": "BUTTON"
+    }
+  ],
+  "mixed": [
+    {
+      "first": "settings",
+      "second": "add",
+      "remaining": [
+        "AddFeedFolderURLFolderNo folderUse HTTP Basic AuthOptional feed credentials, not your Nextcloud login. Nextcloud stores them to fetch this feed.Add feed"
+      ],
+      "focusInside": true,
+      "passed": false
+    },
+    {
+      "first": "add",
+      "second": "settings",
+      "remaining": [
+        "AddFeedFolderURLFolderNo folderUse HTTP Basic AuthOptional feed credentials, not your Nextcloud login. Nextcloud stores them to fetch this feed.Add feed"
+      ],
+      "focusInside": true,
+      "passed": true
+    },
+    {
+      "first": "settings",
+      "second": "feed",
+      "remaining": [
+        "Feed settings — Example feedDefault to extracting full articleItems from this feed open as the full article. Also asks the server to scrape new items when the feed updates, so other clients show full text too. Existing items are extracted as you open them."
+      ],
+      "focusInside": true,
+      "passed": false
+    },
+    {
+      "first": "feed",
+      "second": "settings",
+      "remaining": [
+        "Feed settings — Example feedDefault to extracting full articleItems from this feed open as the full article. Also asks the server to scrape new items when the feed updates, so other clients show full text too. Existing items are extracted as you open them."
+      ],
+      "focusInside": true,
+      "passed": true
+    }
+  ],
+  "browser": "Chrome/153.0.8010.52",
+  "result": "failed",
+  "error": "AssertionError [ERR_ASSERTION]: mixed native/Base overlays must dismiss only the last-opened owner\n    at file:///home/beltino/.worktrees/dripfeed-web-fox-base-ui/tests/dialogs.browser.mjs:455:10"
+}
