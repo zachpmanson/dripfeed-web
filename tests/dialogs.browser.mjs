@@ -10,8 +10,10 @@ import { createServer } from 'vite'
 assert.ok(process.env.CHROMIUM_PATH, 'Set CHROMIUM_PATH to a Chromium executable')
 const profile = await mkdtemp(join(tmpdir(), 'dripfeed-dialog-'))
 const artifacts = process.env.TEST_ARTIFACT_DIR
-const server = await createServer({ server: { host: '127.0.0.1', port: 0 } })
-const evidence = { checks: [], pageErrors: [] }
+const server = await createServer({
+  server: { host: '127.0.0.1', port: 0, watch: { ignored: ['**/.pi-subagents/**'] } },
+})
+const evidence = { checks: [], pageErrors: [], blockedRequests: [], iframeFocus: [], mixed: [] }
 let browser, socket
 async function eventually(check) {
   for (let i = 0; i < 100; i++) {
@@ -54,6 +56,21 @@ try {
   const pending = new Map()
   socket.onmessage = ({ data }) => {
     const message = JSON.parse(data)
+    if (message.method === 'Fetch.requestPaused') {
+      const { requestId, request } = message.params
+      const url = new URL(request.url)
+      // Vite normally proxies /apps to the real News server, including mutating GETs.
+      if (
+        url.origin === new URL(server.resolvedUrls.local[0]).origin &&
+        !url.pathname.startsWith('/apps') &&
+        request.method === 'GET'
+      ) {
+        void send('Fetch.continueRequest', { requestId })
+      } else {
+        evidence.blockedRequests.push(request.url)
+        void send('Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' })
+      }
+    }
     if (message.method === 'Runtime.exceptionThrown')
       evidence.pageErrors.push(message.params.exceptionDetails.text)
     if (!message.id) return
@@ -96,12 +113,19 @@ try {
       windowsVirtualKeyCode: code,
       modifiers,
     })
+    // Base UI redirects focus from its sentinels on the next animation frame.
+    await evaluate(
+      'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
+    )
   }
   const pointer = async (x, y, type, buttons) =>
     send('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons, clickCount: 1 })
   const clickAt = async (x, y) => {
     await pointer(x, y, 'mousePressed', 1)
     await pointer(x, y, 'mouseReleased', 0)
+    await evaluate(
+      'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
+    )
   }
   const click = async (selector) => {
     const point = await evaluate(
@@ -109,6 +133,7 @@ try {
     )
     await clickAt(point.x, point.y)
   }
+  await send('Fetch.enable', { patterns: [{ urlPattern: '*' }] })
   await send('Page.enable')
   await send('Runtime.enable')
   await send('Accessibility.enable')
@@ -121,14 +146,17 @@ try {
   evidence.browser = (await send('Browser.getVersion')).product
   await send('Page.navigate', { url: `${server.resolvedUrls.local[0]}tests/fixtures/dialogs.html` })
   await eventually(() => evaluate(`!!document.querySelector('#settings')`))
+  await evaluate(`fetch('/apps/news/api/v1-3/items/fixture/fulltext').catch(() => {})`)
+  await eventually(() => evidence.blockedRequests.length === 1)
+  assert.ok(evidence.blockedRequests[0].includes('/apps/news/'))
   const open = async (kind) => {
     // Use real keyboard activation, not a synthetic click.
     await evaluate(`document.querySelector('#${kind}').focus()`)
     await key('Enter')
-    await eventually(() => evaluate(`!!document.querySelector('dialog[open]')`))
+    await eventually(() => evaluate(`!!document.querySelector('.app-dialog')`))
   }
   const closed = async (kind) => {
-    await eventually(() => evaluate(`!document.querySelector('dialog')`))
+    await eventually(() => evaluate(`!document.querySelector('.app-dialog')`))
     assert.equal(await evaluate('document.activeElement.id'), kind, 'focus restores to trigger')
   }
   for (const [kind, name] of [
@@ -137,7 +165,8 @@ try {
     ['feed', 'Feed settings — Example feed'],
   ]) {
     await open(kind)
-    assert.equal(await evaluate(`document.querySelector('dialog').matches(':modal')`), true)
+    if (await evaluate(`document.querySelector('.app-dialog').tagName === 'DIALOG'`))
+      assert.equal(await evaluate(`document.querySelector('.app-dialog').matches(':modal')`), true)
     let ax
     await eventually(async () => {
       ax = await send('Accessibility.getFullAXTree')
@@ -153,7 +182,7 @@ try {
         (node) =>
           node.role?.value === 'dialog' && node.name?.value.toLowerCase() === name.toLowerCase(),
       ),
-      'named native dialog appears in accessibility tree',
+      'named dialog appears in accessibility tree',
     )
     if (kind === 'settings')
       assert.ok(
@@ -167,13 +196,13 @@ try {
       )
     assert.equal(
       await evaluate(
-        `document.activeElement.matches('${kind === 'add' ? 'input[type=url]' : 'dialog button'}')`,
+        `document.activeElement.matches('${kind === 'add' ? 'input[type=url]' : '.app-dialog button'}')`,
       ),
       true,
       'initial focus',
     )
     await evaluate(
-      `window.controls = [...document.querySelectorAll('dialog button, dialog a[href], dialog input, dialog textarea, dialog select')].filter(e => !e.disabled && e.getClientRects().length); controls[0].focus()`,
+      `window.controls = [...document.querySelector('.app-dialog').querySelectorAll('button, a[href], input, textarea, select')].filter(e => !e.disabled && e.getClientRects().length); controls[0].focus()`,
     )
     await key('Tab', 8)
     assert.equal(
@@ -186,7 +215,7 @@ try {
     for (let i = 0; i < 25; i++) {
       await key('Tab')
       assert.equal(
-        await evaluate(`!!document.activeElement.closest('dialog')`),
+        await evaluate(`!!document.activeElement.closest('.app-dialog')`),
         true,
         'forward keyboard focus stays inside',
       )
@@ -194,36 +223,69 @@ try {
     for (let i = 0; i < 25; i++) {
       await key('Tab', 8)
       assert.equal(
-        await evaluate(`!!document.activeElement.closest('dialog')`),
+        await evaluate(`!!document.activeElement.closest('.app-dialog')`),
         true,
         'backward keyboard focus stays inside',
       )
+    }
+    if (kind === 'settings') {
+      const geometry = await evaluate(
+        `(() => { const d=document.querySelector('.app-dialog'); const r=d.getBoundingClientRect(); return {width:r.width,height:r.height,left:r.left,top:r.top} })()`,
+      )
+      evidence.checks.push({ desktopSettings: geometry })
+      if (artifacts) {
+        await mkdir(artifacts, { recursive: true })
+        const shot = await send('Page.captureScreenshot', { format: 'png' })
+        await writeFile(join(artifacts, 'desktop.png'), Buffer.from(shot.data, 'base64'))
+      }
     }
     assert.ok(
       !ax.nodes.some((node) => !node.ignored && node.name?.value === 'Background input'),
       'background is excluded from active accessibility tree',
     )
+    await evaluate(
+      `document.querySelector('iframe').contentDocument.querySelector('button').focus()`,
+    )
+    await evaluate(
+      'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
+    )
+    const focusProbe = await evaluate(`({
+      inside: !!document.activeElement.closest('.app-dialog'),
+      activeTag: document.activeElement.tagName,
+      frameActiveTag: document.querySelector('iframe').contentDocument.activeElement.tagName,
+    })`)
+    evidence.iframeFocus.push({ kind, ...focusProbe })
+    // Diagnostic only: Chromium also permits this same-origin scripted focus
+    // with the native baseline. Pointer/keyboard interaction is the parity gate.
+    if (!focusProbe.inside) await evaluate(`document.querySelector('.app-dialog button').focus()`)
     // A click on dialog padding must not dismiss it.
     const rect = await evaluate(
-      `(() => {const r=document.querySelector('dialog').getBoundingClientRect();return {x:r.x,y:r.y}})()`,
+      `(() => {const r=document.querySelector('.app-dialog').getBoundingClientRect();return {x:r.x,y:r.y}})()`,
     )
     await clickAt(rect.x + 3, rect.y + 3)
-    assert.equal(await evaluate(`!!document.querySelector('dialog[open]')`), true)
+    assert.equal(await evaluate(`!!document.querySelector('.app-dialog')`), true)
     await key('Escape')
     await closed(kind)
     await open(kind)
-    await click('dialog button[aria-label=close]')
+    await click('.app-dialog button[aria-label=close]')
     await closed(kind)
     await open(kind)
     const inside = await evaluate(
-      `(() => {const r=document.querySelector('dialog').getBoundingClientRect();return {x:r.x+3,y:r.y+3}})()`,
+      `(() => {const r=document.querySelector('.app-dialog').getBoundingClientRect();return {x:r.x+3,y:r.y+3}})()`,
     )
     await pointer(inside.x, inside.y, 'mousePressed', 1)
     await pointer(2, 2, 'mouseReleased', 0)
     assert.equal(
-      await evaluate(`!!document.querySelector('dialog[open]')`),
+      await evaluate(`!!document.querySelector('.app-dialog')`),
       true,
       'drag to backdrop does not dismiss',
+    )
+    await pointer(2, 2, 'mousePressed', 1)
+    await pointer(inside.x, inside.y, 'mouseReleased', 0)
+    assert.equal(
+      await evaluate(`!!document.querySelector('.app-dialog')`),
+      true,
+      'drag from backdrop into content does not dismiss',
     )
     await clickAt(2, 2)
     await closed(kind)
@@ -240,6 +302,13 @@ try {
       null,
       'background article button cannot activate through backdrop',
     )
+    await clickAt(article.x, article.y)
+    assert.equal(
+      await evaluate(`document.querySelector('iframe').contentDocument.body.dataset.clicked`),
+      'true',
+      'iframe interaction restores after close',
+    )
+    await evaluate(`delete document.querySelector('iframe').contentDocument.body.dataset.clicked`)
     evidence.checks.push(
       `${kind}: AX name, initial focus, Tab/Shift-Tab, inert app/iframe, padding/drag, Escape/close/backdrop, restored trigger`,
     )
@@ -289,6 +358,71 @@ try {
     'feed auth: labelled masked password; optional controls reset on reopen; expanded form fits/scrolls at 360x450 in both themes; Tab wraps; no API submission',
   )
 
+  // Preference changes must really insert/remove the editor and preserve Tab edges.
+  await open('settings')
+  await click('.app-dialog button[aria-label=close]')
+  await closed('settings')
+  await click('#settings')
+  await eventually(() => evaluate(`!!document.querySelector('.app-dialog')`))
+  assert.equal(
+    await evaluate(`document.activeElement.matches('.app-dialog button[aria-label=close]')`),
+    true,
+    'pointer opening retains close-button focus',
+  )
+  await evaluate(`document.querySelector('.css-actions button').click()`)
+  await eventually(() => evaluate(`!document.querySelector('textarea')`))
+  await evaluate(
+    `document.querySelector('.settings-form > :nth-child(2) button:last-child').click()`,
+  )
+  await eventually(() => evaluate(`!!document.querySelector('textarea')`))
+  assert.equal(
+    await evaluate(`document.querySelector('textarea').value`),
+    '',
+    'reset clears CSS before editor reopens',
+  )
+  await evaluate(`document.querySelector('.settings-form > :last-child button').focus()`)
+  await key('Tab')
+  assert.equal(
+    await evaluate(`document.activeElement.matches('.app-dialog button[aria-label=close]')`),
+    true,
+    'dynamic controls preserve wrapping',
+  )
+  await key('Escape')
+  await closed('settings')
+  for (let i = 0; i < 3; i++) {
+    await open('settings')
+    await key('Escape')
+    await closed('settings')
+  }
+  evidence.checks.push(
+    'Settings: pointer opening, dynamic editor/reset, current Tab edges, rapid reopen',
+  )
+
+  // Native and candidate dialogs remain separately owned in the real app.
+  // These four cases are mandatory, not an opt-in that can silently pass.
+  for (const native of ['add', 'feed']) {
+    for (const [first, second] of [
+      ['settings', native],
+      [native, 'settings'],
+    ]) {
+      await open(first)
+      await evaluate(
+        `window.dispatchEvent(new CustomEvent('fixture-stack', {detail: '${second}'}))`,
+      )
+      await eventually(() => evaluate(`document.querySelectorAll('.app-dialog').length === 2`))
+      await key('Escape')
+      const remaining = await evaluate(
+        `Array.from(document.querySelectorAll('.app-dialog')).map(d => d.textContent)`,
+      )
+      const focusInside = await evaluate(`!!document.activeElement.closest('.app-dialog')`)
+      const expected = first === 'settings' ? 'Settings' : first === 'add' ? 'Add' : 'Feed settings'
+      const passed = remaining.length === 1 && remaining[0].includes(expected) && focusInside
+      evidence.mixed.push({ first, second, remaining, focusInside, passed })
+      await evaluate(`window.dispatchEvent(new CustomEvent('fixture-stack', {detail: 'reset'}))`)
+      await eventually(() => evaluate(`!document.querySelector('.app-dialog')`))
+    }
+  }
+
   await open('settings')
   await send('Emulation.setDeviceMetricsOverride', {
     width: 360,
@@ -299,7 +433,7 @@ try {
   for (const theme of ['dark', 'light']) {
     await evaluate(`document.documentElement.dataset.theme = '${theme}'`)
     const metrics = await evaluate(
-      `(() => {const d=document.querySelector('dialog'); const r=d.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,scrolls:d.scrollHeight>d.clientHeight,text:getComputedStyle(d).color,backdrop:getComputedStyle(d,'::backdrop').backgroundColor}})()`,
+      `(() => {const d=document.querySelector('.app-dialog'); const r=d.getBoundingClientRect();const backdrop=document.querySelector('.base-dialog-backdrop');return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,scrolls:d.scrollHeight>d.clientHeight,text:getComputedStyle(d).color,backdrop:backdrop ? getComputedStyle(backdrop).backgroundColor : getComputedStyle(d,'::backdrop').backgroundColor}})()`,
     )
     assert.ok(
       metrics.left >= 0 && metrics.right <= 360 && metrics.top >= 0 && metrics.bottom <= 450,
@@ -317,6 +451,11 @@ try {
     }
   }
   assert.deepEqual(evidence.pageErrors, [])
+  assert.equal(evidence.mixed.length, 4)
+  assert.ok(
+    evidence.mixed.every((test) => test.passed),
+    'mixed native/Base overlays must dismiss only the last-opened owner',
+  )
   evidence.result = 'passed'
 } catch (error) {
   evidence.result = 'failed'

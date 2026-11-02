@@ -1,4 +1,4 @@
-import { StrictMode, useState } from 'react'
+import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AddModal } from '../../src/components/feed/AddModal'
 import { FeedSettingsModal } from '../../src/components/feed/FeedSettingsModal'
@@ -12,7 +12,18 @@ const feed = { id: 42, title: 'Example feed', fullTextEnabled: false } as NewsFe
 function Harness() {
   const [open, setOpen] = useState('')
   const [css, setCss] = useState('p { color: red; }')
+  const [cssMode, setCssMode] = useState<'custom' | 'default'>('custom')
+  const [stack, setStack] = useState('')
   const close = () => setOpen('')
+  useEffect(() => {
+    const changeStack = (event: Event) => {
+      const kind = (event as CustomEvent<string>).detail
+      setStack(kind === 'reset' ? '' : kind)
+      if (kind === 'reset') setOpen('')
+    }
+    window.addEventListener('fixture-stack', changeStack)
+    return () => window.removeEventListener('fixture-stack', changeStack)
+  }, [])
   return (
     <>
       <button id="settings" onClick={() => setOpen('settings')}>
@@ -32,31 +43,41 @@ function Harness() {
           '<button id="article" onclick="document.body.dataset.clicked = \'true\'">Article button</button>'
         }
       />
-      {open === 'settings' && (
+      {(open === 'settings' || stack === 'settings') && (
         <SettingsModal
           feeds={[]}
           folders={[]}
           uiTheme="dark"
-          articleCssMode="custom"
+          articleCssMode={cssMode}
           articleCss={css}
           showFavicons
           singleClickRead
           dimBoilerplate
           onUiTheme={noop}
-          onArticleCssMode={noop}
+          onArticleCssMode={setCssMode}
           onArticleCss={setCss}
           onShowFavicons={noop}
           onSingleClickRead={noop}
           onDimBoilerplate={noop}
           onLogout={noop}
-          onClose={close}
+          onClose={stack === 'settings' ? () => setStack('') : close}
         />
       )}
-      {open === 'add' && (
-        <AddModal settings={settings} folders={[]} onClose={close} onCreated={noop} />
+      {(open === 'add' || stack === 'add') && (
+        <AddModal
+          settings={settings}
+          folders={[]}
+          onClose={stack === 'add' ? () => setStack('') : close}
+          onCreated={noop}
+        />
       )}
-      {open === 'feed' && (
-        <FeedSettingsModal settings={settings} feed={feed} onClose={close} onChanged={noop} />
+      {(open === 'feed' || stack === 'feed') && (
+        <FeedSettingsModal
+          settings={settings}
+          feed={feed}
+          onClose={stack === 'feed' ? () => setStack('') : close}
+          onChanged={noop}
+        />
       )}
     </>
   )
