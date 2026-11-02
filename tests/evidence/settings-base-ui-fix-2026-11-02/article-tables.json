@@ -1,0 +1,120 @@
+{
+  "layouts": [
+    {
+      "width": 360,
+      "viewport": 360,
+      "documentWidth": 360,
+      "proseWidth": 328,
+      "tables": [
+        {
+          "id": "narrow",
+          "left": 150.53125,
+          "right": 209.46875,
+          "width": 58.9375,
+          "center": 180,
+          "scrollWidth": 57,
+          "clientWidth": 57,
+          "scrollLeft": 0
+        },
+        {
+          "id": "wide",
+          "left": 16,
+          "right": 344,
+          "width": 328,
+          "center": 180,
+          "scrollWidth": 326,
+          "clientWidth": 326,
+          "scrollLeft": 0
+        },
+        {
+          "id": "overflow",
+          "left": 16,
+          "right": 344,
+          "width": 328,
+          "center": 180,
+          "scrollWidth": 10130,
+          "clientWidth": 326,
+          "scrollLeft": 9804
+        }
+      ]
+    },
+    {
+      "width": 1000,
+      "viewport": 1000,
+      "documentWidth": 1000,
+      "proseWidth": 736,
+      "tables": [
+        {
+          "id": "narrow",
+          "left": 470.53125,
+          "right": 529.46875,
+          "width": 58.9375,
+          "center": 500,
+          "scrollWidth": 57,
+          "clientWidth": 57,
+          "scrollLeft": 0
+        },
+        {
+          "id": "wide",
+          "left": 16,
+          "right": 984,
+          "width": 968,
+          "center": 500,
+          "scrollWidth": 966,
+          "clientWidth": 966,
+          "scrollLeft": 0
+        },
+        {
+          "id": "overflow",
+          "left": 16,
+          "right": 984,
+          "width": 968,
+          "center": 500,
+          "scrollWidth": 10130,
+          "clientWidth": 966,
+          "scrollLeft": 9164
+        }
+      ]
+    },
+    {
+      "width": 1600,
+      "viewport": 1600,
+      "documentWidth": 1600,
+      "proseWidth": 736,
+      "tables": [
+        {
+          "id": "narrow",
+          "left": 770.53125,
+          "right": 829.46875,
+          "width": 58.9375,
+          "center": 800,
+          "scrollWidth": 57,
+          "clientWidth": 57,
+          "scrollLeft": 0
+        },
+        {
+          "id": "wide",
+          "left": 16,
+          "right": 1584,
+          "width": 1568,
+          "center": 800,
+          "scrollWidth": 1566,
+          "clientWidth": 1566,
+          "scrollLeft": 0
+        },
+        {
+          "id": "overflow",
+          "left": 16,
+          "right": 1584,
+          "width": 1568,
+          "center": 800,
+          "scrollWidth": 10130,
+          "clientWidth": 1566,
+          "scrollLeft": 8564
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "result": "passed"
+}

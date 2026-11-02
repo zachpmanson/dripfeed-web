@@ -1,0 +1,243 @@
+{
+  "mode": "regression",
+  "requests": [
+    {
+      "url": "https://article.example/absolute.png",
+      "type": "image",
+      "frame": "about:srcdoc"
+    },
+    {
+      "url": "https://article.example/images/photo.png",
+      "type": "image",
+      "frame": "about:srcdoc"
+    },
+    {
+      "url": "https://css-probe.invalid/unsanitized-control-image",
+      "type": "image",
+      "frame": "about:srcdoc"
+    },
+    {
+      "url": "https://css-probe.invalid/unsanitized-control",
+      "type": "image",
+      "frame": "about:srcdoc"
+    }
+  ],
+  "unexpectedRemote": [],
+  "cases": {
+    "escapedUrl": {
+      "breakout": false,
+      "customStyle": "",
+      "fontSize": "16px",
+      "lineHeight": "24.8px",
+      "color": "rgb(0, 0, 0)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "0",
+      "images": [],
+      "requests": []
+    },
+    "escapedImport": {
+      "breakout": false,
+      "customStyle": "",
+      "fontSize": "16px",
+      "lineHeight": "24.8px",
+      "color": "rgb(0, 0, 0)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "0",
+      "images": [],
+      "requests": []
+    },
+    "imageSet": {
+      "breakout": false,
+      "customStyle": "",
+      "fontSize": "16px",
+      "lineHeight": "24.8px",
+      "color": "rgb(0, 0, 0)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "0",
+      "images": [],
+      "requests": []
+    },
+    "literalUrl": {
+      "breakout": false,
+      "customStyle": "",
+      "fontSize": "16px",
+      "lineHeight": "24.8px",
+      "color": "rgb(0, 0, 0)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "0",
+      "images": [],
+      "requests": []
+    },
+    "literalImport": {
+      "breakout": false,
+      "customStyle": "",
+      "fontSize": "16px",
+      "lineHeight": "24.8px",
+      "color": "rgb(0, 0, 0)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "0",
+      "images": [],
+      "requests": []
+    },
+    "breakout": {
+      "breakout": false,
+      "customStyle": "",
+      "fontSize": "16px",
+      "lineHeight": "24.8px",
+      "color": "rgb(0, 0, 0)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "0",
+      "images": [],
+      "requests": []
+    },
+    "commentBreakout": {
+      "breakout": false,
+      "customStyle": "",
+      "fontSize": "16px",
+      "lineHeight": "24.8px",
+      "color": "rgb(0, 0, 0)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "0",
+      "images": [],
+      "requests": []
+    },
+    "stringBreakout": {
+      "breakout": false,
+      "customStyle": "",
+      "fontSize": "16px",
+      "lineHeight": "24.8px",
+      "color": "rgb(0, 0, 0)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "0",
+      "images": [],
+      "requests": []
+    },
+    "typography": {
+      "breakout": false,
+      "customStyle": "@media (min-width:1px){#sample{font-family:Georgia,serif;font-size:calc(20px + 3px);line-height:1.8;color:rgb(12,34,56)}}",
+      "fontSize": "23px",
+      "lineHeight": "41.4px",
+      "color": "rgb(12, 34, 56)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "0",
+      "images": [],
+      "requests": []
+    },
+    "articleImages": {
+      "breakout": false,
+      "customStyle": null,
+      "fontSize": "16px",
+      "lineHeight": "24.8px",
+      "color": "rgb(0, 0, 0)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "0",
+      "images": [
+        {
+          "src": "https://article.example/absolute.png",
+          "naturalWidth": 1
+        },
+        {
+          "src": "https://article.example/images/photo.png",
+          "naturalWidth": 1
+        }
+      ],
+      "requests": [
+        {
+          "url": "https://article.example/absolute.png",
+          "type": "image",
+          "frame": "about:srcdoc"
+        },
+        {
+          "url": "https://article.example/images/photo.png",
+          "type": "image",
+          "frame": "about:srcdoc"
+        }
+      ]
+    },
+    "defaultMode": {
+      "breakout": false,
+      "customStyle": null,
+      "fontSize": "16px",
+      "lineHeight": "24.8px",
+      "color": "rgb(0, 0, 0)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "0",
+      "images": [],
+      "requests": []
+    },
+    "sandbox": {
+      "breakout": false,
+      "customStyle": null,
+      "fontSize": "16px",
+      "lineHeight": "24.8px",
+      "color": "rgb(0, 0, 0)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "0",
+      "images": [],
+      "requests": []
+    },
+    "cssUpdate": {
+      "breakout": false,
+      "customStyle": "",
+      "fontSize": "16px",
+      "lineHeight": "24.8px",
+      "color": "rgb(0, 0, 0)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "0",
+      "images": [],
+      "requests": [],
+      "sameIframe": true
+    },
+    "themeBefore": {
+      "breakout": false,
+      "customStyle": "",
+      "fontSize": "16px",
+      "lineHeight": "24.8px",
+      "color": "rgb(0, 0, 0)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "0",
+      "images": [],
+      "requests": []
+    },
+    "themeAfter": {
+      "breakout": false,
+      "customStyle": "",
+      "fontSize": "16px",
+      "lineHeight": "24.8px",
+      "color": "rgb(0, 0, 0)",
+      "sandbox": "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "scriptRan": null,
+      "themeRevision": "1",
+      "images": []
+    }
+  },
+  "pageErrors": [],
+  "browserVersion": "153.0.8010.52",
+  "controlRequests": [
+    {
+      "url": "https://css-probe.invalid/unsanitized-control-image",
+      "type": "image",
+      "frame": "about:srcdoc"
+    },
+    {
+      "url": "https://css-probe.invalid/unsanitized-control",
+      "type": "image",
+      "frame": "about:srcdoc"
+    }
+  ],
+  "result": "passed"
+}

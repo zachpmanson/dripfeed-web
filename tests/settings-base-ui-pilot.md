@@ -1,6 +1,12 @@
 # Settings Base UI pilot — 2 November 2026 (Melbourne)
 
-## Decision: retain the native dialog
+> **Historical snapshot, superseded:** the owner subsequently requested fixing
+> the problems rather than rejecting the migration. Settings' restored Base UI
+> implementation and passing ownership fixes are documented in
+> [settings-base-ui-fix.md](settings-base-ui-fix.md). The receipts below remain
+> unchanged as evidence of the original failed experiment.
+
+## Initial decision: retain the native dialog
 
 The Settings-only `@base-ui/react@1.9.0` experiment failed the mixed-overlay
 parity gate. It is **not accepted for integration or deployment**. The final

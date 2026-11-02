@@ -20,7 +20,10 @@ try {
   evidence.browser = browser.version()
   const context = await browser.newContext()
   await context.route('**/*', (route) => {
-    if (new URL(route.request().url()).origin === origin) return route.continue()
+    const request = route.request()
+    const url = new URL(request.url())
+    if (url.origin === origin && !url.pathname.startsWith('/apps') && request.method() === 'GET')
+      return route.continue()
     evidence.blockedRequests.push(route.request().url())
     return route.abort()
   })

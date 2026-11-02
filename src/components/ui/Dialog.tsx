@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalLayer } from './useModalLayer'
 
 /** Native modality keeps the app (including article iframes) inert, without
  * changing its DOM or styles. Mount only while open; unmount restores focus. */
@@ -19,18 +20,17 @@ export function Dialog({
   const ref = useRef<HTMLDialogElement>(null)
   const backdropPress = useRef(false)
 
-  useLayoutEffect(() => {
-    const dialog = ref.current!
-    const opener = document.activeElement
-    dialog.showModal()
-    dialog.querySelector<HTMLElement>('[data-dialog-autofocus]')?.focus()
-    return () => {
-      dialog.close()
-      // A transient menu item may have opened this dialog and since disappeared.
-      const target = (restoreFocusTo ? document.querySelector(restoreFocusTo) : null) ?? opener
-      if (target instanceof HTMLElement && target.isConnected) target.focus()
-    }
-  }, [restoreFocusTo])
+  const layer = useModalLayer(ref, restoreFocusTo, {
+    activate: () => {
+      const dialog = ref.current!
+      if (!dialog.open) dialog.showModal()
+      layer.initialFocus()?.focus()
+    },
+    suspend: () => {
+      backdropPress.current = false
+      ref.current?.close()
+    },
+  })
 
   const outside = (x: number, y: number) => {
     const rect = ref.current!.getBoundingClientRect()
@@ -46,7 +46,7 @@ export function Dialog({
       onCancel={(event) => {
         // React owns the open state; don't let Escape leave a mounted, closed dialog.
         event.preventDefault()
-        onClose()
+        if (layer.isTop()) onClose()
       }}
       onPointerDown={(event) => {
         backdropPress.current =

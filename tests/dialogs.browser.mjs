@@ -398,30 +398,160 @@ try {
     'Settings: pointer opening, dynamic editor/reset, current Tab edges, rapid reopen',
   )
 
-  // Native and candidate dialogs remain separately owned in the real app.
-  // These four cases are mandatory, not an opt-in that can silently pass.
+  const stack = async (kind) => {
+    await evaluate(`window.dispatchEvent(new CustomEvent('fixture-stack', {detail: '${kind}'}))`)
+  }
+  const activeOwner = async (kind) => {
+    const expected = kind === 'settings' ? 'settings' : kind === 'add' ? 'add' : 'feed settings'
+    await eventually(() =>
+      evaluate(`(() => {
+      const visible = [...document.querySelectorAll('.app-dialog')].filter(d => d.getClientRects().length);
+      const d = visible[0];
+      return visible.length === 1 && d.textContent.toLowerCase().includes('${expected}') && d.contains(document.activeElement);
+    })()`),
+    )
+    const state = await evaluate(`(() => {
+      const visible = [...document.querySelectorAll('.app-dialog')].filter(d => d.getClientRects().length);
+      const d = visible[0], r = d.getBoundingClientRect();
+      window.activePopup = d;
+      return { visible: visible.length, hit: d.contains(document.elementFromPoint(r.x+r.width/2, r.y+r.height/2)) };
+    })()`)
+    assert.equal(state.hit, true, `${kind}: newest owner wins pointer hit-testing`)
+    let ax
+    await eventually(async () => {
+      ax = await send('Accessibility.getFullAXTree')
+      const dialogs = ax.nodes.filter((n) => !n.ignored && n.role?.value === 'dialog')
+      return dialogs.length === 1 && dialogs[0].name?.value.toLowerCase().includes(expected)
+    })
+    for (let i = 0; i < 3; i++) {
+      await key('Tab')
+      assert.equal(
+        await evaluate('activePopup.contains(document.activeElement)'),
+        true,
+        'newest owner traps Tab',
+      )
+      await key('Tab', 8)
+      assert.equal(
+        await evaluate('activePopup.contains(document.activeElement)'),
+        true,
+        'newest owner traps Shift-Tab',
+      )
+    }
+    return state
+  }
+
+  // Parent-owned forms stay mounted; only the newest owner is presented.
+  // These four cases are mandatory, including pre-Escape interaction ownership.
   for (const native of ['add', 'feed']) {
     for (const [first, second] of [
       ['settings', native],
       [native, 'settings'],
     ]) {
       await open(first)
+      if (first === 'add') await click('.app-dialog input[type=checkbox]')
       await evaluate(
-        `window.dispatchEvent(new CustomEvent('fixture-stack', {detail: '${second}'}))`,
+        `window.savedControl = document.querySelector('.app-dialog input[type=password]') ?? document.querySelector('.app-dialog textarea') ?? document.querySelector('.app-dialog input') ?? document.querySelector('.app-dialog button'); savedControl.focus()`,
       )
+      if (first !== 'feed') await send('Input.insertText', { text: 'synthetic-preserved-value' })
+      await evaluate(
+        `window.savedValue = savedControl.value; window.savedChecked = savedControl.checked`,
+      )
+      await stack(second)
       await eventually(() => evaluate(`document.querySelectorAll('.app-dialog').length === 2`))
+      const beforeEscape = await activeOwner(second)
+      assert.equal(
+        await evaluate('savedControl.isConnected'),
+        true,
+        'covered form node remains mounted',
+      )
       await key('Escape')
+      await activeOwner(first)
       const remaining = await evaluate(
         `Array.from(document.querySelectorAll('.app-dialog')).map(d => d.textContent)`,
       )
       const focusInside = await evaluate(`!!document.activeElement.closest('.app-dialog')`)
       const expected = first === 'settings' ? 'Settings' : first === 'add' ? 'Add' : 'Feed settings'
-      const passed = remaining.length === 1 && remaining[0].includes(expected) && focusInside
-      evidence.mixed.push({ first, second, remaining, focusInside, passed })
-      await evaluate(`window.dispatchEvent(new CustomEvent('fixture-stack', {detail: 'reset'}))`)
+      const preserved = await evaluate(
+        'savedControl.isConnected && savedControl.value === savedValue && savedControl.checked === savedChecked && document.activeElement === savedControl',
+      )
+      const passed =
+        remaining.length === 1 && remaining[0].includes(expected) && focusInside && preserved
+      evidence.mixed.push({
+        first,
+        second,
+        beforeEscape,
+        remaining,
+        focusInside,
+        preserved,
+        passed,
+      })
+      await stack('reset')
       await eventually(() => evaluate(`!document.querySelector('.app-dialog')`))
     }
   }
+
+  // Removing either type of covered owner must not steal focus or revive it.
+  for (const [first, second] of [
+    ['add', 'settings'],
+    ['settings', 'add'],
+  ]) {
+    await open(first)
+    await stack(second)
+    await activeOwner(second)
+    await stack('remove-covered')
+    await eventually(() => evaluate(`document.querySelectorAll('.app-dialog').length === 1`))
+    await activeOwner(second)
+    await key('Escape')
+    await closed(first)
+  }
+  evidence.checks.push(
+    'covered owner removal in both directions: active owner and connected return chain preserved',
+  )
+
+  // Genuine same-commit replacements (not merely removing covers from Add).
+  for (const [first, second] of [
+    ['settings', 'add'],
+    ['add', 'settings'],
+    ['settings', 'feed'],
+    ['feed', 'settings'],
+    ['add', 'feed'],
+  ]) {
+    await open(first)
+    await stack(`replace-${second}`)
+    await eventually(() => evaluate(`document.querySelectorAll('.app-dialog').length === 1`))
+    await activeOwner(second)
+    await key('Escape')
+    // With no underlying owner, Feed settings' explicit persistent row wins.
+    await closed(second === 'feed' ? 'feed' : first)
+  }
+  evidence.checks.push(
+    'atomic Base/native replacements: pending opener chain and explicit feed-row return targets preserved',
+  )
+
+  // Three owners, then a rapid full replacement: no stale focus jobs or revivals.
+  for (const replace of [false, true]) {
+    await open('add')
+    await stack('settings')
+    await activeOwner('settings')
+    await stack('third-feed')
+    await activeOwner('feed')
+    assert.equal(await evaluate(`document.querySelectorAll('.app-dialog').length`), 3)
+    if (replace) {
+      await stack('replace-add')
+      await eventually(() => evaluate(`document.querySelectorAll('.app-dialog').length === 1`))
+      await activeOwner('add')
+    } else {
+      await key('Escape')
+      await activeOwner('settings')
+      await key('Escape')
+      await activeOwner('add')
+    }
+    await key('Escape')
+    await closed('add')
+  }
+  evidence.checks.push(
+    'three-owner LIFO dismissal and rapid replacement: one interactive owner, no stale focus restoration',
+  )
 
   await open('settings')
   await send('Emulation.setDeviceMetricsOverride', {

@@ -17,6 +17,14 @@ try {
   await server.listen()
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH, headless: true })
   const page = await browser.newPage()
+  const origin = new URL(server.resolvedUrls.local[0]).origin
+  await page.context().route('**/*', (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (url.origin === origin && !url.pathname.startsWith('/apps') && request.method() === 'GET')
+      return route.continue()
+    return route.abort()
+  })
   page.on('pageerror', (error) => evidence.errors.push(error.message))
   for (const width of [360, 1000, 1600]) {
     await page.setViewportSize({ width, height: 900 })

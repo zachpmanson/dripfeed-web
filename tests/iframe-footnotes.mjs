@@ -23,6 +23,14 @@ try {
   })
   evidence.browserVersion = browser.version()
   const context = await browser.newContext({ viewport: { width: 1000, height: 800 } })
+  const origin = new URL(server.resolvedUrls.local[0]).origin
+  await context.route('**/*', (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (url.origin === origin && !url.pathname.startsWith('/apps') && request.method() === 'GET')
+      return route.continue()
+    return route.abort()
+  })
   // Never contact the article's origin; popup behavior is still exercised.
   await context.route('https://article.example/**', (route) =>
     route.fulfill({ contentType: 'text/html', body: '<h1>External article</h1>' }),

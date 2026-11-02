@@ -76,9 +76,13 @@ screenshots. The fixture uses StrictMode, like the app. Parent-side scripted ifr
 focus is recorded as a diagnostic only: Chromium permits it in the unchanged native
 baseline too; it is not an adversarial inertness or sandbox guarantee.
 
-The rejected Settings-only Base UI pilot and paired browser evidence are recorded
-in [settings-base-ui-pilot.md](settings-base-ui-pilot.md). The final tree keeps
-native dialogs; the candidate survives only in the documented experiment commit.
+Settings now uses Base UI with a shared active-owner stack; Add/Feed settings
+remain native. The runner distinguishes mounted forms from the one presented
+owner and checks both sides of Escape, preserved fields, removed covered owners,
+actual same-commit replacements and three-owner handoffs. Current fixes and
+passing evidence: [settings-base-ui-fix.md](settings-base-ui-fix.md). The initial
+failed experiment remains in [settings-base-ui-pilot.md](settings-base-ui-pilot.md)
+as historical evidence, not the current decision.
 
 The React/jsdom tests in `src/components/ui/Dialog.test.tsx` cover lifecycle,
 cancel handling, Tab handler wiring, backdrop decisions, custom CSS callbacks,
@@ -86,8 +90,11 @@ existing Add/feed settings busy/error/success flows, feed-credential submission,
 retry/clearing behavior, and the unsupported-instance hint. jsdom has no native
 `showModal`, inertness, layout or default Tab navigation: those are explicitly
 shimmed, not claimed as browser evidence. Native modality and user keyboard
-behavior are verified by the separate Chromium run. Scripted focus into an
-inert iframe is not an adversarial-security guarantee of this correction.
+behavior are verified by the separate Chromium run. `BaseDialog.test.tsx` and
+`ModalLayer.test.tsx` additionally cover the library lifecycle, persistent-target
+replacement, suspension without form remount, StrictMode and atomic opener-chain
+handoff. Their native shims are wiring tests, not browser evidence. Scripted
+iframe focus is not an adversarial-security guarantee of this correction.
 
 # Browser regression: custom article CSS
 

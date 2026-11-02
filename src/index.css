@@ -1,5 +1,6 @@
 @layer theme, base, legacy, components, utilities;
-@import 'tailwindcss';
+/* Only app source defines utilities, not test receipts or agent artifacts. */
+@import 'tailwindcss' source('./');
 
 @theme inline {
   --color-app-bg: var(--bg);

@@ -34,7 +34,8 @@ try {
   await context.route('**/*', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
-    if (url.origin === origin) return route.continue()
+    if (url.pathname.startsWith('/apps')) return route.abort()
+    if (url.origin === origin && request.method() === 'GET') return route.continue()
     const record = {
       url: request.url(),
       type: request.resourceType(),

@@ -14,12 +14,24 @@ function Harness() {
   const [css, setCss] = useState('p { color: red; }')
   const [cssMode, setCssMode] = useState<'custom' | 'default'>('custom')
   const [stack, setStack] = useState('')
+  const [extra, setExtra] = useState('')
   const close = () => setOpen('')
   useEffect(() => {
     const changeStack = (event: Event) => {
       const kind = (event as CustomEvent<string>).detail
-      setStack(kind === 'reset' ? '' : kind)
-      if (kind === 'reset') setOpen('')
+      if (kind === 'reset') {
+        setOpen('')
+        setStack('')
+        setExtra('')
+      } else if (kind === 'remove-covered') {
+        setOpen('')
+      } else if (kind === 'third-feed') {
+        setExtra('feed')
+      } else if (kind.startsWith('replace-')) {
+        setOpen(kind.slice('replace-'.length))
+        setStack('')
+        setExtra('')
+      } else setStack(kind)
     }
     window.addEventListener('fixture-stack', changeStack)
     return () => window.removeEventListener('fixture-stack', changeStack)
@@ -71,11 +83,13 @@ function Harness() {
           onCreated={noop}
         />
       )}
-      {(open === 'feed' || stack === 'feed') && (
+      {(open === 'feed' || stack === 'feed' || extra === 'feed') && (
         <FeedSettingsModal
           settings={settings}
           feed={feed}
-          onClose={stack === 'feed' ? () => setStack('') : close}
+          onClose={
+            extra === 'feed' ? () => setExtra('') : stack === 'feed' ? () => setStack('') : close
+          }
           onChanged={noop}
         />
       )}
