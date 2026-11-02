@@ -1,3 +1,4 @@
+import { Checkbox } from '@base-ui/react/checkbox'
 import { useId } from 'react'
 import { ArrowTopRightOnSquareIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { ThemeSetting, ArticleCssMode } from '../../theme'
@@ -116,31 +117,37 @@ export function SettingsModal({
         )}
         <div className="setting-row">
           <label className="setting-label checkbox">
-            <input
-              type="checkbox"
+            <Checkbox.Root
               checked={showFavicons}
-              onChange={(e) => onShowFavicons(e.target.checked)}
-            />
+              onCheckedChange={(checked) => onShowFavicons(checked === true)}
+              className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm border border-app-border bg-app-bg text-app-on-accent data-[checked]:bg-app-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
+            >
+              <Checkbox.Indicator aria-hidden>✓</Checkbox.Indicator>
+            </Checkbox.Root>
             Show favicons
           </label>
         </div>
         <div className="setting-row">
           <label className="setting-label checkbox">
-            <input
-              type="checkbox"
+            <Checkbox.Root
               checked={singleClickRead}
-              onChange={(e) => onSingleClickRead(e.target.checked)}
-            />
+              onCheckedChange={(checked) => onSingleClickRead(checked === true)}
+              className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm border border-app-border bg-app-bg text-app-on-accent data-[checked]:bg-app-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
+            >
+              <Checkbox.Indicator aria-hidden>✓</Checkbox.Indicator>
+            </Checkbox.Root>
             Mark as read on single click
           </label>
         </div>
         <div className="setting-row">
           <label className="setting-label checkbox">
-            <input
-              type="checkbox"
+            <Checkbox.Root
               checked={dimBoilerplate}
-              onChange={(e) => onDimBoilerplate(e.target.checked)}
-            />
+              onCheckedChange={(checked) => onDimBoilerplate(checked === true)}
+              className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm border border-app-border bg-app-bg text-app-on-accent data-[checked]:bg-app-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
+            >
+              <Checkbox.Indicator aria-hidden>✓</Checkbox.Indicator>
+            </Checkbox.Root>
             Dim Boilerplate Text
           </label>
         </div>

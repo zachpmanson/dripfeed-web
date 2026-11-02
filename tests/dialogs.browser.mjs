@@ -202,7 +202,7 @@ try {
       'initial focus',
     )
     await evaluate(
-      `window.controls = [...document.querySelector('.app-dialog').querySelectorAll('button, a[href], input, textarea, select')].filter(e => !e.disabled && e.getClientRects().length); controls[0].focus()`,
+      `window.controls = [...document.querySelector('.app-dialog').querySelectorAll('button, a[href], input, textarea, select')].filter(e => !e.disabled && e.tabIndex >= 0 && e.getClientRects().length); controls[0].focus()`,
     )
     await key('Tab', 8)
     assert.equal(
@@ -314,15 +314,15 @@ try {
     )
   }
   await open('add')
-  await click('dialog input[type=checkbox]')
-  await eventually(() => evaluate(`!!document.querySelector('dialog input[type=password]')`))
+  await click(' .app-dialog input[type=checkbox]')
+  await eventually(() => evaluate(`!!document.querySelector(' .app-dialog input[type=password]')`))
   assert.equal(
     await evaluate(
-      `document.querySelector('dialog input[type=password]').closest('label').textContent`,
+      `document.querySelector(' .app-dialog input[type=password]').closest('label').textContent`,
     ),
     'Feed password',
   )
-  await evaluate(`document.querySelector('dialog input[type=password]').focus()`)
+  await evaluate(`document.querySelector(' .app-dialog input[type=password]').focus()`)
   await send('Input.insertText', { text: 'dummy-feed-password' })
   await send('Emulation.setDeviceMetricsOverride', {
     width: 360,
@@ -333,25 +333,31 @@ try {
   for (const theme of ['dark', 'light']) {
     await evaluate(`document.documentElement.dataset.theme = '${theme}'`)
     const metrics = await evaluate(
-      `(() => {const d=document.querySelector('dialog'); const r=d.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,scrolls:d.scrollHeight>d.clientHeight}})()`,
+      `(() => {const d=document.querySelector('.app-dialog'); const r=d.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,scrolls:d.scrollHeight>d.clientHeight}})()`,
     )
     assert.ok(
       metrics.left >= 0 && metrics.right <= 360 && metrics.top >= 0 && metrics.bottom <= 450,
     )
     assert.equal(metrics.scrolls, true, 'expanded feed auth form scrolls within small viewport')
-    await evaluate(`document.querySelector('dialog button[type=submit]').focus()`)
+    await evaluate(`document.querySelector(' .app-dialog button[type=submit]').focus()`)
     await key('Tab')
     assert.equal(
-      await evaluate(`document.activeElement.matches('dialog button[aria-label=close]')`),
+      await evaluate(`document.activeElement.matches(' .app-dialog button[aria-label=close]')`),
       true,
     )
   }
   await key('Escape')
   await closed('add')
   await open('add')
-  assert.equal(await evaluate(`!!document.querySelector('dialog input[type=password]')`), false)
-  await evaluate(`document.querySelector('dialog input[type=checkbox]').click()`)
-  assert.equal(await evaluate(`document.querySelector('dialog input[type=password]').value`), '')
+  assert.equal(
+    await evaluate(`!!document.querySelector(' .app-dialog input[type=password]')`),
+    false,
+  )
+  await evaluate(`document.querySelector(' .app-dialog input[type=checkbox]').click()`)
+  assert.equal(
+    await evaluate(`document.querySelector(' .app-dialog input[type=password]').value`),
+    '',
+  )
   await key('Escape')
   await closed('add')
   evidence.checks.push(
@@ -372,7 +378,7 @@ try {
   await evaluate(`document.querySelector('.css-actions button').click()`)
   await eventually(() => evaluate(`!document.querySelector('textarea')`))
   await evaluate(
-    `document.querySelector('.settings-form > :nth-child(2) button:last-child').click()`,
+    `[...document.querySelectorAll('[role="radio"]')].find(e => e.textContent === 'Custom').click()`,
   )
   await eventually(() => evaluate(`!!document.querySelector('textarea')`))
   assert.equal(
@@ -402,7 +408,14 @@ try {
     await evaluate(`window.dispatchEvent(new CustomEvent('fixture-stack', {detail: '${kind}'}))`)
   }
   const activeOwner = async (kind) => {
-    const expected = kind === 'settings' ? 'settings' : kind === 'add' ? 'add' : 'feed settings'
+    const expected =
+      kind === 'settings'
+        ? 'settings'
+        : kind === 'add'
+          ? 'add'
+          : kind === 'native'
+            ? 'native probe'
+            : 'feed settings'
     await eventually(() =>
       evaluate(`(() => {
       const visible = [...document.querySelectorAll('.app-dialog')].filter(d => d.getClientRects().length);
@@ -442,7 +455,7 @@ try {
 
   // Parent-owned forms stay mounted; only the newest owner is presented.
   // These four cases are mandatory, including pre-Escape interaction ownership.
-  for (const native of ['add', 'feed']) {
+  for (const native of ['add', 'feed', 'native']) {
     for (const [first, second] of [
       ['settings', native],
       [native, 'settings'],
@@ -470,7 +483,14 @@ try {
         `Array.from(document.querySelectorAll('.app-dialog')).map(d => d.textContent)`,
       )
       const focusInside = await evaluate(`!!document.activeElement.closest('.app-dialog')`)
-      const expected = first === 'settings' ? 'Settings' : first === 'add' ? 'Add' : 'Feed settings'
+      const expected =
+        first === 'settings'
+          ? 'Settings'
+          : first === 'add'
+            ? 'Add'
+            : first === 'native'
+              ? 'Native probe'
+              : 'Feed settings'
       const preserved = await evaluate(
         'savedControl.isConnected && savedControl.value === savedValue && savedControl.checked === savedChecked && document.activeElement === savedControl',
       )
@@ -494,6 +514,8 @@ try {
   for (const [first, second] of [
     ['add', 'settings'],
     ['settings', 'add'],
+    ['native', 'settings'],
+    ['settings', 'native'],
   ]) {
     await open(first)
     await stack(second)
@@ -515,6 +537,8 @@ try {
     ['settings', 'feed'],
     ['feed', 'settings'],
     ['add', 'feed'],
+    ['native', 'settings'],
+    ['settings', 'native'],
   ]) {
     await open(first)
     await stack(`replace-${second}`)
@@ -581,7 +605,7 @@ try {
     }
   }
   assert.deepEqual(evidence.pageErrors, [])
-  assert.equal(evidence.mixed.length, 4)
+  assert.equal(evidence.mixed.length, 6)
   assert.ok(
     evidence.mixed.every((test) => test.passed),
     'mixed native/Base overlays must dismiss only the last-opened owner',

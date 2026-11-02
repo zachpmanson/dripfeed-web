@@ -112,7 +112,7 @@ it.each([false, true])(
     mocks.extract.mockRejectedValue(failure)
     await act(async () => root.render(<Harness auto={auto} />))
     const extract = () =>
-      container.querySelector<HTMLButtonElement>('button[title^="Extract full article"]')!
+      container.querySelector<HTMLButtonElement>('button[aria-label^="Extract full article"]')!
     if (!auto) await act(async () => extract().click())
     expect(container.querySelectorAll('[role="alert"]')).toHaveLength(1)
     expect(container.querySelector('article [role="alert"]')?.textContent).toContain(

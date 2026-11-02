@@ -1,3 +1,4 @@
+import { Dialog as NativeDialog } from '../../src/components/ui/Dialog'
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AddModal } from '../../src/components/feed/AddModal'
@@ -47,6 +48,9 @@ function Harness() {
       <button id="feed" data-feed-id="42" onClick={() => setOpen('feed')}>
         Open feed settings
       </button>
+      <button id="native" onClick={() => setOpen('native')}>
+        Open native probe
+      </button>
       <input id="background" aria-label="Background input" />
       <iframe
         className="block"
@@ -55,6 +59,18 @@ function Harness() {
           '<button id="article" onclick="document.body.dataset.clicked = \'true\'">Article button</button>'
         }
       />
+      {(open === 'native' || stack === 'native') && (
+        <NativeDialog
+          labelledBy="native-probe-title"
+          onClose={stack === 'native' ? () => setStack('') : close}
+        >
+          <span id="native-probe-title">Native probe</span>
+          <input aria-label="Native probe value" defaultValue="probe" />
+          <button aria-label="close" onClick={stack === 'native' ? () => setStack('') : close}>
+            Close
+          </button>
+        </NativeDialog>
+      )}
       {(open === 'settings' || stack === 'settings') && (
         <SettingsModal
           feeds={[]}

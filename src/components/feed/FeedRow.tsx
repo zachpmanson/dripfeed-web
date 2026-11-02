@@ -1,3 +1,4 @@
+import { FeedContextMenu, type FeedMenuOptions } from './FeedContextMenu'
 import type { NewsFeed } from '../../api/types'
 import type { RarityInfo } from '../../rarity'
 import { FeedIcon } from './FeedIcon'
@@ -7,14 +8,14 @@ export default function FeedRow({
   feed,
   active,
   onSelect,
-  onCtx,
+  menu,
   showFavicons,
   rarityInfo,
 }: {
   feed: NewsFeed
   active: boolean
   onSelect: () => void
-  onCtx: (e: React.MouseEvent, feed: NewsFeed) => void
+  menu: FeedMenuOptions
   showFavicons: boolean
   rarityInfo?: RarityInfo
 }) {
@@ -23,19 +24,20 @@ export default function FeedRow({
     ? `Average gap: ${rarityInfo.gap.toFixed(2)}h; multiplier: ${rarityInfo.mult.toPrecision(4)}`
     : 'Average gap: unavailable (fewer than 2 dated items); multiplier: 1 (neutral fallback)'
   return (
-    <button
-      data-feed-id={feed.id}
-      title={tooltip}
-      className={`feed-row ${sidebarItemClassName(active)}`}
-      aria-current={active ? 'page' : undefined}
-      onClick={onSelect}
-      onContextMenu={(e) => onCtx(e, feed)}
-    >
-      <span className="feed-left flex min-w-0 items-center gap-2">
-        {showFavicons && <FeedIcon feed={feed} size={14} />}
-        <span className="feed-name truncate">{feed.title}</span>
-      </span>
-      {n > 0 && <span className="count">{n}</span>}
-    </button>
+    <FeedContextMenu feed={feed} menu={menu}>
+      <button
+        data-feed-id={feed.id}
+        title={tooltip}
+        className={`feed-row ${sidebarItemClassName(active)}`}
+        aria-current={active ? 'page' : undefined}
+        onClick={onSelect}
+      >
+        <span className="feed-left flex min-w-0 items-center gap-2">
+          {showFavicons && <FeedIcon feed={feed} size={14} />}
+          <span className="feed-name truncate">{feed.title}</span>
+        </span>
+        {n > 0 && <span className="count">{n}</span>}
+      </button>
+    </FeedContextMenu>
   )
 }

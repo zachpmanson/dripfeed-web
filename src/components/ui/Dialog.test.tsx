@@ -59,7 +59,10 @@ const click = async (element: HTMLElement) => act(async () => element.click())
 const button = (text: string) =>
   Array.from(document.querySelectorAll('button')).find((b) => b.textContent === text)!
 const dialog = () => document.querySelector('dialog')!
-const name = () => document.getElementById(dialog().getAttribute('aria-labelledby')!)!.textContent
+const name = () =>
+  document.getElementById(
+    document.querySelector('dialog, [role="dialog"]')!.getAttribute('aria-labelledby')!,
+  )!.textContent
 async function input(element: HTMLInputElement, value: string) {
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(element, value)
@@ -208,7 +211,9 @@ it('preserves Add feed/folder submission, busy, errors and switch focus', async 
   )
   expect(name()).toBe('Add')
   const url = document.querySelector<HTMLInputElement>('input[type=url]')!
-  expect(document.activeElement).toBe(url)
+  await act(async () => {
+    await vi.waitFor(() => expect(document.activeElement).toBe(url))
+  })
   await input(url, 'https://example.com/feed')
   await submit()
   expect(createFeed).toHaveBeenCalledWith(settings, 'https://example.com/feed', null, undefined)
@@ -255,9 +260,14 @@ it('submits optional feed credentials separately, locks busy controls and clears
   await input(user, 'private-reader')
   await input(password, ' secret:päss ')
   await act(async () => {
-    const select = document.querySelector('select')!
-    select.value = '9'
-    select.dispatchEvent(new Event('change', { bubbles: true }))
+    document
+      .querySelector<HTMLElement>('[role="combobox"]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+  })
+  await act(async () => {
+    Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'))
+      .find((option) => option.textContent === 'Private feeds')!
+      .click()
   })
   await submit()
   expect(createFeed).toHaveBeenCalledWith(settings, 'https://example.com/private.rss', 9, {
@@ -266,7 +276,9 @@ it('submits optional feed credentials separately, locks busy controls and clears
   })
   expect(user.disabled).toBe(true)
   expect(password.disabled).toBe(true)
-  expect(button('Folder').disabled).toBe(true)
+  expect(button('Folder').getAttribute('aria-disabled')).toBe('true')
+  await click(button('Folder'))
+  expect(document.querySelector('input[type=url]')).not.toBeNull()
   await submit()
   expect(createFeed).toHaveBeenCalledOnce()
   await act(async () => request.resolve())

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
+import { ContextMenu } from '@base-ui/react/context-menu'
 import { ArrowTopRightOnSquareIcon, CheckIcon } from '@heroicons/react/24/outline'
 import type { NewsFeed, NewsFolder } from '../../api/types'
 import type { Settings } from '../../settings'
@@ -6,215 +7,265 @@ import { deleteFeed, moveFeed, renameFeed } from '../../api/news'
 import { markFeedAllRead } from '../../actions'
 import { copyText } from '../../utils'
 
-interface Props {
-  feed: NewsFeed
+export interface FeedMenuOptions {
   folders: NewsFolder[]
   settings: Settings
-  x: number
-  y: number
-  unread: number
-  onClose: () => void
-  onChanged: () => void // refresh sidebar meta after delete/move
-  onOpenSettings: () => void // hand off to the per-feed settings modal
+  onChanged: () => void
+  onOpenSettings: (feed: NewsFeed) => void
 }
 
-/**
- * Right-click menu on a feed row: mark all read, per-feed settings, delete
- * the feed, move it to another folder (flyout submenu), or copy/open its
- * URLs. All hit the News API then refresh.
- */
+let latestOpening = 0
+
+/** Compose the real row button: no nested interactive trigger or transient opener. */
 export function FeedContextMenu({
+  feed,
+  menu,
+  children,
+}: {
+  feed: NewsFeed
+  menu: FeedMenuOptions
+  children: ReactElement
+}) {
+  const [open, setOpen] = useState(false)
+  const [keyboardAnchor, setKeyboardAnchor] = useState<HTMLElement | null>(null)
+  const handoff = useRef(false)
+  useLayoutEffect(() => {
+    if (!open) return
+    const opening = ++latestOpening
+    return () => {
+      // Resolve after ancestor host removal, not during child layout cleanup:
+      // a collapsing folder can still contain a soon-to-be-detached row here.
+      queueMicrotask(() => {
+        if (opening !== latestOpening || handoff.current) return
+        const activeDialog = [...document.querySelectorAll<HTMLElement>('.app-dialog')].some(
+          (dialog) => dialog.getClientRects().length > 0,
+        )
+        if (activeDialog) return
+        const target =
+          document.querySelector<HTMLElement>(`[data-feed-id="${feed.id}"]`) ??
+          document.querySelector<HTMLElement>('[data-feed-focus-fallback]')
+        if (target?.isConnected) target.focus()
+      })
+    }
+  }, [open, feed.id])
+  return (
+    <ContextMenu.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (next) {
+          handoff.current = false
+          setKeyboardAnchor(null)
+        }
+        setOpen(next)
+      }}
+    >
+      <ContextMenu.Trigger
+        render={children}
+        onKeyDown={(event) => {
+          if (event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey)) return
+          event.preventDefault()
+          event.stopPropagation()
+          handoff.current = false
+          setKeyboardAnchor(event.currentTarget)
+          setOpen(true)
+        }}
+      />
+      {open && (
+        <ContextMenu.Portal>
+          <ContextMenu.Backdrop className="ctx-backdrop" />
+          <ContextMenu.Positioner
+            anchor={keyboardAnchor ?? undefined}
+            collisionPadding={8}
+            className="z-[1002]"
+          >
+            <ContextMenu.Popup
+              className="ctx-menu"
+              aria-label={`Actions for ${feed.title}`}
+              onContextMenu={(event) => {
+                event.preventDefault()
+                setOpen(false)
+              }}
+              finalFocus={false}
+            >
+              <FeedMenuItems
+                feed={feed}
+                {...menu}
+                onClose={() => setOpen(false)}
+                onOpenSettings={() => {
+                  // Suppress the menu's delayed focus job before mounting the modal.
+                  handoff.current = true
+                  setOpen(false)
+                  menu.onOpenSettings(feed)
+                }}
+              />
+            </ContextMenu.Popup>
+          </ContextMenu.Positioner>
+        </ContextMenu.Portal>
+      )}
+    </ContextMenu.Root>
+  )
+}
+
+function FeedMenuItems({
   feed,
   folders,
   settings,
-  x,
-  y,
-  unread,
   onClose,
   onChanged,
   onOpenSettings,
-}: Props) {
-  const [moveOpen, setMoveOpen] = useState(false)
+}: FeedMenuOptions & { feed: NewsFeed; onClose: () => void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // 'copied' shows inline confirmation in the menu item before it closes.
   const [copied, setCopied] = useState(false)
-
-  // Feed's site link (nullable — parser may not have found one) vs the raw
-  // feed URL (always present); both are offered as separate menu items.
-  const websiteUrl = feed.link
-
-  // Hover-intent close: give the cursor time to cross any remaining gap or
-  // take a diagonal path into the flyout; cancels on re-enter.
-  const closeTimer = useRef<number | null>(null)
-  const clearCloseTimer = () => {
-    if (closeTimer.current !== null) {
-      clearTimeout(closeTimer.current)
-      closeTimer.current = null
+  const locked = useRef(false)
+  const alive = useRef(true)
+  const copyTimer = useRef<number | undefined>(undefined)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+      window.clearTimeout(copyTimer.current)
     }
-  }
-  useEffect(() => clearCloseTimer, [])
+  }, [])
 
-  const openMove = () => {
-    clearCloseTimer()
-    setMoveOpen(true)
-  }
-  const scheduleClose = () => {
-    if (closeTimer.current !== null) clearTimeout(closeTimer.current)
-    closeTimer.current = window.setTimeout(() => {
-      setMoveOpen(false)
-      closeTimer.current = null
-    }, 150)
-  }
-
-  const doMarkAllRead = async () => {
-    if (busy) return
+  const mutate = async (write: () => Promise<unknown>) => {
+    if (locked.current) return
+    locked.current = true
     setBusy(true)
     setError(null)
     try {
-      await markFeedAllRead(settings, feed.id)
+      await write()
       onChanged()
-      onClose()
+      if (alive.current) onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-      setBusy(false)
+      if (alive.current) {
+        setError(e instanceof Error ? e.message : String(e))
+        setBusy(false)
+        locked.current = false
+      }
     }
   }
-
-  const doRename = async () => {
-    if (busy) return
+  const rename = () => {
+    if (locked.current) return
     const name = prompt(`Rename feed "${feed.title}":`, feed.title)
     if (name === null || name.trim() === '' || name.trim() === feed.title) return
-    setBusy(true)
-    setError(null)
-    try {
-      await renameFeed(settings, feed.id, name.trim())
-      onChanged()
-      onClose()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-      setBusy(false)
-    }
+    void mutate(() => renameFeed(settings, feed.id, name.trim()))
   }
-
-  const doDelete = async () => {
-    if (busy) return
-    if (!confirm(`Delete feed "${feed.title}" and its items?`)) return
-    setBusy(true)
-    setError(null)
-    try {
-      await deleteFeed(settings, feed.id)
-      onChanged()
-      onClose()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-      setBusy(false)
-    }
+  const remove = () => {
+    if (locked.current || !confirm(`Delete feed "${feed.title}" and its items?`)) return
+    void mutate(() => deleteFeed(settings, feed.id))
   }
-
-  const doMove = async (folderId: number | null) => {
-    if (busy) return
+  const copy = async () => {
+    if (locked.current || copied) return
+    locked.current = true
     setBusy(true)
-    setError(null)
-    try {
-      await moveFeed(settings, feed.id, folderId)
-      onChanged()
-      onClose()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-      setBusy(false)
-    }
-  }
-
-  const doCopyFeedUrl = async () => {
-    if (busy) return
     setError(null)
     try {
       await copyText(feed.url)
+      if (!alive.current) return
+      setBusy(false)
+      locked.current = false
       setCopied(true)
-      // Let the confirmation land before the menu disappears.
-      window.setTimeout(onClose, 700)
+      // This instance owns both the acknowledgement and its dismissal. Neither
+      // an old clipboard promise nor an old timer may close a reopened menu.
+      copyTimer.current = window.setTimeout(() => {
+        if (alive.current) onClose()
+      }, 700)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'could not copy')
+      if (alive.current) {
+        setError(e instanceof Error ? e.message : 'could not copy')
+        setBusy(false)
+        locked.current = false
+      }
     }
   }
-
   return (
-    <div
-      className="ctx-backdrop"
-      onClick={onClose}
-      onContextMenu={(e) => {
-        e.preventDefault()
-        onClose()
-      }}
-    >
-      <div className="ctx-menu" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
-        {unread > 0 && (
-          <button className="ctx-item" onClick={doMarkAllRead}>
-            Mark all as read
-          </button>
-        )}
-        <div className="ctx-sub" onMouseEnter={openMove} onMouseLeave={scheduleClose}>
-          <button
-            className="ctx-item"
-            aria-haspopup="menu"
-            aria-expanded={moveOpen}
-            onClick={() => setMoveOpen((o) => !o)}
-          >
-            Move to folder…
-          </button>
-          {moveOpen && (
-            <div className="ctx-menu ctx-submenu" role="menu">
-              <button className="ctx-item" onClick={() => doMove(null)}>
-                No folder
-              </button>
-              {folders.map((f) => (
-                <button key={f.id} className="ctx-item" onClick={() => doMove(f.id)}>
-                  {f.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <button className="ctx-item" onClick={doRename}>
-          Rename
-        </button>
-        <button
+    <>
+      {feed.unreadCount > 0 && (
+        <ContextMenu.Item
           className="ctx-item"
-          onClick={() => {
-            // The modal outlives this menu, so close first.
-            onClose()
-            onOpenSettings()
-          }}
+          disabled={busy}
+          closeOnClick={false}
+          onClick={() => void mutate(() => markFeedAllRead(settings, feed.id))}
         >
-          Feed settings…
-        </button>
-        <button className="ctx-item danger" onClick={doDelete}>
-          Delete
-        </button>
-        {websiteUrl && (
-          <button
-            className="ctx-item"
-            onClick={() => {
-              window.open(websiteUrl, '_blank', 'noopener')
-              onClose()
-            }}
-          >
-            Open website <ArrowTopRightOnSquareIcon className="menu-icon" aria-hidden="true" />
-          </button>
+          Mark all as read
+        </ContextMenu.Item>
+      )}
+      <ContextMenu.SubmenuRoot>
+        <ContextMenu.SubmenuTrigger className="ctx-item" disabled={busy}>
+          Move to folder…
+        </ContextMenu.SubmenuTrigger>
+        <ContextMenu.Portal>
+          <ContextMenu.Positioner collisionPadding={8} className="z-[1003]">
+            <ContextMenu.Popup
+              className="ctx-menu"
+              aria-label="Move to folder"
+              onContextMenu={(event) => {
+                event.preventDefault()
+                onClose()
+              }}
+            >
+              {[{ id: null, name: 'No folder' }, ...folders].map((folder) => (
+                <ContextMenu.Item
+                  key={folder.id ?? 'none'}
+                  className="ctx-item"
+                  disabled={busy}
+                  closeOnClick={false}
+                  onClick={() => void mutate(() => moveFeed(settings, feed.id, folder.id))}
+                >
+                  {folder.name}
+                </ContextMenu.Item>
+              ))}
+            </ContextMenu.Popup>
+          </ContextMenu.Positioner>
+        </ContextMenu.Portal>
+      </ContextMenu.SubmenuRoot>
+      <ContextMenu.Item className="ctx-item" disabled={busy} closeOnClick={false} onClick={rename}>
+        Rename
+      </ContextMenu.Item>
+      <ContextMenu.Item
+        className="ctx-item"
+        closeOnClick={false}
+        onClick={() => onOpenSettings(feed)}
+      >
+        Feed settings…
+      </ContextMenu.Item>
+      <ContextMenu.Item
+        className="ctx-item danger"
+        disabled={busy}
+        closeOnClick={false}
+        onClick={remove}
+      >
+        Delete
+      </ContextMenu.Item>
+      {feed.link && (
+        <ContextMenu.Item
+          className="ctx-item"
+          onClick={() => window.open(feed.link!, '_blank', 'noopener')}
+        >
+          Open website <ArrowTopRightOnSquareIcon className="menu-icon" aria-hidden="true" />
+        </ContextMenu.Item>
+      )}
+      <ContextMenu.Item
+        className="ctx-item"
+        disabled={busy || copied}
+        closeOnClick={false}
+        onClick={() => void copy()}
+      >
+        {copied ? (
+          <>
+            Copied <CheckIcon className="menu-icon" aria-hidden="true" />
+          </>
+        ) : (
+          'Copy feed url'
         )}
-        <button className="ctx-item" onClick={doCopyFeedUrl} disabled={copied}>
-          {copied ? (
-            <>
-              Copied <CheckIcon className="menu-icon" aria-hidden="true" />
-            </>
-          ) : (
-            'Copy feed url'
-          )}
-        </button>
-        {error && <div className="error ctx-error">{error}</div>}
-        {busy && <div className="muted ctx-busy">Working…</div>}
-      </div>
-    </div>
+      </ContextMenu.Item>
+      {error && (
+        <div role="alert" className="error ctx-error">
+          {error}
+        </div>
+      )}
+      {busy && <div className="muted ctx-busy">Working…</div>}
+    </>
   )
 }

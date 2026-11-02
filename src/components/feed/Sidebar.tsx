@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronDownIcon } from '@heroicons/react/24/outline'
 import type { NewsFolder, NewsFeed, NewsItem } from '../../api/types'
 import { starredCount } from '../../selectors'
-import { FeedContextMenu } from './FeedContextMenu'
+import type { FeedMenuOptions } from './FeedContextMenu'
 import { FeedSettingsModal } from './FeedSettingsModal'
 import FeedRow from './FeedRow'
 import FolderSection from './FolderSection'
@@ -66,7 +66,6 @@ export function Sidebar({
     }
   })
 
-  const [ctx, setCtx] = useState<{ feed: NewsFeed; x: number; y: number } | null>(null)
   // Per-feed settings modal, held as an id (not the row object): the poll
   // replaces feed objects, and the modal should follow the live row.
   const [settingsFeedId, setSettingsFeedId] = useState<number | null>(null)
@@ -113,9 +112,11 @@ export function Sidebar({
   }
   const allCollapsed = sortedFolders.length > 0 && sortedFolders.every((f) => collapsed.has(f.id))
 
-  const onCtx = (e: React.MouseEvent, feed: NewsFeed) => {
-    e.preventDefault()
-    setCtx({ feed, x: e.clientX, y: e.clientY })
+  const menu: FeedMenuOptions = {
+    folders,
+    settings,
+    onChanged: onMetaChanged,
+    onOpenSettings: (feed) => setSettingsFeedId(feed.id),
   }
 
   return (
@@ -147,6 +148,7 @@ export function Sidebar({
       </div>
       <div className="sidebar-scroll min-h-0 overflow-y-auto p-2" ref={scrollRef}>
         <button
+          data-feed-focus-fallback
           className={sidebarItemClassName(view.kind === 'all')}
           aria-current={view.kind === 'all' ? 'page' : undefined}
           onClick={() => onSelect({ kind: 'all' })}
@@ -181,7 +183,7 @@ export function Sidebar({
             onSelectFolder={() => onSelect({ kind: 'folder', id: folder.id })}
             onSelectFeed={(id) => onSelect({ kind: 'feed', id })}
             onToggle={toggle}
-            onCtx={onCtx}
+            menu={menu}
             showFavicons={showFavicons}
             rarityStats={rarityStats}
           />
@@ -198,7 +200,7 @@ export function Sidebar({
                 feed={f}
                 active={view.kind === 'feed' && view.id === f.id}
                 onSelect={() => onSelect({ kind: 'feed', id: f.id })}
-                onCtx={onCtx}
+                menu={menu}
                 showFavicons={showFavicons}
                 rarityInfo={rarityStats.get(f.id)}
               />
@@ -206,19 +208,6 @@ export function Sidebar({
           </div>
         )}
       </div>
-      {ctx && settings && (
-        <FeedContextMenu
-          feed={ctx.feed}
-          folders={folders}
-          settings={settings}
-          x={ctx.x}
-          y={ctx.y}
-          unread={ctx.feed.unreadCount}
-          onClose={() => setCtx(null)}
-          onChanged={onMetaChanged}
-          onOpenSettings={() => setSettingsFeedId(ctx.feed.id)}
-        />
-      )}
       {settingsFeedId !== null && settings && feeds.get(settingsFeedId) && (
         <FeedSettingsModal
           feed={feeds.get(settingsFeedId)!}

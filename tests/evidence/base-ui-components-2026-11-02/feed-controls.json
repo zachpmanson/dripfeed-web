@@ -1,0 +1,96 @@
+{
+  "checks": [
+    "Real persistent row: keyboard anchor, aria-current, no nested button, Home/End/typeahead, submenu Right/Left and single-layer Escape",
+    "Outside click consumed; deferred mark-read guards/errors/retry; numeric move payload; unchanged native prompt/confirm cancel",
+    "700ms copy acknowledgement; dismissed timers, clipboard and mutation promises cannot dismiss same-feed replacement",
+    "Different-feed reopening also isolates late write rejection; no leaked error or stale dismissal",
+    "Pointer/keyboard menu → independent settings → replaced persistent row; removed row returns to connected sidebar fallback; no focus theft or double Escape",
+    "Open grouped menu panel/folder removal resolves connected fallback after host removal; right-click inside either popup suppresses native menu and dismisses app menu",
+    "Typed header/destination Select; modal listbox Escape/layering; typed 0/false mandatory radios; Tooltip label/focus; strict boolean Checkboxes; keyboard Folder auth clearing/focus/busy",
+    "Persistent/replaced/single Toast alert without focus theft; long menu/submenu bounded at 360/1000px, dark/light, 20px root font"
+  ],
+  "errors": [],
+  "blockedRequests": [
+    "http://127.0.0.1:5173/apps/news/api/v1-3/items/fixture/fulltext"
+  ],
+  "layouts": [
+    {
+      "width": 360,
+      "theme": "dark",
+      "baselineWidth": 650,
+      "boxes": [
+        {
+          "x": 112,
+          "y": 367,
+          "width": 240,
+          "height": 265
+        },
+        {
+          "x": 8,
+          "y": 8,
+          "width": 340,
+          "height": 408.5
+        }
+      ]
+    },
+    {
+      "width": 360,
+      "theme": "light",
+      "baselineWidth": 650,
+      "boxes": [
+        {
+          "x": 112,
+          "y": 367,
+          "width": 240,
+          "height": 265
+        },
+        {
+          "x": 8,
+          "y": 8,
+          "width": 340,
+          "height": 408.5
+        }
+      ]
+    },
+    {
+      "width": 1000,
+      "theme": "dark",
+      "baselineWidth": 1000,
+      "boxes": [
+        {
+          "x": 258,
+          "y": 367,
+          "width": 240,
+          "height": 265
+        },
+        {
+          "x": 490,
+          "y": 8,
+          "width": 454.328125,
+          "height": 624
+        }
+      ]
+    },
+    {
+      "width": 1000,
+      "theme": "light",
+      "baselineWidth": 1000,
+      "boxes": [
+        {
+          "x": 258,
+          "y": 367,
+          "width": 240,
+          "height": 265
+        },
+        {
+          "x": 490,
+          "y": 8,
+          "width": 454.328125,
+          "height": 624
+        }
+      ]
+    }
+  ],
+  "browser": "153.0.8010.52",
+  "result": "passed"
+}

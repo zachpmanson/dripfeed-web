@@ -1,5 +1,9 @@
 # Settings Base UI pilot — ownership fixes
 
+> This records the Settings-only stage at `aeca2a4`. The owner subsequently
+> authorized the remaining dialogs, feed context menu and shared controls;
+> see [base-ui-components.md](base-ui-components.md) for the completed follow-up.
+
 2 November 2026, Melbourne. The owner explicitly requested **fixing the problems**
 after the initial pilot was rejected. This supersedes the decision in
 [the historical pilot receipt](settings-base-ui-pilot.md), not its recorded evidence.

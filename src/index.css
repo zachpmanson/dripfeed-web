@@ -450,28 +450,16 @@
   }
 
   .ctx-menu {
-    position: fixed;
-    z-index: 1002;
+    max-height: var(--available-height);
+    max-width: calc(100vw - 1rem);
+    overflow-y: auto;
+    overflow-wrap: anywhere;
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0.35rem;
     min-width: 12rem;
     box-shadow: 0 6px 24px var(--menu-shadow);
-  }
-
-  .ctx-sub {
-    position: relative;
-  }
-
-  /* Flush against the parent menu (no hover gap): overlap the parent's
-   right border by 1px so there's no visible seam and no dead zone. */
-  .ctx-submenu {
-    position: absolute;
-    left: calc(100% - 1px);
-    top: -0.35rem;
-    min-width: 11rem;
-    z-index: 1;
   }
 
   .ctx-title {
@@ -499,7 +487,8 @@
     cursor: pointer;
   }
 
-  .ctx-item:hover {
+  .ctx-item:hover,
+  .ctx-item[data-highlighted] {
     background: var(--border);
   }
 
@@ -507,7 +496,8 @@
     color: var(--danger);
   }
 
-  .ctx-item.danger:hover {
+  .ctx-item.danger:hover,
+  .ctx-item.danger[data-highlighted] {
     background: var(--danger-wash);
   }
 
@@ -517,12 +507,14 @@
 
   /* Transient confirmation state ("Copied") — not a dead control, so keep
    the accent colour and drop the hover wash. */
-  .ctx-item:disabled {
+  .ctx-item:disabled,
+  .ctx-item[data-disabled] {
     cursor: default;
     color: var(--accent);
   }
 
-  .ctx-item:disabled:hover {
+  .ctx-item:disabled:hover,
+  .ctx-item[data-disabled]:hover {
     background: transparent;
   }
 

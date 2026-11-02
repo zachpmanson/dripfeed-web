@@ -150,3 +150,56 @@ it('transfers the connected opener across an atomic Base-to-native replacement',
   await act(async () => document.getElementById('dismiss')!.click())
   expect(document.activeElement).toBe(opener)
 })
+
+it.each(['base', 'native'] as const)(
+  'resumes a busy %s form through an enabled fallback, not its disabled autofocus field',
+  async (kind) => {
+    function Harness() {
+      const [covered, setCovered] = useState(false)
+      const Shell = kind === 'base' ? BaseDialog : Dialog
+      return (
+        <>
+          <Shell labelledBy="busy-title" onClose={vi.fn()}>
+            <span id="busy-title">Busy form</span>
+            <input data-dialog-autofocus disabled defaultValue="pending value" />
+            <button id="busy-close">Close busy form</button>
+            <button id="cover-busy" onClick={() => setCovered(true)}>
+              Cover busy form
+            </button>
+          </Shell>
+          {covered && (
+            <BaseDialog labelledBy="cover-title" onClose={() => setCovered(false)}>
+              <span id="cover-title">Cover</span>
+              <button id="dismiss-cover" onClick={() => setCovered(false)}>
+                Dismiss cover
+              </button>
+            </BaseDialog>
+          )}
+        </>
+      )
+    }
+    await act(async () =>
+      root.render(
+        <StrictMode>
+          <Harness />
+        </StrictMode>,
+      ),
+    )
+    await act(async () => {
+      await vi.waitFor(() => expect(document.activeElement?.id).toBe('busy-close'))
+    })
+    // Programmatic fixture cover while no enabled field is remembered, as when
+    // pending Add fields became disabled before another owner was mounted.
+    await act(async () => document.getElementById('cover-busy')!.click())
+    await act(async () => {
+      await vi.waitFor(() => expect(document.activeElement?.id).toBe('dismiss-cover'))
+    })
+    await act(async () => document.getElementById('dismiss-cover')!.click())
+    await act(async () => {
+      await vi.waitFor(() => expect(document.activeElement?.id).toBe('busy-close'))
+    })
+    expect(document.querySelector<HTMLInputElement>('[data-dialog-autofocus]')!.value).toBe(
+      'pending value',
+    )
+  },
+)

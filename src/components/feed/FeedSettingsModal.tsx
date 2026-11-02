@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
-import { Dialog } from '../ui/Dialog'
+import { BaseDialog as Dialog } from '../ui/BaseDialog'
 import type { NewsFeed } from '../../api/types'
 import type { Settings } from '../../settings'
 import { setFeedFullText } from '../../actions'
@@ -55,7 +55,12 @@ export function FeedSettingsModal({ feed, settings, onClose, onChanged }: Props)
   }
 
   return (
-    <Dialog labelledBy={titleId} onClose={onClose} restoreFocusTo={`[data-feed-id="${feed.id}"]`}>
+    <Dialog
+      labelledBy={titleId}
+      onClose={onClose}
+      restoreFocusTo={`[data-feed-id="${feed.id}"]`}
+      restoreFocusFallback="[data-feed-focus-fallback]"
+    >
       <div className="modal-head">
         <span id={titleId} className="muted">
           Feed settings — {feed.title}

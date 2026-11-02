@@ -2,22 +2,24 @@ import { useRef, type ReactNode } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import { useModalLayer } from './useModalLayer'
 
-/** Candidate for Settings only; the other consumers retain native modality. */
+/** App modal presentation; the shared layer owns modality and return focus. */
 export function BaseDialog({
   labelledBy,
   onClose,
   className = 'modal',
   restoreFocusTo,
+  restoreFocusFallback,
   children,
 }: {
   labelledBy: string
   onClose: () => void
   className?: string
   restoreFocusTo?: string
+  restoreFocusFallback?: string
   children: ReactNode
 }) {
   const popup = useRef<HTMLDivElement>(null)
-  const layer = useModalLayer(popup, restoreFocusTo)
+  const layer = useModalLayer(popup, restoreFocusTo, undefined, restoreFocusFallback)
   return (
     <Dialog.Root
       open={layer.active}

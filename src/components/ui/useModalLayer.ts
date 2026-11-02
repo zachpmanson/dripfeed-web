@@ -26,7 +26,7 @@ const focusTarget = (layer: Layer) => {
   )
     return remembered
   return (
-    layer.element.current?.querySelector<HTMLElement>('[data-dialog-autofocus]') ??
+    layer.element.current?.querySelector<HTMLElement>('[data-dialog-autofocus]:not(:disabled)') ??
     layer.element.current?.querySelector<HTMLElement>('button:not(:disabled)') ??
     layer.element.current
   )
@@ -38,6 +38,7 @@ export function useModalLayer(
   element: RefObject<HTMLElement>,
   restoreFocusTo?: string,
   callbacks?: { activate: () => void; suspend: () => void },
+  restoreFocusFallback?: string,
 ) {
   const id = useRef(Symbol('modal'))
   const currentCallbacks = useRef(callbacks)
@@ -75,7 +76,10 @@ export function useModalLayer(
           target.isConnected &&
           !target.matches(':disabled')
           ? target
-          : (previous?.returnTo() ?? handoff?.target() ?? null)
+          : ((restoreFocusFallback ? document.querySelector(restoreFocusFallback) : null) ??
+              previous?.returnTo() ??
+              handoff?.target() ??
+              null)
       },
     }
     entry.current = layer
@@ -102,7 +106,7 @@ export function useModalLayer(
         if (target instanceof HTMLElement && target.isConnected) target.focus()
       })
     }
-  }, [element, restoreFocusTo])
+  }, [element, restoreFocusTo, restoreFocusFallback])
 
   return { active, isTop, initialFocus: () => (entry.current ? focusTarget(entry.current) : null) }
 }

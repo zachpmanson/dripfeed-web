@@ -1,5 +1,7 @@
+import { Tabs } from '@base-ui/react/tabs'
+import { Select } from '../ui/Select'
 import { useEffect, useId, useRef, useState } from 'react'
-import { Dialog } from '../ui/Dialog'
+import { BaseDialog as Dialog } from '../ui/BaseDialog'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import type { NewsFolder } from '../../api/types'
 import type { Settings } from '../../settings'
@@ -97,123 +99,130 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
           <XMarkIcon className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
-      <div className="mb-4 flex overflow-hidden rounded-md border border-app-border">
-        <button
-          className={`rounded-none border-0 px-2.5 py-1.5 text-sm ${tab === 'feed' ? 'bg-app-accent font-semibold text-app-on-accent' : 'bg-transparent text-app-muted'}`}
-          onClick={() => setTab('feed')}
-          disabled={busy}
+      <Tabs.Root
+        value={tab}
+        onValueChange={(next) => {
+          if (busy || (next !== 'feed' && next !== 'folder')) return
+          setTab(next)
+          if (next === 'folder') clearFeedAuth()
+        }}
+      >
+        <Tabs.List
+          aria-label="Add kind"
+          className="mb-4 flex overflow-hidden rounded-md border border-app-border"
         >
-          Feed
-        </button>
-        <button
-          className={`rounded-none border-0 px-2.5 py-1.5 text-sm ${tab === 'folder' ? 'bg-app-accent font-semibold text-app-on-accent' : 'bg-transparent text-app-muted'}`}
-          onClick={() => {
-            setTab('folder')
-            clearFeedAuth()
-          }}
-          disabled={busy}
-        >
-          Folder
-        </button>
-      </div>
-      <form onSubmit={submit} className="flex flex-col gap-3">
-        {tab === 'feed' ? (
-          <>
-            <label className="field">
-              URL
-              <input
-                ref={inputRef}
-                data-dialog-autofocus
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://example.com/feed.xml"
-                disabled={busy}
-              />
-            </label>
-            <label className="field">
-              Folder
-              <select
-                value={folderId ?? 0}
-                onChange={(e) => setFolderId(Number(e.target.value) || null)}
-                disabled={busy}
-              >
-                <option value={0}>No folder</option>
-                {folders.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={useFeedAuth}
-                disabled={busy || !canUseFeedAuth}
-                aria-describedby={authHintId}
-                onChange={(e) => {
-                  if (e.target.checked) setUseFeedAuth(true)
-                  else clearFeedAuth()
-                }}
-              />
-              Use HTTP Basic Auth
-            </label>
-            <p id={authHintId} className="text-xs text-app-muted">
-              {canUseFeedAuth
-                ? 'Optional feed credentials, not your Nextcloud login. Nextcloud stores them to fetch this feed.'
-                : 'Password-protected feeds require the app-root /apps proxy. This Nextcloud URL is unsupported; ordinary feeds can still be added.'}
-            </p>
-            {useFeedAuth && (
+          {(['feed', 'folder'] as const).map((kind) => (
+            <Tabs.Tab
+              key={kind}
+              value={kind}
+              disabled={busy}
+              className="rounded-none border-0 bg-transparent px-2.5 py-1.5 text-sm text-app-muted data-[active]:bg-app-accent data-[active]:font-semibold data-[active]:text-app-on-accent"
+            >
+              {kind === 'feed' ? 'Feed' : 'Folder'}
+            </Tabs.Tab>
+          ))}
+        </Tabs.List>
+        <Tabs.Panel value={tab}>
+          <form onSubmit={submit} className="flex flex-col gap-3">
+            {tab === 'feed' ? (
               <>
                 <label className="field">
-                  Feed username
+                  URL
                   <input
-                    type="text"
-                    value={feedUser}
-                    onChange={(e) => setFeedUser(e.target.value)}
-                    autoComplete="off"
-                    required
+                    ref={inputRef}
+                    data-dialog-autofocus
+                    type="url"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://example.com/feed.xml"
                     disabled={busy}
                   />
                 </label>
                 <label className="field">
-                  Feed password
-                  <input
-                    type="password"
-                    value={feedPassword}
-                    onChange={(e) => setFeedPassword(e.target.value)}
-                    autoComplete="new-password"
+                  Folder
+                  <Select
+                    label="Destination folder"
+                    value={folderId ?? 0}
+                    onChange={(next) => {
+                      if (!busy) setFolderId(next || null)
+                    }}
                     disabled={busy}
+                    options={[
+                      { value: 0, label: 'No folder' },
+                      ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
+                    ]}
                   />
                 </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={useFeedAuth}
+                    disabled={busy || !canUseFeedAuth}
+                    aria-describedby={authHintId}
+                    onChange={(e) => {
+                      if (e.target.checked) setUseFeedAuth(true)
+                      else clearFeedAuth()
+                    }}
+                  />
+                  Use HTTP Basic Auth
+                </label>
+                <p id={authHintId} className="text-xs text-app-muted">
+                  {canUseFeedAuth
+                    ? 'Optional feed credentials, not your Nextcloud login. Nextcloud stores them to fetch this feed.'
+                    : 'Password-protected feeds require the app-root /apps proxy. This Nextcloud URL is unsupported; ordinary feeds can still be added.'}
+                </p>
+                {useFeedAuth && (
+                  <>
+                    <label className="field">
+                      Feed username
+                      <input
+                        type="text"
+                        value={feedUser}
+                        onChange={(e) => setFeedUser(e.target.value)}
+                        autoComplete="off"
+                        required
+                        disabled={busy}
+                      />
+                    </label>
+                    <label className="field">
+                      Feed password
+                      <input
+                        type="password"
+                        value={feedPassword}
+                        onChange={(e) => setFeedPassword(e.target.value)}
+                        autoComplete="new-password"
+                        disabled={busy}
+                      />
+                    </label>
+                  </>
+                )}
               </>
+            ) : (
+              <label className="field">
+                Name
+                <input
+                  ref={inputRef}
+                  data-dialog-autofocus
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="My folder"
+                  disabled={busy}
+                />
+              </label>
             )}
-          </>
-        ) : (
-          <label className="field">
-            Name
-            <input
-              ref={inputRef}
-              data-dialog-autofocus
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="My folder"
+            {error && <div className="error">{error}</div>}
+            {done && <div className="ok">{done}</div>}
+            <button
+              className="cursor-pointer rounded-md border-0 bg-app-accent p-2.5 font-semibold text-app-on-accent disabled:cursor-default disabled:opacity-60"
+              type="submit"
               disabled={busy}
-            />
-          </label>
-        )}
-        {error && <div className="error">{error}</div>}
-        {done && <div className="ok">{done}</div>}
-        <button
-          className="cursor-pointer rounded-md border-0 bg-app-accent p-2.5 font-semibold text-app-on-accent disabled:cursor-default disabled:opacity-60"
-          type="submit"
-          disabled={busy}
-        >
-          {busy ? 'Adding…' : tab === 'feed' ? 'Add feed' : 'Create folder'}
-        </button>
-      </form>
+            >
+              {busy ? 'Adding…' : tab === 'feed' ? 'Add feed' : 'Create folder'}
+            </button>
+          </form>
+        </Tabs.Panel>
+      </Tabs.Root>
     </Dialog>
   )
 }

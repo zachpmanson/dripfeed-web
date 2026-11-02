@@ -76,11 +76,13 @@ screenshots. The fixture uses StrictMode, like the app. Parent-side scripted ifr
 focus is recorded as a diagnostic only: Chromium permits it in the unchanged native
 baseline too; it is not an adversarial inertness or sandbox guarantee.
 
-Settings now uses Base UI with a shared active-owner stack; Add/Feed settings
-remain native. The runner distinguishes mounted forms from the one presented
+Settings, Add and Feed settings use Base UI with a shared active-owner stack.
+The fixture also retains a real isolated native Dialog probe, including both
+native/Base cover directions, covered-owner removal and atomic replacements. The runner distinguishes mounted forms from the one presented
 owner and checks both sides of Escape, preserved fields, removed covered owners,
 actual same-commit replacements and three-owner handoffs. Current fixes and
-passing evidence: [settings-base-ui-fix.md](settings-base-ui-fix.md). The initial
+passing evidence: [base-ui-components.md](base-ui-components.md), following the
+[Settings-only fix](settings-base-ui-fix.md). The initial
 failed experiment remains in [settings-base-ui-pilot.md](settings-base-ui-pilot.md)
 as historical evidence, not the current decision.
 
@@ -154,3 +156,29 @@ rejections stay local, 401 still invalidates authentication, stale-session
 failures cannot report, and dismissed consecutive errors stay deduplicated
 through background polling. The toast has no auto-dismiss timer; reset/logout
 and unmount invalidate its session and clear the error/dedup state.
+
+# Browser regression: feed menu and Base controls
+
+`feed-controls.browser.mjs` renders the real StrictMode Sidebar/FeedRow, Add,
+Settings and shared controls. Fixture-only Vite module mocks replace News writes,
+mark-read and clipboard operations; all non-fixture traffic and every /apps path
+(including a synthetic fulltext GET probe) are blocked before navigation.
+
+```sh
+PLAYWRIGHT_MODULE=/path/to/node_modules/playwright \
+CHROMIUM_PATH=/path/to/chromium \
+TEST_ARTIFACT_DIR=/tmp/feed-controls \
+nix develop --command node tests/feed-controls.browser.mjs
+```
+
+Checks include pointer/keyboard context invocation and collision bounds, managed
+submenu keys/scrolling, no selection/clickthrough, deferred write errors/retry and
+duplicate guards, native prompt/confirm cancellation, 700ms copy acknowledgement
+and stale lifetime isolation, settings handoff to replaced/removed persistent
+rows, typed Select/RadioGroup values (including 0/false), modal Select layering
+and Escape, checkbox booleans, Tooltip keyboard labels, keyboard Tabs/auth clearing
+and busy Add cover/uncover. Toast replacement and persistence beyond five seconds
+are exercised without replacing app error/session ownership. Existing error-toast
+and session tests remain separate. Menu geometry compares page width to the
+fixture's inherited desktop-header baseline; it does not claim a responsive app
+layout redesign. Optional JSON/screenshot artifacts follow the other runners.

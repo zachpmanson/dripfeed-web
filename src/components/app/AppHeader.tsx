@@ -1,3 +1,4 @@
+import { Select } from '../ui/Select'
 import { Cog6ToothIcon, PlusIcon } from '@heroicons/react/24/outline'
 import { IconButton } from '../ui/IconButton'
 import { Seg } from '../ui/Seg'
@@ -31,16 +32,17 @@ export default function AppHeader({
     <header className="flex items-center justify-between border-b border-app-border bg-app-panel px-4 py-2.5">
       <h1 className="m-0 text-base tracking-[0.02em]">Dripfeed</h1>
       <div className="header-right flex items-center gap-2">
-        <select
-          className="header-select cursor-pointer rounded-md border border-app-border bg-app-panel px-2 py-1 text-[0.85rem] leading-[1.4] text-app-text hover:border-app-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
-          title="Items shown: all, unread only, or all items with unread floated to the top"
+        <Select<ShowMode>
+          className="header-select"
+          label="Items shown: all, unread only, or all items with unread floated to the top"
           value={showMode}
-          onChange={(e) => onShowModeChange(e.target.value as ShowMode)}
-        >
-          <option value="all">All items</option>
-          <option value="unread">Unread only</option>
-          <option value="priority">Unread first</option>
-        </select>
+          onChange={onShowModeChange}
+          options={[
+            { value: 'all', label: 'All items' },
+            { value: 'unread', label: 'Unread only' },
+            { value: 'priority', label: 'Unread first' },
+          ]}
+        />
         <Seg<SortMode>
           value={sortMode}
           onChange={onSortModeChange}

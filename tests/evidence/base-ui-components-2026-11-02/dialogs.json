@@ -1,0 +1,152 @@
+{
+  "checks": [
+    [
+      {
+        "role": "dialog",
+        "name": "SETTINGS"
+      }
+    ],
+    {
+      "desktopSettings": {
+        "width": 352,
+        "height": 629.34375,
+        "left": 324,
+        "top": 85.328125
+      }
+    },
+    "settings: AX name, initial focus, Tab/Shift-Tab, inert app/iframe, padding/drag, Escape/close/backdrop, restored trigger",
+    [
+      {
+        "role": "dialog",
+        "name": "ADD"
+      }
+    ],
+    "add: AX name, initial focus, Tab/Shift-Tab, inert app/iframe, padding/drag, Escape/close/backdrop, restored trigger",
+    [
+      {
+        "role": "dialog",
+        "name": "FEED SETTINGS — EXAMPLE FEED"
+      }
+    ],
+    "feed: AX name, initial focus, Tab/Shift-Tab, inert app/iframe, padding/drag, Escape/close/backdrop, restored trigger",
+    "feed auth: labelled masked password; optional controls reset on reopen; expanded form fits/scrolls at 360x450 in both themes; Tab wraps; no API submission",
+    "Settings: pointer opening, dynamic editor/reset, current Tab edges, rapid reopen",
+    "covered owner removal in both directions: active owner and connected return chain preserved",
+    "atomic Base/native replacements: pending opener chain and explicit feed-row return targets preserved",
+    "three-owner LIFO dismissal and rapid replacement: one interactive owner, no stale focus restoration",
+    "dark: small viewport contained/scrollable; text rgb(216, 220, 227); original scrim preserved",
+    "light: small viewport contained/scrollable; text rgb(28, 31, 38); original scrim preserved"
+  ],
+  "pageErrors": [],
+  "blockedRequests": [
+    "http://127.0.0.1:5173/apps/news/api/v1-3/items/fixture/fulltext"
+  ],
+  "iframeFocus": [
+    {
+      "kind": "settings",
+      "inside": false,
+      "activeTag": "IFRAME",
+      "frameActiveTag": "BUTTON"
+    },
+    {
+      "kind": "add",
+      "inside": false,
+      "activeTag": "IFRAME",
+      "frameActiveTag": "BUTTON"
+    },
+    {
+      "kind": "feed",
+      "inside": false,
+      "activeTag": "IFRAME",
+      "frameActiveTag": "BUTTON"
+    }
+  ],
+  "mixed": [
+    {
+      "first": "settings",
+      "second": "add",
+      "beforeEscape": {
+        "visible": 1,
+        "hit": true
+      },
+      "remaining": [
+        "SettingsUI dark modeLightDarkSystemArticle CSSDefaultCustomCustom article CSSsynthetic-preserved-valueApplied live to the open article. Unsupported or resource-loading CSS is ignored.Reset to default✓Show favicons✓Mark as read on single click✓Dim Boilerplate Textdripfeed-web 2026-11-02 @ aeca2a4Export OPMLLog out"
+      ],
+      "focusInside": true,
+      "preserved": true,
+      "passed": true
+    },
+    {
+      "first": "add",
+      "second": "settings",
+      "beforeEscape": {
+        "visible": 1,
+        "hit": true
+      },
+      "remaining": [
+        "AddFeedFolderURLFolderNo folder▾Use HTTP Basic AuthOptional feed credentials, not your Nextcloud login. Nextcloud stores them to fetch this feed.Feed usernameFeed passwordAdd feed"
+      ],
+      "focusInside": true,
+      "preserved": true,
+      "passed": true
+    },
+    {
+      "first": "settings",
+      "second": "feed",
+      "beforeEscape": {
+        "visible": 1,
+        "hit": true
+      },
+      "remaining": [
+        "SettingsUI dark modeLightDarkSystemArticle CSSDefaultCustomCustom article CSSsynthetic-preserved-valuesynthetic-preserved-valueApplied live to the open article. Unsupported or resource-loading CSS is ignored.Reset to default✓Show favicons✓Mark as read on single click✓Dim Boilerplate Textdripfeed-web 2026-11-02 @ aeca2a4Export OPMLLog out"
+      ],
+      "focusInside": true,
+      "preserved": true,
+      "passed": true
+    },
+    {
+      "first": "feed",
+      "second": "settings",
+      "beforeEscape": {
+        "visible": 1,
+        "hit": true
+      },
+      "remaining": [
+        "Feed settings — Example feedDefault to extracting full articleItems from this feed open as the full article. Also asks the server to scrape new items when the feed updates, so other clients show full text too. Existing items are extracted as you open them."
+      ],
+      "focusInside": true,
+      "preserved": true,
+      "passed": true
+    },
+    {
+      "first": "settings",
+      "second": "native",
+      "beforeEscape": {
+        "visible": 1,
+        "hit": true
+      },
+      "remaining": [
+        "SettingsUI dark modeLightDarkSystemArticle CSSDefaultCustomCustom article CSSsynthetic-preserved-valuesynthetic-preserved-valuesynthetic-preserved-valueApplied live to the open article. Unsupported or resource-loading CSS is ignored.Reset to default✓Show favicons✓Mark as read on single click✓Dim Boilerplate Textdripfeed-web 2026-11-02 @ aeca2a4Export OPMLLog out"
+      ],
+      "focusInside": true,
+      "preserved": true,
+      "passed": true
+    },
+    {
+      "first": "native",
+      "second": "settings",
+      "beforeEscape": {
+        "visible": 1,
+        "hit": true
+      },
+      "remaining": [
+        "Native probeClose"
+      ],
+      "focusInside": true,
+      "preserved": true,
+      "passed": true
+    }
+  ],
+  "browser": "Chrome/153.0.8010.52",
+  "result": "passed"
+}

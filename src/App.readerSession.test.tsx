@@ -160,7 +160,7 @@ async function click(label: string) {
 }
 
 function extractButton() {
-  return container.querySelector<HTMLButtonElement>('button[title^="Extract full article"]')!
+  return container.querySelector<HTMLButtonElement>('button[aria-label^="Extract full article"]')!
 }
 
 async function signInToNewSession() {

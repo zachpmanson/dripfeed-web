@@ -1,3 +1,5 @@
+import { type FeedMenuOptions } from './FeedContextMenu'
+import { Collapsible } from '@base-ui/react/collapsible'
 import { ChevronDownIcon } from '@heroicons/react/24/outline'
 import type { NewsFeed, NewsFolder } from '../../api/types'
 import type { RarityInfo } from '../../rarity'
@@ -13,7 +15,7 @@ export default function FolderSection({
   onSelectFolder,
   onSelectFeed,
   onToggle,
-  onCtx,
+  menu,
   showFavicons,
   rarityStats,
 }: {
@@ -25,14 +27,14 @@ export default function FolderSection({
   onSelectFolder: () => void
   onSelectFeed: (feedId: number) => void
   onToggle: (folderId: number) => void
-  onCtx: (e: React.MouseEvent, feed: NewsFeed) => void
+  menu: FeedMenuOptions
   showFavicons: boolean
   rarityStats: Map<number, RarityInfo>
 }) {
   const unread = feeds.reduce((total, feed) => total + feed.unreadCount, 0)
 
   return (
-    <div className="folder">
+    <Collapsible.Root className="folder" open={!collapsed} onOpenChange={() => onToggle(folder.id)}>
       <div className="folder-head flex items-center">
         <button
           className={`folder-name-btn ${sidebarItemClassName(selected, selected ? 'text-app-text' : 'text-app-muted', 'min-w-0 flex-1 gap-2')}`}
@@ -43,31 +45,30 @@ export default function FolderSection({
           {unread > 0 && <span className="count">{unread}</span>}
         </button>
         <span className="folder-right flex items-center">
-          <button
+          <Collapsible.Trigger
             className="icon-btn caret-btn inline-flex size-8 items-center justify-center rounded border-0 p-0 text-app-muted hover:bg-app-border hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
             title={collapsed ? 'Expand folder' : 'Collapse folder'}
-            onClick={() => onToggle(folder.id)}
-            aria-expanded={!collapsed}
           >
             <ChevronDownIcon
               className={`caret${collapsed ? ' collapsed' : ''}`}
               aria-hidden="true"
             />
-          </button>
+          </Collapsible.Trigger>
         </span>
       </div>
-      {!collapsed &&
-        feeds.map((feed) => (
+      <Collapsible.Panel>
+        {feeds.map((feed) => (
           <FeedRow
             key={feed.id}
             feed={feed}
             active={selectedFeedId === feed.id}
             onSelect={() => onSelectFeed(feed.id)}
-            onCtx={onCtx}
+            menu={menu}
             showFavicons={showFavicons}
             rarityInfo={rarityStats.get(feed.id)}
           />
         ))}
-    </div>
+      </Collapsible.Panel>
+    </Collapsible.Root>
   )
 }

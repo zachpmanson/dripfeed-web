@@ -208,7 +208,9 @@ describe('legacy feature callers', () => {
     })
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[title^="Extract full article"]')!.click()
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label^="Extract full article"]')!
+        .click()
     })
 
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('unsupported')

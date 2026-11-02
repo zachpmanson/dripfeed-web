@@ -102,7 +102,7 @@ async function render(items: NewsItem[] = [item()], autoExtract = true, strict =
 }
 
 function extractButton() {
-  return container.querySelector<HTMLButtonElement>('button[title^="Extract full article"]')!
+  return container.querySelector<HTMLButtonElement>('button[aria-label^="Extract full article"]')!
 }
 
 describe('auto extraction session deduplication', () => {
