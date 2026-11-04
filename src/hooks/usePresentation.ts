@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 
 export type Presentation = 'list' | 'newspaper'
-export const NEWSPAPER_QUERY = '(min-width: 1100px)'
 const KEY = 'dripfeed.presentation'
 
 export default function usePresentation() {
@@ -12,17 +11,6 @@ export default function usePresentation() {
       return 'list'
     }
   })
-  const [desktop, setDesktop] = useState(
-    () => window.matchMedia?.(NEWSPAPER_QUERY).matches ?? false,
-  )
-  useEffect(() => {
-    const query = window.matchMedia?.(NEWSPAPER_QUERY)
-    if (!query) return
-    const update = () => setDesktop(query.matches)
-    update()
-    query.addEventListener('change', update)
-    return () => query.removeEventListener('change', update)
-  }, [])
   useEffect(() => {
     try {
       localStorage.setItem(KEY, presentation)
@@ -33,7 +21,6 @@ export default function usePresentation() {
   return {
     presentation,
     setPresentation,
-    desktop,
-    newspaper: desktop && presentation === 'newspaper',
+    newspaper: presentation === 'newspaper',
   }
 }

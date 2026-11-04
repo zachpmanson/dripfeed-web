@@ -5,7 +5,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import App from './App'
 import type { AppData } from './hooks'
 import type { NewsFeed, NewsItem } from './api/types'
-import { NEWSPAPER_QUERY } from './hooks/usePresentation'
 
 const mocks = vi.hoisted(() => ({ store: null as AppData | null }))
 vi.mock('./hooks', () => ({ useStore: () => mocks.store! }))
@@ -22,8 +21,6 @@ vi.mock('./hooks/useThemePreferences', () => ({
 }))
 
 let root: Root, container: HTMLDivElement
-let desktop: boolean
-let resize: () => void
 let observe: IntersectionObserverCallback
 let disconnected: ReturnType<typeof vi.fn>
 const item = (id: number): NewsItem =>
@@ -45,23 +42,6 @@ beforeEach(() => {
   localStorage.setItem('dripfeed.showMode', 'all')
   localStorage.setItem('dripfeed.sort', 'newest')
   window.history.replaceState(null, '', '/?view=all')
-  desktop = true
-  resize = () => {}
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn((query) => {
-      expect(query).toBe(NEWSPAPER_QUERY)
-      return {
-        get matches() {
-          return desktop
-        },
-        addEventListener: (_: string, cb: () => void) => {
-          resize = cb
-        },
-        removeEventListener: vi.fn(),
-      }
-    }),
-  )
   disconnected = vi.fn()
   vi.stubGlobal(
     'IntersectionObserver',
@@ -125,24 +105,49 @@ const selectNewspaper = async () => {
 }
 const newspaper = () => container.querySelector<HTMLUListElement>('.newspaper')!
 
-it('defaults to the unchanged list; stores a mode choice and retains it across narrow fallback', async () => {
+it.each([360, 768, 1100, 1600])(
+  'shows both mode controls at %spx and keeps the selected mode through resize',
+  async (width) => {
+    vi.stubGlobal('innerWidth', width)
+    vi.stubGlobal('matchMedia', undefined)
+    await render()
+    expect(container.querySelector('.item-list')).not.toBeNull()
+    expect(container.querySelector('[aria-label="Presentation"]')).not.toBeNull()
+    await selectNewspaper()
+    expect(newspaper()).not.toBeNull()
+    expect(localStorage.getItem('dripfeed.presentation')).toBe('newspaper')
+    await act(async () => {
+      vi.stubGlobal('innerWidth', width < 1100 ? 1600 : 360)
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(newspaper()).not.toBeNull()
+    expect(container.querySelector('[aria-label="Presentation"]')).not.toBeNull()
+    expect(localStorage.getItem('dripfeed.presentation')).toBe('newspaper')
+    const list = [...container.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find(
+      (button) => button.textContent === 'List',
+    )!
+    await act(async () => list.click())
+    expect(container.querySelector('.item-list')).not.toBeNull()
+    expect(localStorage.getItem('dripfeed.presentation')).toBe('list')
+  },
+)
+
+it('loads the saved newspaper mode on a narrow window and preserves the open reader on resize', async () => {
+  vi.stubGlobal('innerWidth', 360)
+  localStorage.setItem('dripfeed.presentation', 'newspaper')
   await render()
-  expect(container.querySelector('.item-list')).not.toBeNull()
-  await selectNewspaper()
   expect(newspaper()).not.toBeNull()
-  expect(localStorage.getItem('dripfeed.presentation')).toBe('newspaper')
+  await click('[data-story-id="120"]')
+  const frame = container.querySelector('iframe')
+  expect(frame).not.toBeNull()
+  const route = location.search
   await act(async () => {
-    desktop = false
-    resize()
+    vi.stubGlobal('innerWidth', 1600)
+    window.dispatchEvent(new Event('resize'))
   })
-  expect(container.querySelector('.item-list')).not.toBeNull()
-  expect(container.querySelector('[aria-label="Presentation"]')).toBeNull()
+  expect(container.querySelector('iframe')).toBe(frame)
+  expect(location.search).toBe(route)
   expect(localStorage.getItem('dripfeed.presentation')).toBe('newspaper')
-  await act(async () => {
-    desktop = true
-    resize()
-  })
-  expect(newspaper()).not.toBeNull()
 })
 
 it('requires explicit URL selection to mount/extract; returns scroll, render window and focus without hidden paging', async () => {

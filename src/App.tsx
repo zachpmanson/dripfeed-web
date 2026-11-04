@@ -30,7 +30,7 @@ export default function App() {
   // knows to reveal (expand folder + scroll) that feed in sync.
   const [revealNonce, setRevealNonce] = useState(0)
   const { sortMode, setSortMode, showMode, setShowMode } = useListPreferences()
-  const { presentation, setPresentation, desktop, newspaper } = usePresentation()
+  const { presentation, setPresentation, newspaper } = usePresentation()
   const backRef = useRef<HTMLButtonElement>(null)
   const store = useStore(settings, view, showMode === 'unread')
   useEffect(() => {
@@ -164,7 +164,6 @@ export default function App() {
       <AppHeader
         presentation={presentation}
         onPresentationChange={setPresentation}
-        desktop={desktop}
         showMode={showMode}
         onShowModeChange={setShowMode}
         sortMode={sortMode}

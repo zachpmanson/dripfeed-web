@@ -96,22 +96,9 @@ const newItem = item('https://new.example.com/article')
 let root: Root
 let container: HTMLDivElement
 let resetRequest: Promise<void> | undefined
-let desktop: boolean
-let resize: () => void
 
 beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
-  desktop = true
-  resize = () => {}
-  vi.stubGlobal('matchMedia', () => ({
-    get matches() {
-      return desktop
-    },
-    addEventListener: (_: string, listener: () => void) => {
-      resize = listener
-    },
-    removeEventListener: vi.fn(),
-  }))
   localStorage.clear()
   await resetLocal()
   saveSettings({ baseUrl: '', user: 'old reader', appPassword: 'password' })
@@ -217,7 +204,7 @@ it.each(['resolve', 'reject'] as const)(
   },
 )
 
-it.each(['select', 'narrow', 'list'] as const)(
+it.each(['select', 'list'] as const)(
   'binds a late newspaper reader mount (%s) to the old pool generation without caching a new-session attempt',
   async (transition) => {
     localStorage.setItem('dripfeed.presentation', 'newspaper')
@@ -234,11 +221,6 @@ it.each(['select', 'narrow', 'list'] as const)(
       await act(async () => {
         history.replaceState(null, '', '/?view=all&item=42')
         window.dispatchEvent(new PopStateEvent('popstate'))
-      })
-    } else if (transition === 'narrow') {
-      await act(async () => {
-        desktop = false
-        resize()
       })
     } else {
       await click('List')

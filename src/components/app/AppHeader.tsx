@@ -20,11 +20,9 @@ export default function AppHeader({
   onSettings,
   presentation = 'list',
   onPresentationChange,
-  desktop = false,
 }: {
   presentation?: Presentation
   onPresentationChange?: (mode: Presentation) => void
-  desktop?: boolean
   showMode: ShowMode
   onShowModeChange: (mode: ShowMode) => void
   sortMode: SortMode
@@ -58,7 +56,7 @@ export default function AppHeader({
             { value: 'rarity', label: 'Rarity', title: 'Weighted rarity: rare feeds first' },
           ]}
         />
-        {desktop && onPresentationChange && (
+        {onPresentationChange && (
           <Seg<Presentation>
             title="Presentation"
             value={presentation}
