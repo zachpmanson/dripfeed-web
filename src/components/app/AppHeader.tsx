@@ -4,6 +4,7 @@ import { IconButton } from '../ui/IconButton'
 import { Seg } from '../ui/Seg'
 import { Spinner } from '../ui/Spinner'
 import type { ShowMode, SortMode } from '../../views'
+import type { Presentation } from '../../hooks/usePresentation'
 
 export type { ShowMode, SortMode } from '../../views'
 
@@ -17,7 +18,13 @@ export default function AppHeader({
   onSync,
   onAdd,
   onSettings,
+  presentation = 'list',
+  onPresentationChange,
+  desktop = false,
 }: {
+  presentation?: Presentation
+  onPresentationChange?: (mode: Presentation) => void
+  desktop?: boolean
   showMode: ShowMode
   onShowModeChange: (mode: ShowMode) => void
   sortMode: SortMode
@@ -51,6 +58,17 @@ export default function AppHeader({
             { value: 'rarity', label: 'Rarity', title: 'Weighted rarity: rare feeds first' },
           ]}
         />
+        {desktop && onPresentationChange && (
+          <Seg<Presentation>
+            title="Presentation"
+            value={presentation}
+            onChange={onPresentationChange}
+            options={[
+              { value: 'list', label: 'List' },
+              { value: 'newspaper', label: 'Newspaper' },
+            ]}
+          />
+        )}
         <IconButton
           className={`add-btn sync${syncing ? ' syncing' : ''}`}
           title={`Refresh now — re-sync newest items, feeds and folders (${poolLength} local)`}

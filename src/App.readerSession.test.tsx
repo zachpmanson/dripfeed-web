@@ -26,8 +26,11 @@ vi.mock('./hooks/useThemePreferences', () => ({
 vi.mock('./components/feed/Sidebar', () => ({ Sidebar: () => null }))
 vi.mock('./components/items/ItemList', () => ({ ItemList: () => null }))
 vi.mock('./components/app/AppHeader', () => ({
-  default: ({ onSettings }: ComponentProps<typeof AppHeader>) => (
-    <button onClick={onSettings}>Settings</button>
+  default: ({ onSettings, onPresentationChange }: ComponentProps<typeof AppHeader>) => (
+    <>
+      <button onClick={onSettings}>Settings</button>
+      <button onClick={() => onPresentationChange?.('list')}>List</button>
+    </>
   ),
 }))
 vi.mock('./components/settings/SettingsForm', () => ({
@@ -93,9 +96,23 @@ const newItem = item('https://new.example.com/article')
 let root: Root
 let container: HTMLDivElement
 let resetRequest: Promise<void> | undefined
+let desktop: boolean
+let resize: () => void
 
 beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  desktop = true
+  resize = () => {}
+  vi.stubGlobal('matchMedia', () => ({
+    get matches() {
+      return desktop
+    },
+    addEventListener: (_: string, listener: () => void) => {
+      resize = listener
+    },
+    removeEventListener: vi.fn(),
+  }))
+  localStorage.clear()
   await resetLocal()
   saveSettings({ baseUrl: '', user: 'old reader', appPassword: 'password' })
   window.history.replaceState(null, '', '/?view=all&item=42')
@@ -197,6 +214,45 @@ it.each(['resolve', 'reject'] as const)(
     await signInToNewSession()
     expect(container.querySelector('iframe')).not.toBe(oldFrame)
     expect(extract.mock.calls.map(([target]) => target.url)).toEqual([oldItem.url, newItem.url])
+  },
+)
+
+it.each(['select', 'narrow', 'list'] as const)(
+  'binds a late newspaper reader mount (%s) to the old pool generation without caching a new-session attempt',
+  async (transition) => {
+    localStorage.setItem('dripfeed.presentation', 'newspaper')
+    window.history.replaceState(null, '', '/?view=all')
+    await render()
+    expect(container.querySelector('iframe')).toBeNull()
+    const extract = vi.mocked(mocks.store!.actions.extractFulltext)
+    expect(extract).not.toHaveBeenCalled()
+
+    await act(async () => resetLocal())
+    // Keep the old ready pool/settings visible across the real DB reset, then
+    // mount ItemView for the first time in this App lifetime.
+    if (transition === 'select') {
+      await act(async () => {
+        history.replaceState(null, '', '/?view=all&item=42')
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      })
+    } else if (transition === 'narrow') {
+      await act(async () => {
+        desktop = false
+        resize()
+      })
+    } else {
+      await click('List')
+    }
+    expect(container.querySelector('iframe')?.getAttribute('srcdoc')).toContain(oldItem.url)
+    expect(extract).not.toHaveBeenCalled()
+    await act(async () => extractButton().click())
+    expect(extract).not.toHaveBeenCalled()
+
+    await signInToNewSession()
+    expect(container.querySelector('iframe')?.getAttribute('srcdoc')).toContain(newItem.url)
+    expect(extract.mock.calls.map(([target]) => target.url)).toEqual([newItem.url])
+    await render()
+    expect(extract).toHaveBeenCalledOnce()
   },
 )
 

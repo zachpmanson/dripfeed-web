@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { NewsItem, NewsFeed } from '../../api/types'
 import type { RarityInfo } from '../../rarity'
 import type { LoadMoreProgress } from '../../store'
 import ItemRow from './ItemRow'
 import TrailingRow from './TrailingRow'
+import NewspaperStory from './NewspaperStory'
 
 /**
  * How many rows the list renders up front, and how many more each batch adds
@@ -21,6 +22,9 @@ const RENDER_BATCH = 50
 
 interface Props {
   items: NewsItem[]
+  newspaper?: boolean
+  active?: boolean
+  onStar?: (item: NewsItem) => void
   /**
    * Identity of the *view* this list belongs to — feed/folder/all/starred,
    * show mode and sort mode, but never the data. The render window restarts
@@ -46,6 +50,9 @@ interface Props {
 
 export function ItemList({
   items,
+  newspaper = false,
+  active = true,
+  onStar,
   windowKey,
   selectedId,
   feedTitle,
@@ -63,6 +70,63 @@ export function ItemList({
   loadingMore = false,
   paging = null,
 }: Props) {
+  const enabledRef = useRef(active)
+  enabledRef.current = active
+  const listRef = useRef<HTMLUListElement>(null)
+  const focusedStory = useRef<{ node: HTMLElement; index: number } | null>(null)
+  useEffect(() => {
+    // Removal sends focus to BODY without a focusin event. Explicit focus
+    // elsewhere (navigation, dialogs, etc.) relinquishes the list's ownership.
+    const onFocus = (event: FocusEvent) => {
+      if (!listRef.current?.contains(event.target as Node)) focusedStory.current = null
+    }
+    document.addEventListener('focusin', onFocus)
+    return () => document.removeEventListener('focusin', onFocus)
+  }, [])
+  const returnTo = useRef<{ id: number; scroll: number } | null>(null)
+  const wasActive = useRef(active)
+  const returnKey = useRef(windowKey)
+  useLayoutEffect(() => {
+    if (returnKey.current !== windowKey) {
+      returnTo.current = null
+      focusedStory.current = null
+      returnKey.current = windowKey
+    }
+    if (active && !wasActive.current) {
+      const list = listRef.current
+      if (list) {
+        list.scrollTop = returnTo.current?.scroll ?? 0
+        const story = returnTo.current
+          ? list.querySelector<HTMLButtonElement>(`[data-story-id="${returnTo.current.id}"]`)
+          : null
+        ;(story ?? list).focus({ preventScroll: true })
+      }
+    }
+    wasActive.current = active
+  }, [active, windowKey])
+  useLayoutEffect(() => {
+    const focused = focusedStory.current
+    if (!newspaper || !active) {
+      focusedStory.current = null
+      return
+    }
+    if (!focused || focused.node.isConnected) return
+    focusedStory.current = null
+    const list = listRef.current
+    // Only recover focus lost by removing a story, never a still-valid focus
+    // target outside this list. Prefer the next story, or the preceding last one.
+    if (list && (!document.activeElement || document.activeElement === document.body)) {
+      const stories = list.querySelectorAll<HTMLButtonElement>('[data-story-id]')
+      ;(stories[Math.min(focused.index, stories.length - 1)] ?? list).focus({
+        preventScroll: true,
+      })
+    }
+  })
+  const selectStory = (id: number) => {
+    returnTo.current = { id, scroll: listRef.current?.scrollTop ?? 0 }
+    onSelect(id)
+  }
+
   // The render window: how many of the caller's ordered items are in the DOM.
   // Held with the key of the view it belongs to, so a view change restarts it
   // during render — React's "adjust state when a prop changes" pattern, which
@@ -103,13 +167,13 @@ export function ItemList({
   // window touches no network, so it is never blocked by a fetch.
   const tailHasWork = limit < items.length || (moreServer && !drained)
   const workRef = useRef(tailHasWork)
-  workRef.current = tailHasWork
+  workRef.current = active && tailHasWork
   // The observer additionally stays quiet while a fetch is in flight (the next
   // scroll after it lands re-enters the margin, or the chain below re-checks),
   // so scrolling during a page doesn't stack calls; the store no-ops them
   // anyway.
   const activeRef = useRef(false)
-  activeRef.current = tailHasWork && !loadingMore
+  activeRef.current = active && tailHasWork && !loadingMore
   const itemsRef = useRef(items)
   itemsRef.current = items
   const limitRef = useRef(limit)
@@ -123,6 +187,7 @@ export function ItemList({
   //      data still pulls more data.
   const advanceRef = useRef<() => void>(() => {})
   advanceRef.current = () => {
+    if (!enabledRef.current) return
     if (limitRef.current < itemsRef.current.length) {
       setRenderWindow((w) => ({
         key: w.key,
@@ -148,7 +213,7 @@ export function ItemList({
   useEffect(() => {
     chain.current = false
     inFlight.current = false
-  }, [windowKey])
+  }, [windowKey, active])
 
   // Chained advance: after a batch lands, WAIT for the list to re-render (two
   // rAFs) before re-checking whether the sentinel is still near the viewport.
@@ -183,11 +248,11 @@ export function ItemList({
       alive = false
       cancelAnimationFrame(raf1)
     }
-  }, [items.length, renderCount])
+  }, [items.length, renderCount, active])
 
   useEffect(() => {
     const el = sentinelRef.current
-    if (!el) return
+    if (!el || !active) return
     const io = new IntersectionObserver(
       (entries) => {
         const e = entries[0]
@@ -209,7 +274,7 @@ export function ItemList({
     )
     io.observe(el)
     return () => io.disconnect()
-  }, [])
+  }, [active])
 
   // Order AND filtering are owned by the caller (App applies newest or rarity,
   // and the view/show-mode filters); never re-sort or re-filter here or the
@@ -219,22 +284,55 @@ export function ItemList({
   const rendered = limit >= items.length ? items : items.slice(0, limit)
 
   return (
-    <ul className="item-list m-0 flex-1 list-none overflow-y-auto border-r border-app-border p-0">
-      {rendered.map((item) => (
-        <ItemRow
-          key={item.id}
-          item={item}
-          selected={item.id === selectedId}
-          feedTitle={feedTitle}
-          feedById={feedById}
-          showFavicons={showFavicons}
-          singleClickRead={singleClickRead}
-          onSelect={onSelect}
-          onRead={onRead}
-          rarityMode={rarityMode}
-          rarityStats={rarityStats}
-        />
-      ))}
+    <ul
+      ref={listRef}
+      onFocusCapture={(event) => {
+        if (!newspaper || !active) return
+        const node = event.target as HTMLElement
+        const headline = node.closest('li')?.querySelector<HTMLButtonElement>('[data-story-id]')
+        focusedStory.current = headline
+          ? {
+              node,
+              index: [...event.currentTarget.querySelectorAll('[data-story-id]')].indexOf(headline),
+            }
+          : null
+      }}
+      tabIndex={-1}
+      aria-label={newspaper ? 'Newspaper stories' : 'Items'}
+      className={
+        newspaper
+          ? 'newspaper m-0 grid min-h-0 flex-1 list-none content-start gap-x-7 gap-y-6 overflow-y-auto bg-app-panel px-10 py-7'
+          : 'item-list m-0 flex-1 list-none overflow-y-auto border-r border-app-border p-0'
+      }
+    >
+      {rendered.map((item, index) =>
+        newspaper ? (
+          <NewspaperStory
+            key={item.id}
+            item={item}
+            lead={index === 0}
+            feedTitle={feedTitle}
+            singleClickRead={singleClickRead}
+            onSelect={selectStory}
+            onRead={onRead}
+            onStar={onStar}
+          />
+        ) : (
+          <ItemRow
+            key={item.id}
+            item={item}
+            selected={item.id === selectedId}
+            feedTitle={feedTitle}
+            feedById={feedById}
+            showFavicons={showFavicons}
+            singleClickRead={singleClickRead}
+            onSelect={onSelect}
+            onRead={onRead}
+            rarityMode={rarityMode}
+            rarityStats={rarityStats}
+          />
+        ),
+      )}
       {items.length === 0 && <li className="empty px-3 py-4 text-app-muted">{emptyText}</li>}
       <TrailingRow
         sentinelRef={sentinelRef}

@@ -859,3 +859,46 @@
     padding: 0.6rem 1rem;
   }
 }
+
+@font-face {
+  font-family: 'Paper Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/dripfeed-newspaper-slippy-serif.ttf') format('truetype');
+}
+
+/* Newspaper chrome only; reader HTML and user article CSS stay in their iframe. */
+.newspaper {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.newspaper > .newspaper-lead {
+  grid-column: span 2;
+  grid-row: span 2;
+  padding-inline-end: 1.75rem;
+  border-inline-end: 1px solid var(--border);
+}
+.newspaper > li:not(.newspaper-story) {
+  grid-column: 1 / -1;
+}
+.newspaper-headline,
+.newspaper-excerpt {
+  font-family: 'Paper Serif', Georgia, serif;
+  overflow-wrap: anywhere;
+}
+.newspaper-headline {
+  font-size: 1.65rem;
+  line-height: 1.18;
+  letter-spacing: -0.035em;
+}
+.newspaper-lead .newspaper-headline {
+  font-size: clamp(2.1rem, 3.1vw, 3.25rem);
+}
+.newspaper-excerpt {
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+.newspaper-lead .newspaper-excerpt {
+  font-size: 1.1rem;
+  line-height: 1.6;
+}

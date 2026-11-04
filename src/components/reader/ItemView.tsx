@@ -33,6 +33,8 @@ function baseHrefFor(url: string | null | undefined): string {
 
 interface Props {
   item: NewsItem | null
+  /** Database generation owning the supplied items, even if this reader mounts after a reset. */
+  ownerGeneration?: number
   feedTitle: (feedId: number) => string
   actions: ReturnType<typeof useStore>['actions']
   articleCssMode: ArticleCssMode
@@ -70,10 +72,11 @@ export function ItemView({
   recentBodies,
   autoExtract,
   onFeedClick,
+  ownerGeneration,
 }: Props) {
-  // A render caused by an old request must not adopt a reset database with
-  // the old item's props. App remounts this lifetime for a new login session.
-  const [dbGeneration] = useState(dbGetGeneration)
+  // Neither late mounts nor old request rerenders may adopt a reset database
+  // with old item props. App remounts this lifetime for a new login session.
+  const [dbGeneration] = useState(() => ownerGeneration ?? dbGetGeneration())
   const mountedRef = useRef(false)
   useEffect(() => {
     mountedRef.current = true

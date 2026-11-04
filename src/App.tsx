@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { dbGetGeneration } from './db'
 import useUrlState from './hooks/useUrlState'
 import useListPreferences from './hooks/useListPreferences'
+import usePresentation from './hooks/usePresentation'
 import useThemePreferences from './hooks/useThemePreferences'
 import { useStore } from './hooks'
 import { unreadScopeKey } from './store'
@@ -29,7 +30,12 @@ export default function App() {
   // knows to reveal (expand folder + scroll) that feed in sync.
   const [revealNonce, setRevealNonce] = useState(0)
   const { sortMode, setSortMode, showMode, setShowMode } = useListPreferences()
+  const { presentation, setPresentation, desktop, newspaper } = usePresentation()
+  const backRef = useRef<HTMLButtonElement>(null)
   const store = useStore(settings, view, showMode === 'unread')
+  useEffect(() => {
+    if (newspaper && selectedId !== null) backRef.current?.focus({ preventScroll: true })
+  }, [newspaper, selectedId, store.ready])
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
 
@@ -149,10 +155,16 @@ export default function App() {
   } = model
   const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
   const feedById = (feedId: number) => feeds.get(feedId)
+  // The list intentionally falls back to its first item. The front page must
+  // not mount that reader (or trigger full-text extraction) without a URL selection.
+  const newspaperReader = newspaper && selectedId !== null && selected?.id === selectedId
 
   return (
     <div className="app flex h-full flex-col bg-app-bg text-app-text">
       <AppHeader
+        presentation={presentation}
+        onPresentationChange={setPresentation}
+        desktop={desktop}
         showMode={showMode}
         onShowModeChange={setShowMode}
         sortMode={sortMode}
@@ -166,7 +178,9 @@ export default function App() {
 
       <ErrorToast error={store.error} onDismiss={store.actions.clearError} />
 
-      <main className="grid min-h-0 flex-1 grid-cols-[14rem_minmax(16rem,24rem)_1fr]">
+      <main
+        className={`grid min-h-0 flex-1 ${newspaper ? 'grid-cols-[14rem_minmax(0,1fr)]' : 'grid-cols-[14rem_minmax(16rem,24rem)_1fr]'}`}
+      >
         <Sidebar
           feeds={feeds}
           folders={folders}
@@ -182,11 +196,16 @@ export default function App() {
             setSelectedId(null)
           }}
         />
-        <div className="flex min-h-0 flex-col">
+        <div className={newspaperReader ? 'hidden' : 'flex min-h-0 min-w-0 flex-col'}>
           <ItemList
+            newspaper={newspaper}
+            active={!newspaperReader}
+            onStar={(item) => {
+              void store.actions.setStar(item, !item.starred)
+            }}
             items={visibleItems}
             windowKey={viewKey}
-            selectedId={selected?.id ?? null}
+            selectedId={newspaper ? selectedId : (selected?.id ?? null)}
             feedTitle={feedTitle}
             feedById={feedById}
             showFavicons={showFavicons}
@@ -207,22 +226,44 @@ export default function App() {
             paging={paging}
           />
         </div>
-        <ItemView
-          key={readerGeneration}
-          item={selected}
-          feedTitle={feedTitle}
-          actions={store.actions}
-          articleCssMode={articleCssMode}
-          articleCss={articleCss}
-          dimBoilerplate={dimBoilerplate}
-          recentBodies={recentBodies}
-          autoExtract={selected ? (feedById(selected.feedId)?.fullTextEnabled ?? false) : false}
-          onFeedClick={(feedId) => {
-            setView({ kind: 'feed', id: feedId })
-            setSelectedId(null)
-            setRevealNonce(revealNonce + 1)
-          }}
-        />
+        <div
+          className={
+            newspaper
+              ? newspaperReader
+                ? 'flex min-h-0 min-w-0 flex-col [&>article]:flex-1'
+                : 'hidden'
+              : 'contents'
+          }
+        >
+          {newspaperReader && (
+            <button
+              ref={backRef}
+              className="shrink-0 self-start border-0 bg-transparent px-6 py-3 text-sm text-app-muted hover:text-app-text"
+              onClick={() => setSelectedId(null)}
+            >
+              ← Back to front page
+            </button>
+          )}
+          {(!newspaper || newspaperReader) && (
+            <ItemView
+              key={readerGeneration}
+              ownerGeneration={readerGeneration}
+              item={selected}
+              feedTitle={feedTitle}
+              actions={store.actions}
+              articleCssMode={articleCssMode}
+              articleCss={articleCss}
+              dimBoilerplate={dimBoilerplate}
+              recentBodies={recentBodies}
+              autoExtract={selected ? (feedById(selected.feedId)?.fullTextEnabled ?? false) : false}
+              onFeedClick={(feedId) => {
+                setView({ kind: 'feed', id: feedId })
+                setSelectedId(null)
+                setRevealNonce(revealNonce + 1)
+              }}
+            />
+          )}
+        </div>
       </main>
       {showAdd && settings && (
         <AddModal
