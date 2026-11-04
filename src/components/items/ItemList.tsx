@@ -5,6 +5,8 @@ import type { LoadMoreProgress } from '../../store'
 import ItemRow from './ItemRow'
 import TrailingRow from './TrailingRow'
 import NewspaperStory from './NewspaperStory'
+import { newspaperRole } from './newspaperMosaic'
+import { useNewspaperMosaic } from './useNewspaperMosaic'
 
 /**
  * How many rows the list renders up front, and how many more each batch adds
@@ -282,6 +284,7 @@ export function ItemList({
   // the DOM — filter/order first, slice second, or a filtered view would render
   // fewer than a batch and miss matches.
   const rendered = limit >= items.length ? items : items.slice(0, limit)
+  useNewspaperMosaic(listRef, newspaper && active, rendered)
 
   return (
     <ul
@@ -301,7 +304,7 @@ export function ItemList({
       aria-label={newspaper ? 'Newspaper stories' : 'Items'}
       className={
         newspaper
-          ? 'newspaper m-0 grid min-h-0 flex-1 list-none content-start gap-x-7 gap-y-6 overflow-y-auto bg-app-panel px-10 py-7'
+          ? 'newspaper m-0 grid min-h-0 flex-1 list-none content-start gap-x-7 overflow-y-auto bg-app-panel px-10 py-7'
           : 'item-list m-0 flex-1 list-none overflow-y-auto border-r border-app-border p-0'
       }
     >
@@ -310,7 +313,7 @@ export function ItemList({
           <NewspaperStory
             key={item.id}
             item={item}
-            lead={index === 0}
+            role={newspaperRole(index)}
             feedTitle={feedTitle}
             singleClickRead={singleClickRead}
             onSelect={selectStory}

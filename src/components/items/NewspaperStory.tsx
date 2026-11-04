@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import type { NewsItem } from '../../api/types'
 import { previewExcerpt, previewImage, previewTitle } from './newspaperPreview'
+import { newspaperColumns, newspaperExcerptLimit, type NewspaperRole } from './newspaperMosaic'
 
 export default function NewspaperStory({
   item,
-  lead,
+  role,
   feedTitle,
   singleClickRead,
   onSelect,
@@ -12,20 +13,42 @@ export default function NewspaperStory({
   onStar,
 }: {
   item: NewsItem
-  lead: boolean
+  role: NewspaperRole
   feedTitle: (feedId: number) => string
   singleClickRead: boolean
   onSelect: (id: number) => void
   onRead: (item: NewsItem) => void
   onStar?: (item: NewsItem) => void
 }) {
-  const excerpt = useMemo(() => previewExcerpt(item), [item])
-  const image = lead ? previewImage(item) : null
+  const excerpt = useMemo(() => previewExcerpt(item, newspaperExcerptLimit(role)), [item, role])
+  const image =
+    role === 'lead' || role === 'feature' || role === 'image' ? previewImage(item) : null
   const [failedImage, setFailedImage] = useState<string | null>(null)
   const title = useMemo(() => previewTitle(item), [item])
+  const imagePreview = image && (
+    <div
+      className={`my-5 overflow-hidden bg-app-bg ${role === 'image' ? 'aspect-[1.5]' : 'aspect-[2.28]'}`}
+    >
+      {failedImage !== image ? (
+        <img
+          className="h-full w-full object-cover"
+          src={image}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setFailedImage(image)}
+        />
+      ) : (
+        <span className="flex h-full items-center justify-center text-xs text-app-muted">
+          Image unavailable
+        </span>
+      )}
+    </div>
+  )
   return (
     <li
-      className={`newspaper-story min-w-0 border-b border-app-border pb-6 ${lead ? 'newspaper-lead' : ''}`}
+      className={`newspaper-story newspaper-${role} mb-6 min-w-0 border-b border-app-border pb-6 ${newspaperColumns(role) === 2 ? 'col-span-2' : ''}`}
     >
       <article dir={item.rtl ? 'rtl' : 'auto'}>
         <div className="mb-3 flex flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-widest text-app-muted">
@@ -53,6 +76,7 @@ export default function NewspaperStory({
             {title}
           </button>
         </h2>
+        {role === 'image' && imagePreview}
         {excerpt && (
           <p
             className={`newspaper-excerpt m-0 ${item.unread ? 'text-app-text' : 'text-app-muted'}`}
@@ -60,25 +84,7 @@ export default function NewspaperStory({
             {excerpt}
           </p>
         )}
-        {image && (
-          <div className="mt-5 aspect-[2.28] overflow-hidden bg-app-bg">
-            {failedImage !== image ? (
-              <img
-                className="h-full w-full object-cover"
-                src={image}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                referrerPolicy="no-referrer"
-                onError={() => setFailedImage(image)}
-              />
-            ) : (
-              <span className="flex h-full items-center justify-center text-xs text-app-muted">
-                Image unavailable
-              </span>
-            )}
-          </div>
-        )}
+        {role !== 'image' && imagePreview}
         <div className="mt-4 flex flex-wrap gap-3 text-xs text-app-muted">
           <button
             className={`min-h-8 rounded-none border-0 bg-transparent px-0 hover:text-app-text ${item.starred ? 'text-app-accent' : ''}`}

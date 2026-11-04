@@ -152,11 +152,29 @@ it('requires explicit URL selection to mount/extract; returns scroll, render win
   expect(container.querySelector('iframe')).toBeNull()
   expect(mocks.store!.actions.extractFulltext).not.toHaveBeenCalled()
   expect(mocks.store!.actions.setRead).not.toHaveBeenCalled()
-  expect(newspaper().querySelectorAll('[data-story-id]')).toHaveLength(50)
+  const storyIds = () =>
+    [...newspaper().querySelectorAll('[data-story-id]')].map((node) =>
+      Number(node.getAttribute('data-story-id')),
+    )
+  expect(storyIds()).toEqual(Array.from({ length: 50 }, (_, i) => 120 - i))
+  expect(newspaper().querySelectorAll('.newspaper-lead')).toHaveLength(1)
+  expect(
+    newspaper()
+      .querySelector('[data-story-id="120"]')
+      ?.closest('li')
+      ?.classList.contains('col-span-2'),
+  ).toBe(true)
+  expect(
+    newspaper()
+      .querySelector('[data-story-id="116"]')
+      ?.closest('li')
+      ?.classList.contains('newspaper-feature'),
+  ).toBe(true)
   await act(async () =>
     observe([{ isIntersecting: true }] as IntersectionObserverEntry[], {} as IntersectionObserver),
   )
-  expect(newspaper().querySelectorAll('[data-story-id]')).toHaveLength(100)
+  expect(storyIds()).toEqual(Array.from({ length: 100 }, (_, i) => 120 - i))
+  expect(newspaper().querySelectorAll('.newspaper-lead')).toHaveLength(1)
   newspaper().scrollTop = 900
   await click('[data-story-id="120"]')
   expect(location.search).toContain('item=120')

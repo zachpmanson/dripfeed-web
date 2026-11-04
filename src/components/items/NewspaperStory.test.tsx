@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { NewsItem } from '../../api/types'
 import NewspaperStory from './NewspaperStory'
+import type { NewspaperRole } from './newspaperMosaic'
 
 let root: Root, container: HTMLDivElement
 beforeEach(() => {
@@ -30,7 +31,7 @@ const item = {
   mediaThumbnail: '/image.png',
 } as NewsItem
 
-const render = async (story = item, lead = true) => {
+const render = async (story = item, role: NewspaperRole = 'lead') => {
   const onSelect = vi.fn(),
     onRead = vi.fn(),
     onStar = vi.fn()
@@ -39,7 +40,7 @@ const render = async (story = item, lead = true) => {
       <ul>
         <NewspaperStory
           item={story}
-          lead={lead}
+          role={role}
           feedTitle={() => 'Feed'}
           singleClickRead
           onSelect={onSelect}
@@ -80,7 +81,7 @@ it('inherits read/unread headline color, retains RTL, and uses focusable native 
   expect(headline.closest('article')?.getAttribute('dir')).toBe('auto')
 })
 
-it('falls back after an image error, retries changed metadata and omits non-lead images', async () => {
+it('falls back after an image error, retries changed metadata and omits brief images', async () => {
   await render()
   const image = container.querySelector('img')!
   expect(image.getAttribute('alt')).toBe('')
@@ -94,7 +95,48 @@ it('falls back after an image error, retries changed metadata and omits non-lead
   expect(container.querySelector('img')?.getAttribute('src')).toBe(
     'https://fixture.invalid/replacement.png',
   )
-  await render(item, false)
+  await render(item, 'brief')
   expect(container.querySelector('img')).toBeNull()
   expect(container.textContent).not.toContain('Image unavailable')
+})
+
+it.each(['feature', 'image'] as const)(
+  'uses safe metadata on %s tiles with the same broken-image fallback',
+  async (role) => {
+    await render(item, role)
+    expect(container.querySelector('li')?.classList.contains(`newspaper-${role}`)).toBe(true)
+    expect(container.querySelector('li')?.classList.contains('col-span-2')).toBe(role === 'feature')
+    const image = container.querySelector('img')!
+    expect(image.getAttribute('src')).toBe('https://fixture.invalid/image.png')
+    if (role === 'image') {
+      expect(
+        image.compareDocumentPosition(container.querySelector('p')!) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+    }
+    await act(async () => image.dispatchEvent(new Event('error')))
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.textContent).toContain('Image unavailable')
+    await render(
+      {
+        ...item,
+        mediaThumbnail: 'javascript:bad',
+        enclosureMime: 'audio/mp3',
+        body: '<img src="https://never.invalid/body"><p>Safe</p>',
+      },
+      role,
+    )
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.textContent).not.toContain('Image unavailable')
+    expect(container.querySelector('p')?.textContent).toBe('Safe')
+  },
+)
+
+it('varies excerpt lengths without truncating headlines or adding unsafe markup', async () => {
+  const story = { ...item, title: 'A complete headline', body: `<p>${'word '.repeat(150)}</p>` }
+  await render(story, 'brief')
+  expect(container.querySelector('p')!.textContent!.length).toBeLessThanOrEqual(161)
+  await render(story, 'feature')
+  expect(container.querySelector('p')!.textContent!.length).toBeGreaterThan(160)
+  expect(container.querySelector('[data-story-id]')!.textContent).toBe(story.title)
 })

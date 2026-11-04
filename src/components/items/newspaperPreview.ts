@@ -59,6 +59,6 @@ export function previewTitle(item: NewsItem): string {
   return text.match(/^[^.?!]*[.?!]/)?.[0] ?? (text || '(untitled)')
 }
 
-export function previewExcerpt(item: NewsItem): string {
-  return plainExcerpt(item.intro ?? '') || plainExcerpt(item.body)
+export function previewExcerpt(item: NewsItem, limit = 320): string {
+  return plainExcerpt(item.intro ?? '', limit) || plainExcerpt(item.body, limit)
 }

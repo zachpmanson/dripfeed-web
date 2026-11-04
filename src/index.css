@@ -871,15 +871,21 @@
 /* Newspaper chrome only; reader HTML and user article CSS stay in their iframe. */
 .newspaper {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Fine rows are measured from natural content (see newspaperMosaic.ts).
+     Sparse placement deliberately keeps top-edge reading order, not dense backfill. */
+  grid-auto-rows: 4px;
+  grid-auto-flow: row;
 }
-.newspaper > .newspaper-lead {
-  grid-column: span 2;
-  grid-row: span 2;
+.newspaper > .newspaper-lead,
+.newspaper > .newspaper-feature {
   padding-inline-end: 1.75rem;
   border-inline-end: 1px solid var(--border);
 }
 .newspaper > li:not(.newspaper-story) {
   grid-column: 1 / -1;
+  /* Measure status/paging rows at natural height, independent of their row span. */
+  align-self: start;
+  min-height: max-content;
 }
 .newspaper-headline,
 .newspaper-excerpt {
@@ -890,6 +896,12 @@
   font-size: 1.65rem;
   line-height: 1.18;
   letter-spacing: -0.035em;
+}
+.newspaper-feature .newspaper-headline {
+  font-size: clamp(1.8rem, 2.5vw, 2.5rem);
+}
+.newspaper-brief .newspaper-headline {
+  font-size: 1.4rem;
 }
 .newspaper-lead .newspaper-headline {
   font-size: clamp(2.1rem, 3.1vw, 3.25rem);
