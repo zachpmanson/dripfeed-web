@@ -868,18 +868,14 @@
   src: url('/fonts/dripfeed-newspaper-slippy-serif.ttf') format('truetype');
 }
 
-/* Newspaper chrome only; reader HTML and user article CSS stay in their iframe. */
+/* Newspaper chrome only; reader HTML and user article CSS stay in their iframe.
+   All stories use the same bottom rule; side rules fragment an uneven mosaic. */
 .newspaper {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   /* Fine rows are measured from natural content (see newspaperMosaic.ts).
      Sparse placement deliberately keeps top-edge reading order, not dense backfill. */
   grid-auto-rows: 4px;
   grid-auto-flow: row;
-}
-.newspaper > .newspaper-lead,
-.newspaper > .newspaper-feature {
-  padding-inline-end: 1.75rem;
-  border-inline-end: 1px solid var(--border);
 }
 .newspaper > li:not(.newspaper-story) {
   grid-column: 1 / -1;

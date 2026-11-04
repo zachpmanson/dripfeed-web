@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+/// <reference types="vite/client" />
+import newspaperCss from '../../index.css?raw'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -131,6 +133,25 @@ it.each(['feature', 'image'] as const)(
     expect(container.querySelector('p')?.textContent).toBe('Safe')
   },
 )
+
+it.each(['lead', 'feature', 'brief', 'image', 'standard'] as const)(
+  'uses the same bottom separator and spacing for %s stories',
+  async (role) => {
+    await render(item, role)
+    const tile = container.querySelector('li')!
+    expect(tile.classList.contains('border-b')).toBe(true)
+    expect(tile.classList.contains('border-app-border')).toBe(true)
+    expect(tile.classList.contains('pb-6')).toBe(true)
+    expect(tile.classList.contains('mb-6')).toBe(true)
+  },
+)
+
+it('does not introduce role-specific side rules into the newspaper mosaic', () => {
+  // Source-style invariant only, not a computed browser layout assertion.
+  expect(newspaperCss).not.toMatch(
+    /\.newspaper[^{}]*\{[^{}]*\bborder-(?:inline-(?:start|end)|left|right)\s*:/,
+  )
+})
 
 it('varies excerpt lengths without truncating headlines or adding unsafe markup', async () => {
   const story = { ...item, title: 'A complete headline', body: `<p>${'word '.repeat(150)}</p>` }
