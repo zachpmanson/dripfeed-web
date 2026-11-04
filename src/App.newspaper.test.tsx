@@ -104,6 +104,7 @@ const selectNewspaper = async () => {
   await act(async () => button.click())
 }
 const newspaper = () => container.querySelector<HTMLUListElement>('.newspaper')!
+const newspaperScroll = () => container.querySelector<HTMLDivElement>('.newspaper-scroll')!
 
 it.each([360, 768, 1100, 1600])(
   'shows both mode controls at %spx and keeps the selected mode through resize',
@@ -128,6 +129,7 @@ it.each([360, 768, 1100, 1600])(
     )!
     await act(async () => list.click())
     expect(container.querySelector('.item-list')).not.toBeNull()
+    expect(container.querySelector('[aria-label="Back"]')).toBeNull()
     expect(localStorage.getItem('dripfeed.presentation')).toBe('list')
   },
 )
@@ -163,11 +165,21 @@ it('requires explicit URL selection to mount/extract; returns scroll, render win
     )
   expect(storyIds()).toEqual(Array.from({ length: 50 }, (_, i) => 120 - i))
   expect(newspaper().querySelectorAll('.newspaper-lead')).toHaveLength(1)
+  expect(newspaper().parentElement).toBe(newspaperScroll())
+  expect(newspaperScroll().classList.contains('overflow-y-auto')).toBe(true)
+  expect(newspaperScroll().classList.contains('min-h-0')).toBe(true)
+  expect(newspaper().classList.contains('overflow-y-auto')).toBe(false)
+  expect(newspaper().classList.contains('flex-1')).toBe(false)
+  expect(newspaper().classList.contains('grid')).toBe(false)
+  expect(newspaper().querySelectorAll('[class*="[column-span:all]"]')).toHaveLength(1)
+  expect([...newspaper().children].every((node) => !(node as HTMLElement).style.gridRowEnd)).toBe(
+    true,
+  )
   expect(
     newspaper()
       .querySelector('[data-story-id="120"]')
       ?.closest('li')
-      ?.classList.contains('col-span-2'),
+      ?.classList.contains('[column-span:all]'),
   ).toBe(true)
   expect(
     newspaper()
@@ -180,13 +192,13 @@ it('requires explicit URL selection to mount/extract; returns scroll, render win
   )
   expect(storyIds()).toEqual(Array.from({ length: 100 }, (_, i) => 120 - i))
   expect(newspaper().querySelectorAll('.newspaper-lead')).toHaveLength(1)
-  newspaper().scrollTop = 900
+  newspaperScroll().scrollTop = 900
   await click('[data-story-id="120"]')
   expect(location.search).toContain('item=120')
   expect(container.querySelector('iframe')).not.toBeNull()
   expect(mocks.store!.actions.extractFulltext).toHaveBeenCalledTimes(1)
-  expect(document.activeElement?.textContent).toContain('Back to front page')
-  expect(newspaper().parentElement?.className).toBe('hidden')
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('Back')
+  expect(newspaperScroll().parentElement?.className).toBe('hidden')
   const count = newspaper().querySelectorAll('[data-story-id]').length
   // Even a queued observer delivery after disconnect must stay quiet.
   await act(async () =>
@@ -195,11 +207,20 @@ it('requires explicit URL selection to mount/extract; returns scroll, render win
   expect(newspaper().querySelectorAll('[data-story-id]')).toHaveLength(count)
   expect(mocks.store!.loadMore).not.toHaveBeenCalled()
   expect(disconnected).toHaveBeenCalled()
-  const back = [...container.querySelectorAll<HTMLButtonElement>('button')].find((b) =>
-    b.textContent?.includes('Back to front page'),
-  )!
+  const back = container.querySelector<HTMLButtonElement>('[aria-label="Back"]')!
+  // Shared title/header wrapper wiring, not a pixel-alignment assertion.
+  const titleLine = back.parentElement!
+  expect(titleLine.classList.contains('flex')).toBe(true)
+  expect(titleLine.classList.contains('min-w-0')).toBe(true)
+  expect(titleLine.querySelector('h2')?.textContent).toBe('Story 120')
+  const header = titleLine.parentElement!
+  expect(header.querySelector('[aria-label="Star"]')).not.toBeNull()
+  expect(header.querySelector('[aria-label^="Extract full article"]')).not.toBeNull()
+  expect(header.querySelector('[aria-label="Mark read"]')).not.toBeNull()
+  expect(header.parentElement?.tagName).toBe('ARTICLE')
+  expect(header.parentElement?.firstElementChild).toBe(header)
   await act(async () => back.click())
-  expect(newspaper().scrollTop).toBe(900)
+  expect(newspaperScroll().scrollTop).toBe(900)
   expect(document.activeElement?.getAttribute('data-story-id')).toBe('120')
   expect(newspaper().querySelectorAll('[data-story-id]')).toHaveLength(100)
   expect(container.querySelector('iframe')).toBeNull()
@@ -321,7 +342,7 @@ it('honors deep links/popstate and never opens a fallback for an unavailable exp
     window.dispatchEvent(new PopStateEvent('popstate'))
   })
   expect(container.querySelector('iframe')).toBeNull()
-  expect(newspaper().parentElement?.className).not.toBe('hidden')
+  expect(newspaperScroll().parentElement?.className).not.toBe('hidden')
 })
 
 it('uses invalid preferences as list and tolerates storage that throws', async () => {

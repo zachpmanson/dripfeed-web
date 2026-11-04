@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 
@@ -31,6 +31,10 @@ function buildTime(): string {
 }
 
 export default defineConfig({
+  test: {
+    // Vitest otherwise stubs even ?raw CSS imports to an empty string.
+    css: { include: [/index\.css\?raw$/] },
+  },
   define: {
     __GIT_SHA__: JSON.stringify(gitSha()),
     __BUILD_TIME__: JSON.stringify(buildTime()),

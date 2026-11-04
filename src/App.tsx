@@ -234,20 +234,24 @@ export default function App() {
               : 'contents'
           }
         >
-          {newspaperReader && (
-            <button
-              ref={backRef}
-              className="shrink-0 self-start border-0 bg-transparent px-6 py-3 text-sm text-app-muted hover:text-app-text"
-              onClick={() => setSelectedId(null)}
-            >
-              ← Back to front page
-            </button>
-          )}
           {(!newspaper || newspaperReader) && (
             <ItemView
               key={readerGeneration}
               ownerGeneration={readerGeneration}
               item={selected}
+              titlePrefix={
+                newspaperReader ? (
+                  <button
+                    ref={backRef}
+                    type="button"
+                    aria-label="Back"
+                    className="inline-flex min-h-8 shrink-0 items-center gap-1 border-0 bg-transparent px-1 text-sm text-app-muted hover:text-app-text"
+                    onClick={() => setSelectedId(null)}
+                  >
+                    <span aria-hidden="true">←</span> Back
+                  </button>
+                ) : undefined
+              }
               feedTitle={feedTitle}
               actions={store.actions}
               articleCssMode={articleCssMode}

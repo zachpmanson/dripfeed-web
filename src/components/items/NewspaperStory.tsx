@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { NewsItem } from '../../api/types'
 import { previewExcerpt, previewImage, previewTitle } from './newspaperPreview'
-import { newspaperColumns, newspaperExcerptLimit, type NewspaperRole } from './newspaperMosaic'
+import { newspaperExcerptLimit, type NewspaperRole } from './newspaperPresentation'
 
 export default function NewspaperStory({
   item,
@@ -27,7 +27,7 @@ export default function NewspaperStory({
   const title = useMemo(() => previewTitle(item), [item])
   const imagePreview = image && (
     <div
-      className={`my-5 overflow-hidden bg-app-bg ${role === 'image' ? 'aspect-[1.5]' : 'aspect-[2.28]'}`}
+      className={`my-5 overflow-hidden bg-app-bg ${role === 'image' ? 'aspect-[1.5]' : 'aspect-[2.28]'} ${role === 'lead' ? 'max-h-80' : ''}`}
     >
       {failedImage !== image ? (
         <img
@@ -48,7 +48,7 @@ export default function NewspaperStory({
   )
   return (
     <li
-      className={`newspaper-story newspaper-${role} mb-6 min-w-0 border-b border-app-border pb-6 ${newspaperColumns(role) === 2 ? 'col-span-2' : ''}`}
+      className={`newspaper-story newspaper-${role} mb-6 min-w-0 border-b border-app-border pb-6 [break-inside:avoid-column] ${role === 'lead' ? '[column-span:all]' : ''}`}
     >
       <article dir={item.rtl ? 'rtl' : 'auto'}>
         <div className="mb-3 flex flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-widest text-app-muted">

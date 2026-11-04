@@ -1,5 +1,6 @@
 import { DocumentTextIcon, StarIcon } from '@heroicons/react/24/outline'
 import { StarIcon as SolidStarIcon } from '@heroicons/react/24/solid'
+import type { ReactNode } from 'react'
 import type { NewsItem } from '../../api/types'
 import type { useStore } from '../../hooks'
 import { titleFor } from '../../utils'
@@ -8,6 +9,7 @@ import { Spinner } from '../ui/Spinner'
 
 export default function ReaderHeader({
   item,
+  titlePrefix,
   actions,
   extracting,
   extractError,
@@ -15,6 +17,7 @@ export default function ReaderHeader({
   onExtract,
 }: {
   item: NewsItem
+  titlePrefix?: ReactNode
   actions: ReturnType<typeof useStore>['actions']
   extracting: boolean
   extractError: string | null
@@ -23,16 +26,19 @@ export default function ReaderHeader({
 }) {
   return (
     <div className="m-0 flex items-start justify-between gap-3">
-      <h2 className="m-0 text-[1.15rem] leading-[1.3] font-bold">
-        <a
-          className="text-app-text no-underline hover:underline"
-          href={item.url}
-          target="_blank"
-          rel="noreferrer"
-        >
-          {titleFor(item)}
-        </a>
-      </h2>
+      <div className="flex min-w-0 items-start gap-2">
+        {titlePrefix}
+        <h2 className="m-0 min-w-0 text-[1.15rem] leading-[1.3] font-bold [overflow-wrap:anywhere]">
+          <a
+            className="text-app-text no-underline hover:underline"
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {titleFor(item)}
+          </a>
+        </h2>
+      </div>
       <div className="m-0 flex shrink-0 gap-[0.4rem]">
         <IconButton
           variant="bare"

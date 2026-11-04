@@ -869,19 +869,15 @@
 }
 
 /* Newspaper chrome only; reader HTML and user article CSS stay in their iframe.
-   All stories use the same bottom rule; side rules fragment an uneven mosaic. */
+   Columns need an auto-height list inside the separate vertical scroller; a
+   constrained multicol height would grow additional columns horizontally.
+   Native balancing may reflow stories when a batch is appended or removed. */
 .newspaper {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  /* Fine rows are measured from natural content (see newspaperMosaic.ts).
-     Sparse placement deliberately keeps top-edge reading order, not dense backfill. */
-  grid-auto-rows: 4px;
-  grid-auto-flow: row;
+  columns: 17rem 4;
+  column-gap: 1.75rem;
 }
 .newspaper > li:not(.newspaper-story) {
-  grid-column: 1 / -1;
-  /* Measure status/paging rows at natural height, independent of their row span. */
-  align-self: start;
-  min-height: max-content;
+  column-span: all;
 }
 .newspaper-headline,
 .newspaper-excerpt {

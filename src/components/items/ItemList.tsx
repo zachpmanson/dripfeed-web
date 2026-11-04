@@ -5,8 +5,7 @@ import type { LoadMoreProgress } from '../../store'
 import ItemRow from './ItemRow'
 import TrailingRow from './TrailingRow'
 import NewspaperStory from './NewspaperStory'
-import { newspaperRole } from './newspaperMosaic'
-import { useNewspaperMosaic } from './useNewspaperMosaic'
+import { newspaperRole } from './newspaperPresentation'
 
 /**
  * How many rows the list renders up front, and how many more each batch adds
@@ -75,6 +74,7 @@ export function ItemList({
   const enabledRef = useRef(active)
   enabledRef.current = active
   const listRef = useRef<HTMLUListElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const focusedStory = useRef<{ node: HTMLElement; index: number } | null>(null)
   useEffect(() => {
     // Removal sends focus to BODY without a focusin event. Explicit focus
@@ -97,7 +97,7 @@ export function ItemList({
     if (active && !wasActive.current) {
       const list = listRef.current
       if (list) {
-        list.scrollTop = returnTo.current?.scroll ?? 0
+        if (scrollRef.current) scrollRef.current.scrollTop = returnTo.current?.scroll ?? 0
         const story = returnTo.current
           ? list.querySelector<HTMLButtonElement>(`[data-story-id="${returnTo.current.id}"]`)
           : null
@@ -125,7 +125,7 @@ export function ItemList({
     }
   })
   const selectStory = (id: number) => {
-    returnTo.current = { id, scroll: listRef.current?.scrollTop ?? 0 }
+    returnTo.current = { id, scroll: scrollRef.current?.scrollTop ?? 0 }
     onSelect(id)
   }
 
@@ -284,67 +284,77 @@ export function ItemList({
   // the DOM — filter/order first, slice second, or a filtered view would render
   // fewer than a batch and miss matches.
   const rendered = limit >= items.length ? items : items.slice(0, limit)
-  useNewspaperMosaic(listRef, newspaper && active, rendered)
 
   return (
-    <ul
-      ref={listRef}
-      onFocusCapture={(event) => {
-        if (!newspaper || !active) return
-        const node = event.target as HTMLElement
-        const headline = node.closest('li')?.querySelector<HTMLButtonElement>('[data-story-id]')
-        focusedStory.current = headline
-          ? {
-              node,
-              index: [...event.currentTarget.querySelectorAll('[data-story-id]')].indexOf(headline),
-            }
-          : null
-      }}
-      tabIndex={-1}
-      aria-label={newspaper ? 'Newspaper stories' : 'Items'}
+    <div
+      ref={scrollRef}
       className={
         newspaper
-          ? 'newspaper m-0 grid min-h-0 flex-1 list-none content-start gap-x-7 overflow-y-auto bg-app-panel px-10 py-7'
-          : 'item-list m-0 flex-1 list-none overflow-y-auto border-r border-app-border p-0'
+          ? 'newspaper-scroll min-h-0 flex-1 overflow-y-auto bg-app-panel px-10 py-7'
+          : 'contents'
       }
     >
-      {rendered.map((item, index) =>
-        newspaper ? (
-          <NewspaperStory
-            key={item.id}
-            item={item}
-            role={newspaperRole(index)}
-            feedTitle={feedTitle}
-            singleClickRead={singleClickRead}
-            onSelect={selectStory}
-            onRead={onRead}
-            onStar={onStar}
-          />
-        ) : (
-          <ItemRow
-            key={item.id}
-            item={item}
-            selected={item.id === selectedId}
-            feedTitle={feedTitle}
-            feedById={feedById}
-            showFavicons={showFavicons}
-            singleClickRead={singleClickRead}
-            onSelect={onSelect}
-            onRead={onRead}
-            rarityMode={rarityMode}
-            rarityStats={rarityStats}
-          />
-        ),
-      )}
-      {items.length === 0 && <li className="empty px-3 py-4 text-app-muted">{emptyText}</li>}
-      <TrailingRow
-        sentinelRef={sentinelRef}
-        onLoadMore={onLoadMore}
-        moreServer={moreServer}
-        drained={drained}
-        loadingMore={loadingMore}
-        paging={paging}
-      />
-    </ul>
+      <ul
+        ref={listRef}
+        onFocusCapture={(event) => {
+          if (!newspaper || !active) return
+          const node = event.target as HTMLElement
+          const headline = node.closest('li')?.querySelector<HTMLButtonElement>('[data-story-id]')
+          focusedStory.current = headline
+            ? {
+                node,
+                index: [...event.currentTarget.querySelectorAll('[data-story-id]')].indexOf(
+                  headline,
+                ),
+              }
+            : null
+        }}
+        tabIndex={-1}
+        aria-label={newspaper ? 'Newspaper stories' : 'Items'}
+        className={
+          newspaper
+            ? 'newspaper m-0 list-none p-0'
+            : 'item-list m-0 flex-1 list-none overflow-y-auto border-r border-app-border p-0'
+        }
+      >
+        {rendered.map((item, index) =>
+          newspaper ? (
+            <NewspaperStory
+              key={item.id}
+              item={item}
+              role={newspaperRole(index)}
+              feedTitle={feedTitle}
+              singleClickRead={singleClickRead}
+              onSelect={selectStory}
+              onRead={onRead}
+              onStar={onStar}
+            />
+          ) : (
+            <ItemRow
+              key={item.id}
+              item={item}
+              selected={item.id === selectedId}
+              feedTitle={feedTitle}
+              feedById={feedById}
+              showFavicons={showFavicons}
+              singleClickRead={singleClickRead}
+              onSelect={onSelect}
+              onRead={onRead}
+              rarityMode={rarityMode}
+              rarityStats={rarityStats}
+            />
+          ),
+        )}
+        {items.length === 0 && <li className="empty px-3 py-4 text-app-muted">{emptyText}</li>}
+        <TrailingRow
+          sentinelRef={sentinelRef}
+          onLoadMore={onLoadMore}
+          moreServer={moreServer}
+          drained={drained}
+          loadingMore={loadingMore}
+          paging={paging}
+        />
+      </ul>
+    </div>
   )
 }
