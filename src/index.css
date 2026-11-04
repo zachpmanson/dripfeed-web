@@ -873,7 +873,7 @@
    constrained multicol height would grow additional columns horizontally.
    Native balancing may reflow stories when a batch is appended or removed. */
 .newspaper {
-  columns: 17rem 4;
+  columns: 17rem 3;
   column-gap: 1.75rem;
 }
 .newspaper > li:not(.newspaper-story) {

@@ -164,10 +164,10 @@ it('varies excerpt lengths without truncating headlines or adding unsafe markup'
   expect(container.querySelector('[data-story-id]')!.textContent).toBe(story.title)
 })
 
-it('uses native balanced columns with a bounded count, not a measured row grid', () => {
+it('uses native balanced columns capped at three, not a measured row grid', () => {
   // Source invariants only: jsdom does not perform multicol layout.
   const columns = newspaperCss.match(/\.newspaper\s*\{([^}]+)\}/)![1]
-  expect(columns).toMatch(/columns:\s*17rem 4;/)
+  expect(columns).toMatch(/columns:\s*17rem 3;/)
   expect(columns).toMatch(/column-gap:\s*1.75rem;/)
   expect(columns).not.toMatch(/\b(?:height|max-height|grid[^:;]*):/)
   expect(newspaperCss).not.toMatch(/grid-auto-rows:/)
