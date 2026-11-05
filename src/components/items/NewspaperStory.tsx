@@ -67,8 +67,11 @@ export default memo(function NewspaperStory({
       className={`newspaper-story newspaper-${role} mb-6 min-w-0 border-b border-app-border pb-6`}
     >
       <article dir={item.rtl ? 'rtl' : 'auto'}>
-        <header className="mb-3 flex items-start justify-between gap-3">
-          <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-widest text-app-muted">
+        <header dir="ltr" className="mb-3 flex items-start justify-between gap-3">
+          <div
+            dir="auto"
+            className="flex min-h-8 min-w-0 flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-widest text-app-muted"
+          >
             <span className="inline-flex min-w-0 max-w-full items-center gap-2">
               {feed && <FeedIcon feed={feed} />}
               <span className="min-w-0 [overflow-wrap:anywhere]">{feedTitle(item.feedId)}</span>

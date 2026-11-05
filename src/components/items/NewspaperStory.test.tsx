@@ -90,10 +90,13 @@ it.each(['lead', 'brief'] as const)(
     const article = container.querySelector('article')!
     const header = article.firstElementChild!
     expect(header.tagName).toBe('HEADER')
+    expect(article.getAttribute('dir')).toBe('rtl')
+    expect(header.getAttribute('dir')).toBe('ltr')
     // Structure/utility wiring only, not native right-edge or pixel geometry.
     expect(header.classList.contains('justify-between')).toBe(true)
     expect(header.classList.contains('items-start')).toBe(true)
     const metadata = header.firstElementChild!
+    expect(metadata.getAttribute('dir')).toBe('auto')
     expect(metadata.textContent).toContain('Feed')
     expect(metadata.querySelector('time')).not.toBeNull()
     expect(metadata.classList.contains('min-h-8')).toBe(true)
