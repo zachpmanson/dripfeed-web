@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { NewsItem, NewsFeed } from '../../api/types'
 import type { RarityInfo } from '../../rarity'
 import type { LoadMoreProgress } from '../../store'
 import ItemRow from './ItemRow'
 import TrailingRow from './TrailingRow'
 import NewspaperList from './NewspaperList'
+import type { NewspaperMotionSnapshot } from './useNewspaperMotion'
 
 /**
  * How many rows the list renders up front, and how many more each batch adds
@@ -49,8 +50,12 @@ export interface ItemListProps {
 }
 
 export function ItemList(props: ItemListProps) {
+  const motionSnapshot = useRef<NewspaperMotionSnapshot | null>(null)
+  useLayoutEffect(() => {
+    if (!props.newspaper) motionSnapshot.current = null
+  }, [props.newspaper])
   return props.newspaper ? (
-    <NewspaperList key={props.windowKey} {...props} />
+    <NewspaperList key={props.windowKey} {...props} motionSnapshot={motionSnapshot} />
   ) : (
     <StandardItemList {...props} />
   )

@@ -9,16 +9,8 @@ export const NEWSPAPER_MAX_MOUNTED_CHUNKS = NEWSPAPER_MAX_VISIBLE_CHUNKS + NEWSP
 export interface NewspaperChunk {
   start: number
   items: NewsItem[]
+  slots: number[]
   signature: string
-}
-
-export function newspaperChunks(items: NewsItem[]): NewspaperChunk[] {
-  const chunks: NewspaperChunk[] = []
-  for (let start = 0; start < items.length; start += NEWSPAPER_CHUNK_SIZE) {
-    const part = items.slice(start, start + NEWSPAPER_CHUNK_SIZE)
-    chunks.push({ start, items: part, signature: part.map((item) => item.id).join(',') })
-  }
-  return chunks
 }
 
 // Match the 17rem minimum column width and 1.75rem gap at the app's 16px root.
@@ -34,8 +26,13 @@ export function newspaperColumnIndices(count: number, columns: number, lead: boo
   return stacks
 }
 
-export function estimatedChunkHeight(count: number, width: number, lead: boolean): number {
-  return Math.ceil(count / newspaperColumnCount(width)) * 420 + (lead ? 300 : 0)
+export function estimatedChunkHeight(
+  count: number,
+  width: number,
+  lead: boolean,
+  tallestColumn = Math.ceil(count / newspaperColumnCount(width)),
+): number {
+  return tallestColumn * 420 + (lead ? 300 : 0)
 }
 
 export function chunkAt(offsets: number[], top: number): number {

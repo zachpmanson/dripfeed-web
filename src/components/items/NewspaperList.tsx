@@ -1,14 +1,30 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from 'react'
 import type { ItemListProps } from './ItemList'
 import NewspaperStory from './NewspaperStory'
 import TrailingRow from './TrailingRow'
 import { newspaperRole } from './newspaperPresentation'
 import {
+  newspaperOwnership,
+  ownedNewspaperItems,
+  ownedNewspaperChunks,
+  ownedNewspaperColumns,
+} from './newspaperOwnership'
+import useNewspaperMotion, {
+  newspaperHeadlineBounds,
+  type NewspaperMotionSnapshot,
+} from './useNewspaperMotion'
+import {
   chunkAt,
   estimatedChunkHeight,
-  newspaperChunks,
   newspaperColumnCount,
-  newspaperColumnIndices,
   newspaperRange,
   NEWSPAPER_CHUNK_SIZE,
   type NewspaperChunk,
@@ -45,6 +61,8 @@ function anchorTop(model: Model, anchor: Anchor): number {
  * retain measured (or width-aware estimated) height, never their story DOM. */
 export default function NewspaperList({
   items,
+  windowKey,
+  motionSnapshot,
   active = true,
   selectedId,
   feedTitle,
@@ -60,30 +78,11 @@ export default function NewspaperList({
   drained = false,
   loadingMore = false,
   paging = null,
-}: ItemListProps) {
+}: ItemListProps & { motionSnapshot: MutableRefObject<NewspaperMotionSnapshot | null> }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
   const sentinelRef = useRef<HTMLLIElement>(null)
   const sectionNodes = useRef(new Map<number, HTMLDivElement>())
-  const selectedIndex = selectedId === null ? -1 : items.findIndex((item) => item.id === selectedId)
-  const selectedCount =
-    selectedIndex < 0
-      ? 0
-      : (Math.floor(selectedIndex / NEWSPAPER_CHUNK_SIZE) + 1) * NEWSPAPER_CHUNK_SIZE
-  const [revealedCount, setRevealedCount] = useState(() =>
-    Math.max(NEWSPAPER_CHUNK_SIZE * 2, selectedCount),
-  )
-  // A hidden URL change must represent its target in this commit, without
-  // ever mounting the prefix. Only the existing windowKey remount resets it.
-  const representedCount = Math.max(revealedCount, selectedCount)
-  useLayoutEffect(() => {
-    if (selectedCount > revealedCount) setRevealedCount(selectedCount)
-  }, [selectedCount, revealedCount])
-  const hiddenLocal = items.length > representedCount
-  const chunks = useMemo(
-    () => newspaperChunks(items.slice(0, representedCount)),
-    [items, representedCount],
-  )
   const [geometry, setGeometry] = useState(() => ({
     width: 900,
     measurements: new Map<string, Measurement>(),
@@ -97,6 +96,44 @@ export default function NewspaperList({
             Math.floor(items.findIndex((item) => item.id === selectedId) / NEWSPAPER_CHUNK_SIZE),
           ),
   }))
+  const columnCount = newspaperColumnCount(geometry.width)
+  const [ownershipState, setOwnershipState] = useState(() => ({
+    items,
+    ownership: newspaperOwnership(items, columnCount),
+  }))
+  let ownership = ownershipState.ownership
+  if (ownershipState.items !== items || ownership.columns !== columnCount) {
+    ownership = newspaperOwnership(items, columnCount, ownership)
+    setOwnershipState({ items, ownership })
+  }
+  const orderedItems = useMemo(() => ownedNewspaperItems(items, ownership), [items, ownership])
+  const positions = useMemo(
+    () => new Map(orderedItems.map((item, index) => [item.id, index])),
+    [orderedItems],
+  )
+  const selectedIndex = selectedId === null ? -1 : (positions.get(selectedId) ?? -1)
+  const selectedCount =
+    selectedIndex < 0
+      ? 0
+      : (Math.floor(selectedIndex / NEWSPAPER_CHUNK_SIZE) + 1) * NEWSPAPER_CHUNK_SIZE
+  const [revealedCount, setRevealedCount] = useState(() =>
+    Math.max(NEWSPAPER_CHUNK_SIZE * 2, selectedCount),
+  )
+  // Exposure counts live stories, not vacant ownership slots. Empty sections
+  // disappear instead of accumulating scroll space after many reads.
+  const representedCount = Math.max(revealedCount, selectedCount)
+  useLayoutEffect(() => {
+    if (selectedCount > revealedCount) setRevealedCount(selectedCount)
+  }, [selectedCount, revealedCount])
+  const hiddenLocal = items.length > representedCount
+  const chunks = useMemo(
+    () => ownedNewspaperChunks(orderedItems.slice(0, representedCount), ownership),
+    [orderedItems, representedCount, ownership],
+  )
+  const chunkFor = useCallback(
+    (id: number) => chunks.findIndex((chunk) => chunk.items.some((item) => item.id === id)),
+    [chunks],
+  )
   const model = useMemo<Model>(() => {
     const offsets = [0]
     for (const chunk of chunks) {
@@ -104,12 +141,16 @@ export default function NewspaperList({
       const height =
         measured?.width === geometry.width
           ? measured.height
-          : estimatedChunkHeight(chunk.items.length, geometry.width, chunk.start === 0)
+          : estimatedChunkHeight(
+              chunk.items.length,
+              geometry.width,
+              chunk.slots[0] === 0,
+              Math.max(...ownedNewspaperColumns(chunk, columnCount).map((column) => column.length)),
+            )
       offsets.push(offsets[offsets.length - 1] + height)
     }
     return { chunks, offsets }
-  }, [chunks, geometry.measurements, geometry.width])
-  const columnCount = newspaperColumnCount(geometry.width)
+  }, [chunks, geometry.measurements, geometry.width, columnCount])
   const previousModel = useRef(model)
   const pendingAnchor = useRef<Anchor | null>(null)
   const visualAnchor = useRef<VisualAnchor | null>(null)
@@ -162,13 +203,13 @@ export default function NewspaperList({
   useLayoutEffect(() => {
     if (!active && selectedId !== null && returnTo.current?.id !== selectedId) {
       returnTo.current = { id: selectedId, scroll: null }
-      const index = items.findIndex((item) => item.id === selectedId)
+      const target = chunkFor(selectedId)
       setGeometry((old) => ({
         ...old,
-        target: Math.max(0, Math.floor(index / NEWSPAPER_CHUNK_SIZE)),
+        target: Math.max(0, target),
       }))
     }
-  }, [active, selectedId, items])
+  }, [active, selectedId, chunkFor])
 
   const refreshRef = useRef<() => void>(() => {})
   const scheduleRef = useRef<() => void>(() => {})
@@ -224,7 +265,7 @@ export default function NewspaperList({
     const bounds = root.getBoundingClientRect()
     const headlines = listRef.current?.querySelectorAll<HTMLButtonElement>('[data-story-id]') ?? []
     for (const headline of headlines) {
-      const rect = headline.getBoundingClientRect()
+      const rect = newspaperHeadlineBounds(headline)
       if (rect.bottom > bounds.top && rect.top < bounds.bottom) {
         visualAnchor.current = {
           id: headline.dataset.storyId!,
@@ -320,10 +361,8 @@ export default function NewspaperList({
     }
     if (returning) {
       const saved = returnTo.current
-      const index = saved ? items.findIndex((item) => item.id === saved.id) : -1
-      root.scrollTop =
-        saved?.scroll ??
-        (index < 0 ? 0 : model.offsets[Math.floor(index / NEWSPAPER_CHUNK_SIZE)] + contentOrigin())
+      const index = saved ? chunkFor(saved.id) : -1
+      root.scrollTop = saved?.scroll ?? (index < 0 ? 0 : model.offsets[index] + contentOrigin())
       focusReturn.current = true
       pendingAnchor.current = null
       rememberVisualAnchor()
@@ -337,7 +376,7 @@ export default function NewspaperList({
         // Preserve an actual visible headline through column reflow.
         // Fractional chunk anchoring is the fallback for evicted/deleted nodes.
         root.scrollTop +=
-          headline.getBoundingClientRect().top - root.getBoundingClientRect().top - visual.offset
+          newspaperHeadlineBounds(headline).top - root.getBoundingClientRect().top - visual.offset
       } else {
         const anchor = pendingAnchor.current ?? anchorAt(previousModel.current, geometry.top)
         if (anchor) root.scrollTop = anchorTop(model, anchor) + contentOrigin()
@@ -354,18 +393,15 @@ export default function NewspaperList({
         ? list.querySelector<HTMLButtonElement>(`[data-story-id="${returnTo.current.id}"]`)
         : null
       // A range update may need one synchronous commit before the target exists.
-      const index = returnTo.current
-        ? items.findIndex((item) => item.id === returnTo.current!.id)
-        : -1
-      const target = Math.floor(index / NEWSPAPER_CHUNK_SIZE)
-      if (!story && index >= 0 && (target < range.first || target > range.last)) {
+      const target = returnTo.current ? chunkFor(returnTo.current.id) : -1
+      if (!story && target >= 0 && (target < range.first || target > range.last)) {
         setGeometry((old) => ({ ...old, target }))
       } else {
         if (story && returnTo.current?.scroll === null) {
           // A URL selection has no saved pixel position. Reveal its headline,
           // not just the beginning of a potentially very tall section.
           root.scrollTop +=
-            story.getBoundingClientRect().top - root.getBoundingClientRect().top - contentOrigin()
+            newspaperHeadlineBounds(story).top - root.getBoundingClientRect().top - contentOrigin()
           measure()
           rememberVisualAnchor()
         }
@@ -403,6 +439,7 @@ export default function NewspaperList({
     range.last,
     contentOrigin,
     rememberVisualAnchor,
+    chunkFor,
   ])
 
   // One generation-scoped rAF coalesces scroll, resize, image/font reflow and
@@ -449,9 +486,9 @@ export default function NewspaperList({
     <NewspaperStory
       key={chunk.items[localIndex].id}
       item={chunk.items[localIndex]}
-      index={chunk.start + localIndex}
+      index={positions.get(chunk.items[localIndex].id)}
       total={items.length}
-      role={newspaperRole(chunk.start + localIndex)}
+      role={newspaperRole(chunk.slots[localIndex])}
       feedTitle={feedTitle}
       feedById={feedById}
       showFavicons={showFavicons}
@@ -462,6 +499,24 @@ export default function NewspaperList({
     />
   )
 
+  // The first measured width may change column count before the first paint;
+  // that initial distribution is not a user-visible layout transition.
+  useNewspaperMotion(
+    scrollRef,
+    listRef,
+    active,
+    chunks
+      .slice(range.first, range.last + 1)
+      .map((chunk) => chunk.start)
+      .join(','),
+    {
+      ready: geometry.height > 0,
+      session: windowKey,
+      columns: columnCount,
+      snapshot: motionSnapshot,
+    },
+  )
+
   return (
     <div
       ref={scrollRef}
@@ -470,7 +525,7 @@ export default function NewspaperList({
         localApproach.current = true
         scheduleRef.current()
       }}
-      className="newspaper-scroll min-h-0 flex-1 overflow-y-auto bg-app-panel px-10 py-7 [overflow-anchor:none]"
+      className="newspaper-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-app-panel px-10 py-7 [overflow-anchor:none]"
     >
       <ul
         ref={listRef}
@@ -487,7 +542,7 @@ export default function NewspaperList({
         }}
       >
         {chunks.map((chunk, index) => (
-          <li key={index} className="flow-root list-none" role="presentation">
+          <li key={chunk.start} className="flow-root list-none" role="presentation">
             {index >= range.first && index <= range.last ? (
               <div
                 ref={(node) => {
@@ -497,25 +552,23 @@ export default function NewspaperList({
                 className="newspaper grid items-start gap-x-7"
                 style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
                 role="group"
-                aria-label={`Stories ${chunk.start + 1}–${chunk.start + chunk.items.length}`}
+                aria-label={`Stories ${positions.get(chunk.items[0].id)! + 1}–${positions.get(chunk.items.at(-1)!.id)! + 1}`}
                 data-newspaper-chunk={index}
               >
-                {chunk.start === 0 && (
+                {chunk.slots[0] === 0 && (
                   <ul className="col-span-full m-0 list-none p-0" aria-label="Lead story">
                     {renderStory(chunk, 0)}
                   </ul>
                 )}
-                {newspaperColumnIndices(chunk.items.length, columnCount, chunk.start === 0).map(
-                  (indices, column) => (
-                    <ul
-                      key={column}
-                      className="newspaper-column m-0 min-w-0 list-none p-0"
-                      aria-label={`Column ${column + 1}`}
-                    >
-                      {indices.map((localIndex) => renderStory(chunk, localIndex))}
-                    </ul>
-                  ),
-                )}
+                {ownedNewspaperColumns(chunk, columnCount).map((indices, column) => (
+                  <ul
+                    key={column}
+                    className="newspaper-column m-0 min-w-0 list-none p-0"
+                    aria-label={`Column ${column + 1}`}
+                  >
+                    {indices.map((localIndex) => renderStory(chunk, localIndex))}
+                  </ul>
+                ))}
               </div>
             ) : (
               <div
