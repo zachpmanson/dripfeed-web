@@ -24,6 +24,13 @@ describe('inert newspaper previews', () => {
       'Body',
     )
   })
+  it('caps HTML parsing before text extraction, including very large boilerplate prefixes', () => {
+    expect(
+      plainExcerpt(`<script>${'x'.repeat(100_000)}</script><p>Beyond the parsing budget</p>`),
+    ).toBe('')
+    expect(plainExcerpt(`<p>Opening</p>${'word '.repeat(100_000)}`, 12)).toBe('Opening word…')
+    expect(document.querySelector('script')).toBeNull()
+  })
   it('uses inert bounded fallback headlines for untitled or empty items', () => {
     expect(
       previewTitle({

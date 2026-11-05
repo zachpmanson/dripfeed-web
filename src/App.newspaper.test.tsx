@@ -21,7 +21,7 @@ vi.mock('./hooks/useThemePreferences', () => ({
 }))
 
 let root: Root, container: HTMLDivElement
-let observe: IntersectionObserverCallback
+let resize: ResizeObserverCallback
 let disconnected: ReturnType<typeof vi.fn>
 const item = (id: number): NewsItem =>
   ({
@@ -46,8 +46,15 @@ beforeEach(() => {
   vi.stubGlobal(
     'IntersectionObserver',
     class {
-      constructor(cb: IntersectionObserverCallback) {
-        observe = cb
+      observe() {}
+      disconnect = disconnected
+    },
+  )
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(cb: ResizeObserverCallback) {
+        resize = cb
       }
       observe() {}
       disconnect = disconnected
@@ -103,7 +110,7 @@ const selectNewspaper = async () => {
   )!
   await act(async () => button.click())
 }
-const newspaper = () => container.querySelector<HTMLUListElement>('.newspaper')!
+const newspaper = () => container.querySelector<HTMLUListElement>('.newspaper-chunks')!
 const newspaperScroll = () => container.querySelector<HTMLDivElement>('.newspaper-scroll')!
 
 it.each([360, 768, 1100, 1600])(
@@ -152,7 +159,7 @@ it('loads the saved newspaper mode on a narrow window and preserves the open rea
   expect(localStorage.getItem('dripfeed.presentation')).toBe('newspaper')
 })
 
-it('requires explicit URL selection to mount/extract; returns scroll, render window and focus without hidden paging', async () => {
+it('requires explicit URL selection to mount/extract; returns scroll, chunks and focus without hidden paging', async () => {
   localStorage.setItem('dripfeed.presentation', 'newspaper')
   mocks.store!.feeds.get(1)!.fullTextEnabled = true
   await render()
@@ -163,7 +170,8 @@ it('requires explicit URL selection to mount/extract; returns scroll, render win
     [...newspaper().querySelectorAll('[data-story-id]')].map((node) =>
       Number(node.getAttribute('data-story-id')),
     )
-  expect(storyIds()).toEqual(Array.from({ length: 50 }, (_, i) => 120 - i))
+  expect(storyIds()).toEqual(Array.from({ length: 100 }, (_, i) => 120 - i))
+  expect(newspaper().querySelectorAll('.newspaper')).toHaveLength(2)
   expect(newspaper().querySelectorAll('.newspaper-lead')).toHaveLength(1)
   expect(newspaper().parentElement).toBe(newspaperScroll())
   expect(newspaperScroll().classList.contains('overflow-y-auto')).toBe(true)
@@ -187,9 +195,7 @@ it('requires explicit URL selection to mount/extract; returns scroll, render win
       ?.closest('li')
       ?.classList.contains('newspaper-feature'),
   ).toBe(true)
-  await act(async () =>
-    observe([{ isIntersecting: true }] as IntersectionObserverEntry[], {} as IntersectionObserver),
-  )
+  await act(async () => resize([], {} as ResizeObserver))
   expect(storyIds()).toEqual(Array.from({ length: 100 }, (_, i) => 120 - i))
   expect(newspaper().querySelectorAll('.newspaper-lead')).toHaveLength(1)
   newspaperScroll().scrollTop = 900
@@ -200,10 +206,8 @@ it('requires explicit URL selection to mount/extract; returns scroll, render win
   expect(document.activeElement?.getAttribute('aria-label')).toBe('Back')
   expect(newspaperScroll().parentElement?.className).toBe('hidden')
   const count = newspaper().querySelectorAll('[data-story-id]').length
-  // Even a queued observer delivery after disconnect must stay quiet.
-  await act(async () =>
-    observe([{ isIntersecting: true }] as IntersectionObserverEntry[], {} as IntersectionObserver),
-  )
+  // Even a queued resize delivery after disconnect must stay quiet.
+  await act(async () => resize([], {} as ResizeObserver))
   expect(newspaper().querySelectorAll('[data-story-id]')).toHaveLength(count)
   expect(mocks.store!.loadMore).not.toHaveBeenCalled()
   expect(disconnected).toHaveBeenCalled()

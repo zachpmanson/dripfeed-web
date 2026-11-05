@@ -182,3 +182,29 @@ are exercised without replacing app error/session ownership. Existing error-toas
 and session tests remain separate. Menu geometry compares page width to the
 fixture's inherited desktop-header baseline; it does not claim a responsive app
 layout redesign. Optional JSON/screenshot artifacts follow the other runners.
+
+# Newspaper chunk virtualization
+
+Newspaper mode uses independently balanced native multicol sections of 50 ordered
+stories. Only the viewport sections plus one whole section ahead/behind are
+mounted (at most five sections / 250 stories); offscreen sections retain measured
+or width-aware estimated height placeholders. This bounds story rendering, not
+the existing unread fetch, ranking sample, IndexedDB mirror or server cursors.
+The first section alone contains the spanning lead. List mode remains unchanged.
+
+The next section is rendered before its leading edge enters the viewport. Server
+prefetch begins two viewport heights (at least 1200px) before the actual local
+tail. One request per approach/current data window avoids draining history inside
+that margin; no-growth results settle and the explicit Load more button retries.
+
+```sh
+nix develop --command pnpm test src/components/items/NewspaperList.test.tsx src/App.newspaper.test.tsx
+```
+
+These tests execute queued animation frames and mocked ResizeObserver/scroll
+geometry against a 10,000-story fixture: bounded initial/deep-link/fast-jump DOM,
+both directions, measured-height reuse, resize/image-height anchors, early
+overscan/prefetch, hidden/stale callbacks, actions/focus/Back, empty-page settling,
+read-removal rearming and ordinary list behavior. They are **not native browser
+multicol geometry, frame-rate or screen-reader measurements**. No new Chromium
+harness is included.

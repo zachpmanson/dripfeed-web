@@ -1,11 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { NewsItem, NewsFeed } from '../../api/types'
 import type { RarityInfo } from '../../rarity'
 import type { LoadMoreProgress } from '../../store'
 import ItemRow from './ItemRow'
 import TrailingRow from './TrailingRow'
-import NewspaperStory from './NewspaperStory'
-import { newspaperRole } from './newspaperPresentation'
+import NewspaperList from './NewspaperList'
 
 /**
  * How many rows the list renders up front, and how many more each batch adds
@@ -21,7 +20,7 @@ import { newspaperRole } from './newspaperPresentation'
  */
 const RENDER_BATCH = 50
 
-interface Props {
+export interface ItemListProps {
   items: NewsItem[]
   newspaper?: boolean
   active?: boolean
@@ -49,11 +48,17 @@ interface Props {
   paging?: LoadMoreProgress | null
 }
 
-export function ItemList({
+export function ItemList(props: ItemListProps) {
+  return props.newspaper ? (
+    <NewspaperList key={props.windowKey} {...props} />
+  ) : (
+    <StandardItemList {...props} />
+  )
+}
+
+function StandardItemList({
   items,
-  newspaper = false,
   active = true,
-  onStar,
   windowKey,
   selectedId,
   feedTitle,
@@ -70,65 +75,10 @@ export function ItemList({
   drained = false,
   loadingMore = false,
   paging = null,
-}: Props) {
+}: ItemListProps) {
   const enabledRef = useRef(active)
   enabledRef.current = active
   const listRef = useRef<HTMLUListElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const focusedStory = useRef<{ node: HTMLElement; index: number } | null>(null)
-  useEffect(() => {
-    // Removal sends focus to BODY without a focusin event. Explicit focus
-    // elsewhere (navigation, dialogs, etc.) relinquishes the list's ownership.
-    const onFocus = (event: FocusEvent) => {
-      if (!listRef.current?.contains(event.target as Node)) focusedStory.current = null
-    }
-    document.addEventListener('focusin', onFocus)
-    return () => document.removeEventListener('focusin', onFocus)
-  }, [])
-  const returnTo = useRef<{ id: number; scroll: number } | null>(null)
-  const wasActive = useRef(active)
-  const returnKey = useRef(windowKey)
-  useLayoutEffect(() => {
-    if (returnKey.current !== windowKey) {
-      returnTo.current = null
-      focusedStory.current = null
-      returnKey.current = windowKey
-    }
-    if (active && !wasActive.current) {
-      const list = listRef.current
-      if (list) {
-        if (scrollRef.current) scrollRef.current.scrollTop = returnTo.current?.scroll ?? 0
-        const story = returnTo.current
-          ? list.querySelector<HTMLButtonElement>(`[data-story-id="${returnTo.current.id}"]`)
-          : null
-        ;(story ?? list).focus({ preventScroll: true })
-      }
-    }
-    wasActive.current = active
-  }, [active, windowKey])
-  useLayoutEffect(() => {
-    const focused = focusedStory.current
-    if (!newspaper || !active) {
-      focusedStory.current = null
-      return
-    }
-    if (!focused || focused.node.isConnected) return
-    focusedStory.current = null
-    const list = listRef.current
-    // Only recover focus lost by removing a story, never a still-valid focus
-    // target outside this list. Prefer the next story, or the preceding last one.
-    if (list && (!document.activeElement || document.activeElement === document.body)) {
-      const stories = list.querySelectorAll<HTMLButtonElement>('[data-story-id]')
-      ;(stories[Math.min(focused.index, stories.length - 1)] ?? list).focus({
-        preventScroll: true,
-      })
-    }
-  })
-  const selectStory = (id: number) => {
-    returnTo.current = { id, scroll: scrollRef.current?.scrollTop ?? 0 }
-    onSelect(id)
-  }
-
   // The render window: how many of the caller's ordered items are in the DOM.
   // Held with the key of the view it belongs to, so a view change restarts it
   // during render — React's "adjust state when a prop changes" pattern, which
@@ -286,75 +236,36 @@ export function ItemList({
   const rendered = limit >= items.length ? items : items.slice(0, limit)
 
   return (
-    <div
-      ref={scrollRef}
-      className={
-        newspaper
-          ? 'newspaper-scroll min-h-0 flex-1 overflow-y-auto bg-app-panel px-10 py-7'
-          : 'contents'
-      }
+    <ul
+      ref={listRef}
+      tabIndex={-1}
+      aria-label="Items"
+      className="item-list m-0 flex-1 list-none overflow-y-auto border-r border-app-border p-0"
     >
-      <ul
-        ref={listRef}
-        onFocusCapture={(event) => {
-          if (!newspaper || !active) return
-          const node = event.target as HTMLElement
-          const headline = node.closest('li')?.querySelector<HTMLButtonElement>('[data-story-id]')
-          focusedStory.current = headline
-            ? {
-                node,
-                index: [...event.currentTarget.querySelectorAll('[data-story-id]')].indexOf(
-                  headline,
-                ),
-              }
-            : null
-        }}
-        tabIndex={-1}
-        aria-label={newspaper ? 'Newspaper stories' : 'Items'}
-        className={
-          newspaper
-            ? 'newspaper m-0 list-none p-0'
-            : 'item-list m-0 flex-1 list-none overflow-y-auto border-r border-app-border p-0'
-        }
-      >
-        {rendered.map((item, index) =>
-          newspaper ? (
-            <NewspaperStory
-              key={item.id}
-              item={item}
-              role={newspaperRole(index)}
-              feedTitle={feedTitle}
-              singleClickRead={singleClickRead}
-              onSelect={selectStory}
-              onRead={onRead}
-              onStar={onStar}
-            />
-          ) : (
-            <ItemRow
-              key={item.id}
-              item={item}
-              selected={item.id === selectedId}
-              feedTitle={feedTitle}
-              feedById={feedById}
-              showFavicons={showFavicons}
-              singleClickRead={singleClickRead}
-              onSelect={onSelect}
-              onRead={onRead}
-              rarityMode={rarityMode}
-              rarityStats={rarityStats}
-            />
-          ),
-        )}
-        {items.length === 0 && <li className="empty px-3 py-4 text-app-muted">{emptyText}</li>}
-        <TrailingRow
-          sentinelRef={sentinelRef}
-          onLoadMore={onLoadMore}
-          moreServer={moreServer}
-          drained={drained}
-          loadingMore={loadingMore}
-          paging={paging}
+      {rendered.map((item) => (
+        <ItemRow
+          key={item.id}
+          item={item}
+          selected={item.id === selectedId}
+          feedTitle={feedTitle}
+          feedById={feedById}
+          showFavicons={showFavicons}
+          singleClickRead={singleClickRead}
+          onSelect={onSelect}
+          onRead={onRead}
+          rarityMode={rarityMode}
+          rarityStats={rarityStats}
         />
-      </ul>
-    </div>
+      ))}
+      {items.length === 0 && <li className="empty px-3 py-4 text-app-muted">{emptyText}</li>}
+      <TrailingRow
+        sentinelRef={sentinelRef}
+        onLoadMore={onLoadMore}
+        moreServer={moreServer}
+        drained={drained}
+        loadingMore={loadingMore}
+        paging={paging}
+      />
+    </ul>
   )
 }

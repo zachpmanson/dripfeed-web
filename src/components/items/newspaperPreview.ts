@@ -3,7 +3,9 @@ import type { NewsItem } from '../../api/types'
 /** Template contents are inert: preview parsing must never activate feed resources. */
 export function plainExcerpt(html: string, limit = 320): string {
   const template = document.createElement('template')
-  template.innerHTML = html
+  // Previews must not parse megabyte feed bodies, even within a bounded chunk.
+  // Truncated markup remains inert and is repaired by the template parser.
+  template.innerHTML = html.slice(0, 32_768)
   template.content
     .querySelectorAll(
       'script, style, template, noscript, iframe, object, embed, svg, math, nav, footer, aside, form, [hidden], [aria-hidden="true"]',

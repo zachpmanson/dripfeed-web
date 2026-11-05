@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import type { NewsItem } from '../../api/types'
 import { previewExcerpt, previewImage, previewTitle } from './newspaperPreview'
 import { newspaperExcerptLimit, type NewspaperRole } from './newspaperPresentation'
 
-export default function NewspaperStory({
+export default memo(function NewspaperStory({
   item,
+  index,
+  total,
   role,
   feedTitle,
   singleClickRead,
@@ -13,6 +15,8 @@ export default function NewspaperStory({
   onStar,
 }: {
   item: NewsItem
+  index?: number
+  total?: number
   role: NewspaperRole
   feedTitle: (feedId: number) => string
   singleClickRead: boolean
@@ -21,8 +25,10 @@ export default function NewspaperStory({
   onStar?: (item: NewsItem) => void
 }) {
   const excerpt = useMemo(() => previewExcerpt(item, newspaperExcerptLimit(role)), [item, role])
-  const image =
-    role === 'lead' || role === 'feature' || role === 'image' ? previewImage(item) : null
+  const image = useMemo(
+    () => (role === 'lead' || role === 'feature' || role === 'image' ? previewImage(item) : null),
+    [item, role],
+  )
   const [failedImage, setFailedImage] = useState<string | null>(null)
   const title = useMemo(() => previewTitle(item), [item])
   const imagePreview = image && (
@@ -48,6 +54,8 @@ export default function NewspaperStory({
   )
   return (
     <li
+      aria-posinset={index === undefined ? undefined : index + 1}
+      aria-setsize={total}
       className={`newspaper-story newspaper-${role} mb-6 min-w-0 border-b border-app-border pb-6 [break-inside:avoid-column] ${role === 'lead' ? '[column-span:all]' : ''}`}
     >
       <article dir={item.rtl ? 'rtl' : 'auto'}>
@@ -105,4 +113,4 @@ export default function NewspaperStory({
       </article>
     </li>
   )
-}
+})
