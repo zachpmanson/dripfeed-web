@@ -191,9 +191,9 @@ export function Sidebar({
 
         {ungrouped.length > 0 && (
           <div className="folder">
-            <div className="folder-head-static">
-              <span className="folder-name no-caret">Feeds</span>
-            </div>
+            <h2 className="folder-head-static m-0 mb-0.5 px-2.5 py-1.5 text-sm font-normal text-app-muted">
+              Feeds
+            </h2>
             {ungrouped.map((f) => (
               <FeedRow
                 key={f.id}
