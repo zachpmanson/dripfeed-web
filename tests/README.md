@@ -219,3 +219,21 @@ actions/heading focus/browser history Back, empty-page settling,
 read-removal rearming and ordinary list behavior. They are **not native browser
 grid/stack geometry, frame-rate or screen-reader measurements**. No new Chromium
 harness is included.
+
+# Interface icon migration
+
+App-owned interface icons use pinned `@tabler/icons-react` components, including
+loading/refresh, stars, read state, disclosure/select carets, custom checkbox
+indicators, close/external-link/copy controls and missing-feed RSS fallback.
+Decorative SVGs stay hidden from assistive technology; the owning controls retain
+their accessible labels and actions. Filled and outline icons preserve state.
+
+The custom Dripfeed favicon and real feed favicons are branding/content, not
+generic control icons; they remain unchanged. Browser-drawn native checkbox
+chrome also remains native. Article HTML and content imagery are not rewritten.
+
+Component tests assert positive Tabler SVG markers, state transitions, callbacks,
+labels, favicon failure fallback and CSS animation/reduced-motion wiring. The
+existing feed-controls browser runner has its caret assertion updated for SVG,
+but no browser run is implied by component tests or the production/Nix build.
+Dependency changes require the matching `fetchPnpmDeps` hash in `nix/package.nix`.

@@ -1,3 +1,4 @@
+import { IconStar, IconStarFilled } from '@tabler/icons-react'
 import { memo, useMemo, useState } from 'react'
 import type { NewsItem } from '../../api/types'
 import { previewExcerpt, previewImage, previewTitle } from './newspaperPreview'
@@ -95,12 +96,17 @@ export default memo(function NewspaperStory({
         {role !== 'image' && imagePreview}
         <div className="mt-4 flex flex-wrap gap-3 text-xs text-app-muted">
           <button
-            className={`min-h-8 rounded-none border-0 bg-transparent px-0 hover:text-app-text ${item.starred ? 'text-app-accent' : ''}`}
+            className={`inline-flex min-h-8 items-center gap-1 rounded-none border-0 bg-transparent px-0 hover:text-app-text ${item.starred ? 'text-app-accent' : ''}`}
             aria-label={`${item.starred ? 'Unstar' : 'Star'}: ${title}`}
             aria-pressed={item.starred}
             onClick={() => onStar?.(item)}
           >
-            {item.starred ? '★ Starred' : '☆ Star'}
+            {item.starred ? (
+              <IconStarFilled className="size-4" aria-hidden="true" />
+            ) : (
+              <IconStar className="size-4" aria-hidden="true" />
+            )}
+            {item.starred ? 'Starred' : 'Star'}
           </button>
           <button
             className="min-h-8 rounded-none border-0 bg-transparent px-0 hover:text-app-text"

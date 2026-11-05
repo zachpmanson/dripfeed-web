@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
 import { ContextMenu } from '@base-ui/react/context-menu'
-import { ArrowTopRightOnSquareIcon, CheckIcon } from '@heroicons/react/24/outline'
+import { IconExternalLink, IconCheck } from '@tabler/icons-react'
 import type { NewsFeed, NewsFolder } from '../../api/types'
 import type { Settings } from '../../settings'
 import { deleteFeed, moveFeed, renameFeed } from '../../api/news'
@@ -243,7 +243,7 @@ function FeedMenuItems({
           className="ctx-item"
           onClick={() => window.open(feed.link!, '_blank', 'noopener')}
         >
-          Open website <ArrowTopRightOnSquareIcon className="menu-icon" aria-hidden="true" />
+          Open website <IconExternalLink className="menu-icon" aria-hidden="true" />
         </ContextMenu.Item>
       )}
       <ContextMenu.Item
@@ -254,7 +254,7 @@ function FeedMenuItems({
       >
         {copied ? (
           <>
-            Copied <CheckIcon className="menu-icon" aria-hidden="true" />
+            Copied <IconCheck className="menu-icon" aria-hidden="true" />
           </>
         ) : (
           'Copy feed url'

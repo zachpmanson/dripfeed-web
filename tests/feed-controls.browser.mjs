@@ -311,7 +311,11 @@ try {
   await headerSelect.focus()
   await page.keyboard.press('ArrowDown')
   await page.getByRole('option', { name: 'Unread first', exact: true }).click()
-  assert.equal(await headerSelect.textContent(), 'Unread first▾')
+  assert.equal(await headerSelect.textContent(), 'Unread first')
+  assert.equal(
+    await headerSelect.locator('svg.tabler-icon-chevron-down[aria-hidden="true"]').count(),
+    1,
+  )
   assert.equal(await page.evaluate(() => fixtureLog.values.at(-1)), 'priority')
   for (const [group, first, second, value] of [
     ['Numeric choice', 'Zero', 'One', 0],

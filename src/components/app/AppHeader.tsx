@@ -1,5 +1,5 @@
 import { Select } from '../ui/Select'
-import { Cog6ToothIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { IconSettings, IconPlus } from '@tabler/icons-react'
 import { IconButton } from '../ui/IconButton'
 import { Seg } from '../ui/Seg'
 import { Spinner } from '../ui/Spinner'
@@ -75,10 +75,10 @@ export default function AppHeader({
           <Spinner />
         </IconButton>
         <IconButton className="add-btn" title="Add feed or folder" onClick={onAdd}>
-          <PlusIcon className="btn-icon" />
+          <IconPlus className="btn-icon" aria-hidden="true" />
         </IconButton>
         <IconButton className="add-btn" title="Settings" onClick={onSettings}>
-          <Cog6ToothIcon className="btn-icon" />
+          <IconSettings className="btn-icon" aria-hidden="true" />
         </IconButton>
       </div>
     </header>

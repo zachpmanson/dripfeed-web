@@ -1,6 +1,6 @@
 import { Checkbox } from '@base-ui/react/checkbox'
 import { useId } from 'react'
-import { ArrowTopRightOnSquareIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { IconExternalLink, IconX, IconCheck } from '@tabler/icons-react'
 import type { ThemeSetting, ArticleCssMode } from '../../theme'
 import { GIT_SHA, REPO_URL, deployLabel } from '../../version'
 import { BaseDialog as Dialog } from '../ui/BaseDialog'
@@ -56,7 +56,7 @@ export function SettingsModal({
           Settings
         </span>
         <button className="icon-btn" onClick={onClose} aria-label="close">
-          <XMarkIcon className="btn-icon" aria-hidden="true" />
+          <IconX className="btn-icon" aria-hidden="true" />
         </button>
       </div>
       <div className="settings-form">
@@ -122,7 +122,9 @@ export function SettingsModal({
               onCheckedChange={(checked) => onShowFavicons(checked === true)}
               className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm border border-app-border bg-app-bg text-app-on-accent data-[checked]:bg-app-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
             >
-              <Checkbox.Indicator aria-hidden>✓</Checkbox.Indicator>
+              <Checkbox.Indicator aria-hidden>
+                <IconCheck className="size-4" aria-hidden="true" />
+              </Checkbox.Indicator>
             </Checkbox.Root>
             Show favicons
           </label>
@@ -134,7 +136,9 @@ export function SettingsModal({
               onCheckedChange={(checked) => onSingleClickRead(checked === true)}
               className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm border border-app-border bg-app-bg text-app-on-accent data-[checked]:bg-app-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
             >
-              <Checkbox.Indicator aria-hidden>✓</Checkbox.Indicator>
+              <Checkbox.Indicator aria-hidden>
+                <IconCheck className="size-4" aria-hidden="true" />
+              </Checkbox.Indicator>
             </Checkbox.Root>
             Mark as read on single click
           </label>
@@ -146,14 +150,16 @@ export function SettingsModal({
               onCheckedChange={(checked) => onDimBoilerplate(checked === true)}
               className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm border border-app-border bg-app-bg text-app-on-accent data-[checked]:bg-app-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
             >
-              <Checkbox.Indicator aria-hidden>✓</Checkbox.Indicator>
+              <Checkbox.Indicator aria-hidden>
+                <IconCheck className="size-4" aria-hidden="true" />
+              </Checkbox.Indicator>
             </Checkbox.Root>
             Dim Boilerplate Text
           </label>
         </div>
         <div className="setting-row">
           <a className="setting-label repo-link" href={REPO_URL} target="_blank" rel="noreferrer">
-            dripfeed-web <ArrowTopRightOnSquareIcon className="menu-icon" aria-hidden="true" />
+            dripfeed-web <IconExternalLink className="menu-icon" aria-hidden="true" />
           </a>
           <span className="muted commit-ref">
             <a href={`${REPO_URL}/commit/${GIT_SHA}`} target="_blank" rel="noreferrer">

@@ -206,9 +206,9 @@
     background: transparent;
   }
 
-  /* One Heroicons loading indicator everywhere. Full-article extraction,
+  /* One shared loading indicator everywhere. Full-article extraction,
    manual refresh, load-more/paging, and the sync gate's connecting state all
-   use this — see components/Spinner.tsx. */
+   use this — see components/ui/Spinner.tsx. */
   .spinner {
     display: inline-block;
     width: 1em;
@@ -555,8 +555,6 @@
     justify-content: center;
     background: var(--accent);
     color: var(--on-accent);
-    font-weight: 700;
-    line-height: 1;
     border-radius: 3px;
   }
 

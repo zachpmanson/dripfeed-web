@@ -8,6 +8,10 @@ import { IconButton } from './IconButton'
 import ErrorToast from '../app/ErrorToast'
 import FolderSection from '../feed/FolderSection'
 import { SettingsModal } from '../settings/SettingsModal'
+import AppHeader from '../app/AppHeader'
+import { FeedIcon } from '../feed/FeedIcon'
+import { Spinner } from './Spinner'
+import type { NewsFeed } from '../../api/types'
 
 let root: Root
 let container: HTMLDivElement
@@ -76,6 +80,12 @@ it('Select emits numeric options, rejects interaction while disabled, and keeps 
       />,
     )
   await act(async () => render())
+  expect(
+    document
+      .querySelector('[role="combobox"] svg.tabler-icon-chevron-down')
+      ?.getAttribute('aria-hidden'),
+  ).toBe('true')
+  expect(document.querySelector('[role="combobox"]')?.textContent).toBe('None')
   await act(async () =>
     document
       .querySelector('[role="combobox"]')!
@@ -135,6 +145,9 @@ it('Collapsible keeps folder selection separate and delegates controlled disclos
   await click(document.querySelector('.caret-btn')!)
   expect(toggle).toHaveBeenCalledExactlyOnceWith(1)
   expect(document.querySelector('.caret-btn')?.getAttribute('aria-expanded')).toBe('false')
+  expect(
+    document.querySelector('.caret-btn svg.tabler-icon-chevron-down')?.getAttribute('aria-hidden'),
+  ).toBe('true')
   await act(async () => root.render(<FolderSection {...props} collapsed={false} />))
   expect(document.querySelector('.caret-btn')?.getAttribute('aria-expanded')).toBe('true')
 })
@@ -161,7 +174,7 @@ it('Toast projects one external error, replaces rather than queues, and clears o
 
 it('Settings preference checkbox callbacks stay strictly boolean and labelled', async () => {
   const changed = [vi.fn(), vi.fn(), vi.fn()]
-  await act(async () =>
+  const render = (checked = true) =>
     root.render(
       <SettingsModal
         feeds={[]}
@@ -169,9 +182,9 @@ it('Settings preference checkbox callbacks stay strictly boolean and labelled', 
         uiTheme="dark"
         articleCssMode="default"
         articleCss=""
-        showFavicons
-        singleClickRead
-        dimBoilerplate
+        showFavicons={checked}
+        singleClickRead={checked}
+        dimBoilerplate={checked}
         onUiTheme={vi.fn()}
         onArticleCssMode={vi.fn()}
         onArticleCss={vi.fn()}
@@ -181,14 +194,95 @@ it('Settings preference checkbox callbacks stay strictly boolean and labelled', 
         onLogout={vi.fn()}
         onClose={vi.fn()}
       />,
-    ),
-  )
+    )
+  await act(async () => render())
   const checkboxes = [...document.querySelectorAll('[role="checkbox"]')]
   expect(checkboxes).toHaveLength(3)
+  expect(
+    document.querySelector('[aria-label="close"] svg.tabler-icon-x')?.getAttribute('aria-hidden'),
+  ).toBe('true')
+  expect(
+    document.querySelector('.repo-link svg.tabler-icon-external-link')?.getAttribute('aria-hidden'),
+  ).toBe('true')
   for (const [index, checkbox] of checkboxes.entries()) {
     expect(checkbox.closest('label')?.textContent?.trim().length).toBeGreaterThan(3)
+    expect(checkbox.querySelector('svg.tabler-icon-check')?.getAttribute('aria-hidden')).toBe(
+      'true',
+    )
     await click(checkbox)
     expect(changed[index]).toHaveBeenCalledExactlyOnceWith(false)
     expect(checkbox.getAttribute('aria-checked')).not.toBe('mixed')
   }
+  await act(async () => render(false))
+  for (const [index, checkbox] of checkboxes.entries()) {
+    expect(checkbox.getAttribute('aria-checked')).toBe('false')
+    expect(checkbox.querySelector('svg.tabler-icon-check')).toBeNull()
+    await click(checkbox)
+    expect(changed[index]).toHaveBeenLastCalledWith(true)
+  }
+})
+
+it('header uses decorative Tabler chrome and retains refresh state and actions', async () => {
+  const onSync = vi.fn(),
+    onAdd = vi.fn(),
+    onSettings = vi.fn()
+  const render = (syncing: boolean) =>
+    root.render(
+      <AppHeader
+        showMode="all"
+        onShowModeChange={vi.fn()}
+        sortMode="newest"
+        onSortModeChange={vi.fn()}
+        syncing={syncing}
+        poolLength={42}
+        onSync={onSync}
+        onAdd={onAdd}
+        onSettings={onSettings}
+      />,
+    )
+  await act(async () => render(false))
+  for (const [label, icon, action] of [
+    ['Refresh now — re-sync newest items, feeds and folders (42 local)', 'refresh', onSync],
+    ['Add feed or folder', 'plus', onAdd],
+    ['Settings', 'settings', onSettings],
+  ] as const) {
+    const button = document.querySelector('[aria-label="' + label + '"]')!
+    const svg = button.querySelector('svg.tabler-icon-' + icon)!
+    expect(svg.getAttribute('aria-hidden')).toBe('true')
+    expect(svg.getAttribute('stroke-width')).toBe('2')
+    expect(button.textContent).toBe('')
+    await click(button)
+    expect(action).toHaveBeenCalledOnce()
+  }
+  expect(document.querySelector('.sync')?.classList.contains('syncing')).toBe(false)
+  await act(async () => render(true))
+  expect(document.querySelector('.sync')?.classList.contains('syncing')).toBe(true)
+  expect(document.querySelector('.sync svg.spinner.tabler-icon-refresh')).not.toBeNull()
+  await act(async () => root.render(<Spinner />))
+  expect(
+    container.querySelector('svg.spinner.tabler-icon-refresh')?.getAttribute('aria-hidden'),
+  ).toBe('true')
+  expect(container.textContent).toBe('')
+})
+
+it('feed icons preserve external branding and dimensions, falling back to decorative Tabler RSS', async () => {
+  const feed = { title: 'Example', faviconLink: 'https://fixture.invalid/brand.png' } as NewsFeed
+  await act(async () => root.render(<FeedIcon feed={feed} size={14} />))
+  const image = container.querySelector('img')!
+  expect(image.getAttribute('src')).toBe(feed.faviconLink)
+  expect(image.getAttribute('alt')).toBe('')
+  expect(image.getAttribute('width')).toBe('14')
+  expect(image.getAttribute('height')).toBe('14')
+  expect(container.querySelector('svg')).toBeNull()
+  await act(async () => image.dispatchEvent(new Event('error')))
+  expect(container.querySelector('img')).toBeNull()
+  expect(container.querySelector('.feed-icon.fallback')?.getAttribute('aria-hidden')).toBe('true')
+  expect(container.querySelector<HTMLElement>('.feed-icon')?.style.width).toBe('14px')
+  expect(container.querySelector('svg.tabler-icon-rss')?.getAttribute('aria-hidden')).toBe('true')
+  expect(container.textContent).toBe('')
+  await act(async () =>
+    root.render(<FeedIcon key="missing" feed={{ ...feed, faviconLink: null }} />),
+  )
+  expect(container.querySelector('svg.tabler-icon-rss')).not.toBeNull()
+  expect(container.querySelector<HTMLElement>('.feed-icon')?.style.width).toBe('16px')
 })

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDownIcon } from '@heroicons/react/24/outline'
+import { IconChevronDown } from '@tabler/icons-react'
 import type { NewsFolder, NewsFeed, NewsItem } from '../../api/types'
 import { starredCount } from '../../selectors'
 import type { FeedMenuOptions } from './FeedContextMenu'
@@ -139,7 +139,7 @@ export function Sidebar({
             }}
             aria-label={allCollapsed ? 'expand all' : 'collapse all'}
           >
-            <ChevronDownIcon
+            <IconChevronDown
               className={`caret${allCollapsed ? ' collapsed' : ''}`}
               aria-hidden="true"
             />

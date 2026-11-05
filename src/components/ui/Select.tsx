@@ -1,3 +1,4 @@
+import { IconChevronDown } from '@tabler/icons-react'
 import { Select as BaseSelect } from '@base-ui/react/select'
 
 /** Single mandatory choice; values stay typed across the popup boundary. */
@@ -31,7 +32,9 @@ export function Select<T extends string | number>({
         className={`inline-flex cursor-pointer items-center justify-between gap-2 rounded-md border border-app-border bg-app-panel px-2 py-1 text-[0.85rem] leading-[1.4] text-app-text hover:border-app-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent disabled:cursor-default disabled:opacity-60 ${className}`}
       >
         <BaseSelect.Value />
-        <BaseSelect.Icon aria-hidden>▾</BaseSelect.Icon>
+        <BaseSelect.Icon aria-hidden>
+          <IconChevronDown className="size-4" aria-hidden="true" />
+        </BaseSelect.Icon>
       </BaseSelect.Trigger>
       <BaseSelect.Portal>
         <BaseSelect.Positioner

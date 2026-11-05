@@ -17,7 +17,7 @@ const feed = {
   title: 'Example',
   unreadCount: 3,
   url: 'https://fixture.invalid/feed',
-  link: null,
+  link: 'https://fixture.invalid/',
 } as NewsFeed
 let root: Root, container: HTMLDivElement
 let changed: ReturnType<typeof vi.fn<() => void>>
@@ -206,4 +206,22 @@ it('settings can outlive a pending mutation without a stale close or focus job',
   await open()
   await act(async () => request.resolve())
   expect(document.querySelector('[role="menu"]')).not.toBeNull()
+})
+
+it('uses decorative Tabler website and copy-acknowledgement icons without changing actions', async () => {
+  vi.mocked(copyText).mockResolvedValue(undefined)
+  const visit = vi.spyOn(window, 'open').mockReturnValue(null)
+  await open()
+  const website = item('Open website')
+  expect(website.querySelector('svg.tabler-icon-external-link')?.getAttribute('aria-hidden')).toBe(
+    'true',
+  )
+  await click(website)
+  expect(visit).toHaveBeenCalledExactlyOnceWith(feed.link, '_blank', 'noopener')
+  await open()
+  await click(item('Copy feed url'))
+  expect(copyText).toHaveBeenCalledExactlyOnceWith(feed.url)
+  expect(item('Copied').querySelector('svg.tabler-icon-check')?.getAttribute('aria-hidden')).toBe(
+    'true',
+  )
 })

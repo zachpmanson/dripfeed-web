@@ -1,5 +1,10 @@
-import { DocumentTextIcon, StarIcon } from '@heroicons/react/24/outline'
-import { StarIcon as SolidStarIcon } from '@heroicons/react/24/solid'
+import {
+  IconFileText,
+  IconStar,
+  IconStarFilled,
+  IconCircleFilled,
+  IconCircle,
+} from '@tabler/icons-react'
 import { useEffect, useRef } from 'react'
 import type { NewsItem } from '../../api/types'
 import type { useStore } from '../../hooks'
@@ -53,9 +58,9 @@ export default function ReaderHeader({
           className="text-[1.05rem] leading-none"
         >
           {item.starred ? (
-            <SolidStarIcon className="btn-icon" aria-hidden="true" />
+            <IconStarFilled className="btn-icon" aria-hidden="true" />
           ) : (
-            <StarIcon className="btn-icon" aria-hidden="true" />
+            <IconStar className="btn-icon" aria-hidden="true" />
           )}
         </IconButton>
         <IconButton
@@ -71,7 +76,7 @@ export default function ReaderHeader({
           onClick={onExtract}
           className="text-[1.05rem] leading-none"
         >
-          {extracting ? <Spinner /> : <DocumentTextIcon className="btn-icon" aria-hidden="true" />}
+          {extracting ? <Spinner /> : <IconFileText className="btn-icon" aria-hidden="true" />}
         </IconButton>
         <IconButton
           variant="bare"
@@ -79,7 +84,11 @@ export default function ReaderHeader({
           onClick={() => actions.setRead(item, !item.unread)}
           className="text-[1.05rem] leading-none"
         >
-          {item.unread ? '●' : '○'}
+          {item.unread ? (
+            <IconCircleFilled className="btn-icon" aria-hidden="true" />
+          ) : (
+            <IconCircle className="btn-icon" aria-hidden="true" />
+          )}
         </IconButton>
       </div>
     </div>

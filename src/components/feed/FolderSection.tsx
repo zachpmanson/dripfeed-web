@@ -1,6 +1,6 @@
 import { type FeedMenuOptions } from './FeedContextMenu'
 import { Collapsible } from '@base-ui/react/collapsible'
-import { ChevronDownIcon } from '@heroicons/react/24/outline'
+import { IconChevronDown } from '@tabler/icons-react'
 import type { NewsFeed, NewsFolder } from '../../api/types'
 import type { RarityInfo } from '../../rarity'
 import FeedRow from './FeedRow'
@@ -49,7 +49,7 @@ export default function FolderSection({
             className="icon-btn caret-btn inline-flex size-8 items-center justify-center rounded border-0 p-0 text-app-muted hover:bg-app-border hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
             title={collapsed ? 'Expand folder' : 'Collapse folder'}
           >
-            <ChevronDownIcon
+            <IconChevronDown
               className={`caret${collapsed ? ' collapsed' : ''}`}
               aria-hidden="true"
             />

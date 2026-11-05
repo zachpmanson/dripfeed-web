@@ -50,3 +50,24 @@ it.each([true, false])('uses title colour without an unread dot (unread=%s)', (u
   expect(title[2]).toBe('Article title')
   expect(title[1].includes('text-app-muted')).toBe(!unread)
 })
+
+it.each([true, false])(
+  'uses a decorative Tabler filled star only for starred items (%s)',
+  (starred) => {
+    const html = renderToStaticMarkup(
+      <ItemRow
+        item={{ ...item, starred }}
+        selected={false}
+        feedTitle={() => 'Feed'}
+        showFavicons={false}
+        singleClickRead={false}
+        onSelect={vi.fn()}
+        onRead={vi.fn()}
+        rarityMode={false}
+      />,
+    )
+    expect(html.includes('tabler-icon-star-filled')).toBe(starred)
+    expect(html.includes('aria-label="starred"')).toBe(starred)
+    if (starred) expect(html).toMatch(/<svg[^>]*aria-hidden="true"/)
+  },
+)

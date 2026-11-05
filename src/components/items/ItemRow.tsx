@@ -1,4 +1,4 @@
-import { StarIcon } from '@heroicons/react/24/solid'
+import { IconStarFilled } from '@tabler/icons-react'
 import type { NewsItem, NewsFeed } from '../../api/types'
 import type { RarityInfo } from '../../rarity'
 import { FeedIcon } from '../feed/FeedIcon'
@@ -71,7 +71,7 @@ export default function ItemRow({
         )}
         {item.starred && (
           <span aria-label="starred">
-            <StarIcon className="list-star-icon" aria-hidden="true" />
+            <IconStarFilled className="list-star-icon" aria-hidden="true" />
           </span>
         )}
       </div>

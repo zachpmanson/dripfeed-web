@@ -7,6 +7,7 @@ import type { NewsItem } from '../../api/types'
 import { dbPutItem } from '../../db'
 import { resetLocal } from '../../store'
 import { ItemView } from './ItemView'
+import ReaderHeader from './ReaderHeader'
 
 const actions: ComponentProps<typeof ItemView>['actions'] = {
   extractFulltext: vi.fn(async () => {}),
@@ -257,4 +258,58 @@ describe('auto extraction session deduplication', () => {
     expect(extractButton().disabled).toBe(false)
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('current item failed')
   })
+})
+
+it('reader Tabler filled/outline states preserve mark-read, star and extraction actions', async () => {
+  const selected = item()
+  const onExtract = vi.fn()
+  const renderHeader = (story = selected, extracting = false) =>
+    root.render(
+      <ReaderHeader
+        item={story}
+        actions={actions}
+        extracting={extracting}
+        extractError={null}
+        autoExtract={false}
+        onExtract={onExtract}
+        focusTitle
+      />,
+    )
+  await act(async () => renderHeader())
+  expect(document.activeElement).toBe(container.querySelector('h2'))
+  const read = container.querySelector<HTMLButtonElement>('[aria-label="Mark read"]')!
+  expect(read.querySelector('svg.tabler-icon-circle-filled')?.getAttribute('aria-hidden')).toBe(
+    'true',
+  )
+  await act(async () => read.click())
+  expect(actions.setRead).toHaveBeenLastCalledWith(selected, false)
+  const star = container.querySelector<HTMLButtonElement>('[aria-label="Star"]')!
+  expect(star.querySelector('svg.tabler-icon-star')?.getAttribute('aria-hidden')).toBe('true')
+  await act(async () => star.click())
+  expect(actions.setStar).toHaveBeenLastCalledWith(selected, true)
+  const extract = container.querySelector<HTMLButtonElement>(
+    '[aria-label="Extract full article from the original URL"]',
+  )!
+  expect(extract.querySelector('svg.tabler-icon-file-text')?.getAttribute('aria-hidden')).toBe(
+    'true',
+  )
+  await act(async () => extract.click())
+  expect(onExtract).toHaveBeenCalledOnce()
+  const changed = { ...selected, unread: false, starred: true }
+  await act(async () => renderHeader(changed, true))
+  const unread = container.querySelector<HTMLButtonElement>('[aria-label="Mark unread"]')!
+  expect(unread.querySelector('svg.tabler-icon-circle')).not.toBeNull()
+  expect(unread.querySelector('svg.tabler-icon-circle-filled')).toBeNull()
+  await act(async () => unread.click())
+  expect(actions.setRead).toHaveBeenLastCalledWith(changed, true)
+  const unstar = container.querySelector<HTMLButtonElement>('[aria-label="Unstar"]')!
+  expect(unstar.querySelector('svg.tabler-icon-star-filled')).not.toBeNull()
+  await act(async () => unstar.click())
+  expect(actions.setStar).toHaveBeenLastCalledWith(changed, false)
+  expect(extract.disabled).toBe(true)
+  expect(
+    extract.querySelector('svg.spinner.tabler-icon-refresh')?.getAttribute('aria-hidden'),
+  ).toBe('true')
+  await act(async () => extract.click())
+  expect(onExtract).toHaveBeenCalledOnce()
 })

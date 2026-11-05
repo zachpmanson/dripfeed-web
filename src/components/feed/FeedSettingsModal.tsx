@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { XMarkIcon } from '@heroicons/react/24/outline'
+import { IconX } from '@tabler/icons-react'
 import { BaseDialog as Dialog } from '../ui/BaseDialog'
 import type { NewsFeed } from '../../api/types'
 import type { Settings } from '../../settings'
@@ -66,7 +66,7 @@ export function FeedSettingsModal({ feed, settings, onClose, onChanged }: Props)
           Feed settings — {feed.title}
         </span>
         <button className="icon-btn" onClick={onClose} aria-label="close">
-          <XMarkIcon className="btn-icon" aria-hidden="true" />
+          <IconX className="btn-icon" aria-hidden="true" />
         </button>
       </div>
       <div className="settings-form">

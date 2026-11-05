@@ -177,3 +177,31 @@ it('bounds the lead image height without enlarging later column images', async (
   await render(item, 'feature')
   expect(container.querySelector('img')?.parentElement?.classList.contains('max-h-80')).toBe(false)
 })
+
+it('renders Tabler star states with explicit visible Star/Starred text and unchanged action labels', async () => {
+  await render()
+  const star = container.querySelector<HTMLButtonElement>('[aria-label="Star: Headline"]')!
+  expect(star.textContent).toBe('Star')
+  expect(star.querySelector('svg.tabler-icon-star')?.getAttribute('aria-hidden')).toBe('true')
+  const { onStar } = await render({ ...item, starred: true })
+  const unstar = container.querySelector<HTMLButtonElement>('[aria-label="Unstar: Headline"]')!
+  expect(unstar.textContent).toBe('Starred')
+  expect(unstar.getAttribute('aria-pressed')).toBe('true')
+  expect(unstar.querySelector('svg.tabler-icon-star-filled')?.getAttribute('aria-hidden')).toBe(
+    'true',
+  )
+  expect(unstar.querySelector('svg.tabler-icon-star')).toBeNull()
+  await act(async () => unstar.click())
+  expect(onStar).toHaveBeenCalledExactlyOnceWith({ ...item, starred: true })
+})
+
+it('preserves spinner rotation, idle refresh sizing and reduced-motion opt-out', () => {
+  // Stylesheet invariants only; jsdom does not compute animations or layout.
+  expect(newspaperCss).toMatch(/\.spinner\s*\{[^}]*animation: spin 0\.8s linear infinite/)
+  expect(newspaperCss).toMatch(
+    /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.spinner\s*\{\s*animation: none/,
+  )
+  expect(newspaperCss).toMatch(
+    /\.header-right \.sync:not\(\.syncing\) \.spinner\s*\{\s*animation: none/,
+  )
+})

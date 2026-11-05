@@ -2,7 +2,7 @@ import { Tabs } from '@base-ui/react/tabs'
 import { Select } from '../ui/Select'
 import { useEffect, useId, useRef, useState } from 'react'
 import { BaseDialog as Dialog } from '../ui/BaseDialog'
-import { XMarkIcon } from '@heroicons/react/24/outline'
+import { IconX } from '@tabler/icons-react'
 import type { NewsFolder } from '../../api/types'
 import type { Settings } from '../../settings'
 import { createFeed, createFolder } from '../../api/news'
@@ -96,7 +96,7 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
           onClick={onClose}
           aria-label="close"
         >
-          <XMarkIcon className="h-4 w-4" aria-hidden="true" />
+          <IconX className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
       <Tabs.Root

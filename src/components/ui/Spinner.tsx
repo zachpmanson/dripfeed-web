@@ -1,6 +1,6 @@
-import { ArrowPathIcon } from '@heroicons/react/24/outline'
+import { IconRefresh } from '@tabler/icons-react'
 
-/** Shared animated Heroicons loading indicator used throughout the app. */
+/** Shared animated loading indicator used throughout the app. */
 export function Spinner() {
-  return <ArrowPathIcon className="spinner" aria-hidden="true" />
+  return <IconRefresh className="spinner" aria-hidden="true" />
 }

@@ -1,3 +1,4 @@
+import { IconRss } from '@tabler/icons-react'
 import { useState } from 'react'
 import type { NewsFeed } from '../../api/types'
 
@@ -8,7 +9,7 @@ interface Props {
 
 /**
  * Feed favicon: renders the feed's faviconLink image, falling back to a
- * rounded letter tile (first char of the title) when there's no favicon or
+ * Tabler RSS tile when there's no favicon or
  * it fails to load.
  */
 export function FeedIcon({ feed, size = 16 }: Props) {
@@ -18,12 +19,8 @@ export function FeedIcon({ feed, size = 16 }: Props) {
 
   if (!showImg) {
     return (
-      <span
-        className="feed-icon fallback"
-        aria-hidden="true"
-        style={{ width: size, height: size, fontSize: size * 0.62 }}
-      >
-        {(feed.title || '?').trim().charAt(0).toUpperCase()}
+      <span className="feed-icon fallback" aria-hidden="true" style={{ width: size, height: size }}>
+        <IconRss size={size * 0.8} aria-hidden="true" />
       </span>
     )
   }
