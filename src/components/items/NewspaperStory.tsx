@@ -56,7 +56,7 @@ export default memo(function NewspaperStory({
     <li
       aria-posinset={index === undefined ? undefined : index + 1}
       aria-setsize={total}
-      className={`newspaper-story newspaper-${role} mb-6 min-w-0 border-b border-app-border pb-6 [break-inside:avoid-column] ${role === 'lead' ? '[column-span:all]' : ''}`}
+      className={`newspaper-story newspaper-${role} mb-6 min-w-0 border-b border-app-border pb-6`}
     >
       <article dir={item.rtl ? 'rtl' : 'auto'}>
         <div className="mb-3 flex flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-widest text-app-muted">

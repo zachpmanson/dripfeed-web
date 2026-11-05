@@ -170,7 +170,7 @@ it('requires explicit URL selection to mount/extract; returns scroll, chunks and
     [...newspaper().querySelectorAll('[data-story-id]')].map((node) =>
       Number(node.getAttribute('data-story-id')),
     )
-  expect(storyIds()).toEqual(Array.from({ length: 100 }, (_, i) => 120 - i))
+  expect(storyIds().sort((a, b) => b - a)).toEqual(Array.from({ length: 100 }, (_, i) => 120 - i))
   expect(newspaper().querySelectorAll('.newspaper')).toHaveLength(2)
   expect(newspaper().querySelectorAll('.newspaper-lead')).toHaveLength(1)
   expect(newspaper().parentElement).toBe(newspaperScroll())
@@ -179,15 +179,17 @@ it('requires explicit URL selection to mount/extract; returns scroll, chunks and
   expect(newspaper().classList.contains('overflow-y-auto')).toBe(false)
   expect(newspaper().classList.contains('flex-1')).toBe(false)
   expect(newspaper().classList.contains('grid')).toBe(false)
-  expect(newspaper().querySelectorAll('[class*="[column-span:all]"]')).toHaveLength(1)
+  expect(newspaper().querySelectorAll('.col-span-full')).toHaveLength(1)
+  expect(newspaper().querySelectorAll('.newspaper-column')).toHaveLength(6)
+  expect(storyIds().slice(0, 4)).toEqual([120, 119, 116, 113])
   expect([...newspaper().children].every((node) => !(node as HTMLElement).style.gridRowEnd)).toBe(
     true,
   )
   expect(
     newspaper()
       .querySelector('[data-story-id="120"]')
-      ?.closest('li')
-      ?.classList.contains('[column-span:all]'),
+      ?.closest('ul')
+      ?.classList.contains('col-span-full'),
   ).toBe(true)
   expect(
     newspaper()
@@ -196,7 +198,7 @@ it('requires explicit URL selection to mount/extract; returns scroll, chunks and
       ?.classList.contains('newspaper-feature'),
   ).toBe(true)
   await act(async () => resize([], {} as ResizeObserver))
-  expect(storyIds()).toEqual(Array.from({ length: 100 }, (_, i) => 120 - i))
+  expect(storyIds().sort((a, b) => b - a)).toEqual(Array.from({ length: 100 }, (_, i) => 120 - i))
   expect(newspaper().querySelectorAll('.newspaper-lead')).toHaveLength(1)
   newspaperScroll().scrollTop = 900
   await click('[data-story-id="120"]')

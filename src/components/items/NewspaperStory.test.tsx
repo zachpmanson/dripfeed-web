@@ -143,8 +143,8 @@ it.each(['lead', 'feature', 'brief', 'image', 'standard'] as const)(
     expect(tile.classList.contains('border-app-border')).toBe(true)
     expect(tile.classList.contains('pb-6')).toBe(true)
     expect(tile.classList.contains('mb-6')).toBe(true)
-    expect(tile.classList.contains('[break-inside:avoid-column]')).toBe(true)
-    expect(tile.classList.contains('[column-span:all]')).toBe(role === 'lead')
+    expect(tile.classList.contains('[break-inside:avoid-column]')).toBe(false)
+    expect(tile.classList.contains('[column-span:all]')).toBe(false)
   },
 )
 
@@ -164,14 +164,10 @@ it('varies excerpt lengths without truncating headlines or adding unsafe markup'
   expect(container.querySelector('[data-story-id]')!.textContent).toBe(story.title)
 })
 
-it('uses native balanced columns capped at three, not a measured row grid', () => {
-  // Source invariants only: jsdom does not perform multicol layout.
-  const columns = newspaperCss.match(/\.newspaper\s*\{([^}]+)\}/)![1]
-  expect(columns).toMatch(/columns:\s*17rem 3;/)
-  expect(columns).toMatch(/column-gap:\s*1.75rem;/)
-  expect(columns).not.toMatch(/\b(?:height|max-height|grid[^:;]*):/)
-  expect(newspaperCss).not.toMatch(/grid-auto-rows:/)
-  expect(newspaperCss).toMatch(/\.newspaper > li:not\(\.newspaper-story\)\s*\{\s*column-span: all;/)
+it('keeps editorial typography without native multicol or fixed-height row rules', () => {
+  // Source invariants only: jsdom does not perform browser layout.
+  expect(newspaperCss).not.toMatch(/\.newspaper\s*\{[^}]*columns:/)
+  expect(newspaperCss).not.toMatch(/column-span:|grid-auto-rows:/)
   expect(newspaperCss).toMatch(/\.newspaper-feature \.newspaper-headline\s*\{\s*font-size: clamp\(/)
 })
 

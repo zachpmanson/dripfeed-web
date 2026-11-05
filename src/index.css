@@ -869,17 +869,8 @@
 }
 
 /* Newspaper chrome only; reader HTML and user article CSS stay in their iframe.
-   Columns need an auto-height list inside the separate vertical scroller; a
-   constrained multicol height would grow additional columns horizontally.
-   Each virtual chunk balances independently; offscreen chunks retain only a
-   height placeholder. Image/font changes are measured by the virtualizer. */
-.newspaper {
-  columns: 17rem 3;
-  column-gap: 1.75rem;
-}
-.newspaper > li:not(.newspaper-story) {
-  column-span: all;
-}
+   Each measured chunk deals ranked stories into independent round-robin stacks.
+   Natural story heights need neither per-card measurement nor fixed grid rows. */
 .newspaper-headline,
 .newspaper-excerpt {
   font-family: 'Paper Serif', Georgia, serif;

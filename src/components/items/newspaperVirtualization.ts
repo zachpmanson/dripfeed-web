@@ -21,9 +21,21 @@ export function newspaperChunks(items: NewsItem[]): NewspaperChunk[] {
   return chunks
 }
 
+// Match the 17rem minimum column width and 1.75rem gap at the app's 16px root.
+export function newspaperColumnCount(width: number): number {
+  return Math.max(1, Math.min(3, Math.floor((width + 28) / (272 + 28))))
+}
+
+/** Local indices retain absolute rank/roles even though DOM traversal is down columns. */
+export function newspaperColumnIndices(count: number, columns: number, lead: boolean): number[][] {
+  const stacks = Array.from({ length: columns }, () => [] as number[])
+  const start = lead && count > 0 ? 1 : 0
+  for (let index = start; index < count; index++) stacks[(index - start) % columns].push(index)
+  return stacks
+}
+
 export function estimatedChunkHeight(count: number, width: number, lead: boolean): number {
-  const columns = Math.max(1, Math.min(3, Math.floor((width + 28) / (272 + 28))))
-  return Math.ceil(count / columns) * 420 + (lead ? 300 : 0)
+  return Math.ceil(count / newspaperColumnCount(width)) * 420 + (lead ? 300 : 0)
 }
 
 export function chunkAt(offsets: number[], top: number): number {

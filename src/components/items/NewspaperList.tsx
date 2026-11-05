@@ -7,6 +7,8 @@ import {
   chunkAt,
   estimatedChunkHeight,
   newspaperChunks,
+  newspaperColumnCount,
+  newspaperColumnIndices,
   newspaperRange,
   NEWSPAPER_CHUNK_SIZE,
   type NewspaperChunk,
@@ -39,7 +41,7 @@ function anchorTop(model: Model, anchor: Anchor): number {
     : model.offsets[chunk] + anchor.fraction * (model.offsets[chunk + 1] - model.offsets[chunk])
 }
 
-/** Whole native multicol sections are the virtualization unit. Offscreen sections
+/** Whole round-robin stack sections are the virtualization unit. Offscreen sections
  * retain measured (or width-aware estimated) height, never their story DOM. */
 export default function NewspaperList({
   items,
@@ -60,7 +62,7 @@ export default function NewspaperList({
   const scrollRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
   const sentinelRef = useRef<HTMLLIElement>(null)
-  const sectionNodes = useRef(new Map<number, HTMLUListElement>())
+  const sectionNodes = useRef(new Map<number, HTMLDivElement>())
   const chunks = useMemo(() => newspaperChunks(items), [items])
   const [geometry, setGeometry] = useState(() => ({
     width: 900,
@@ -87,6 +89,7 @@ export default function NewspaperList({
     }
     return { chunks, offsets }
   }, [chunks, geometry.measurements, geometry.width])
+  const columnCount = newspaperColumnCount(geometry.width)
   const previousModel = useRef(model)
   const pendingAnchor = useRef<Anchor | null>(null)
   const visualAnchor = useRef<VisualAnchor | null>(null)
@@ -297,7 +300,7 @@ export default function NewspaperList({
           ? list.querySelector<HTMLButtonElement>(`[data-story-id="${visual.id}"]`)
           : null
       if (headline && visual) {
-        // Preserve an actual visible headline through native column reflow.
+        // Preserve an actual visible headline through column reflow.
         // Fractional chunk anchoring is the fallback for evicted/deleted nodes.
         root.scrollTop +=
           headline.getBoundingClientRect().top - root.getBoundingClientRect().top - visual.offset
@@ -309,7 +312,10 @@ export default function NewspaperList({
     }
     previousModel.current = model
     measure()
-    if (focusReturn.current) {
+    // Width-driven stack redistribution needs a commit before revealing a
+    // hidden-pane URL selection; the old columns may place it at another row.
+    const width = list.clientWidth || Math.max(0, root.clientWidth - 80) || geometry.width
+    if (focusReturn.current && width === geometry.width) {
       const story = returnTo.current
         ? list.querySelector<HTMLButtonElement>(`[data-story-id="${returnTo.current.id}"]`)
         : null
@@ -323,7 +329,7 @@ export default function NewspaperList({
       } else {
         if (story && returnTo.current?.scroll === null) {
           // A URL selection has no saved pixel position. Reveal its headline,
-          // not just the beginning of a potentially very tall native section.
+          // not just the beginning of a potentially very tall section.
           root.scrollTop +=
             story.getBoundingClientRect().top - root.getBoundingClientRect().top - contentOrigin()
           measure()
@@ -337,7 +343,13 @@ export default function NewspaperList({
     if (focused && !focused.node.isConnected) {
       focusedStory.current = null
       if (!document.activeElement || document.activeElement === document.body) {
-        const stories = [...list.querySelectorAll<HTMLButtonElement>('[data-story-id]')]
+        // Stack DOM order differs from rank. Recover the same (or next ranked)
+        // headline when redistribution/removal disconnects the focused node.
+        const stories = [...list.querySelectorAll<HTMLButtonElement>('[data-story-id]')].sort(
+          (a, b) =>
+            Number(a.closest('li')?.getAttribute('aria-posinset')) -
+            Number(b.closest('li')?.getAttribute('aria-posinset')),
+        )
         const next = stories.find(
           (story) =>
             Number(story.closest('li')?.getAttribute('aria-posinset')) - 1 >= focused.index,
@@ -352,6 +364,7 @@ export default function NewspaperList({
     measure,
     items,
     geometry.top,
+    geometry.width,
     range.first,
     range.last,
     contentOrigin,
@@ -398,6 +411,21 @@ export default function NewspaperList({
     [onSelect],
   )
 
+  const renderStory = (chunk: NewspaperChunk, localIndex: number) => (
+    <NewspaperStory
+      key={chunk.items[localIndex].id}
+      item={chunk.items[localIndex]}
+      index={chunk.start + localIndex}
+      total={items.length}
+      role={newspaperRole(chunk.start + localIndex)}
+      feedTitle={feedTitle}
+      singleClickRead={singleClickRead}
+      onSelect={selectStory}
+      onRead={onRead}
+      onStar={onStar}
+    />
+  )
+
   return (
     <div
       ref={scrollRef}
@@ -421,30 +449,34 @@ export default function NewspaperList({
         {chunks.map((chunk, index) => (
           <li key={index} className="flow-root list-none" role="presentation">
             {index >= range.first && index <= range.last ? (
-              <ul
+              <div
                 ref={(node) => {
                   if (node) sectionNodes.current.set(index, node)
                   else sectionNodes.current.delete(index)
                 }}
-                className="newspaper m-0 list-none p-0"
+                className="newspaper grid items-start gap-x-7"
+                style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
+                role="group"
                 aria-label={`Stories ${chunk.start + 1}–${chunk.start + chunk.items.length}`}
                 data-newspaper-chunk={index}
               >
-                {chunk.items.map((item, localIndex) => (
-                  <NewspaperStory
-                    key={item.id}
-                    item={item}
-                    index={chunk.start + localIndex}
-                    total={items.length}
-                    role={newspaperRole(chunk.start + localIndex)}
-                    feedTitle={feedTitle}
-                    singleClickRead={singleClickRead}
-                    onSelect={selectStory}
-                    onRead={onRead}
-                    onStar={onStar}
-                  />
-                ))}
-              </ul>
+                {chunk.start === 0 && (
+                  <ul className="col-span-full m-0 list-none p-0" aria-label="Lead story">
+                    {renderStory(chunk, 0)}
+                  </ul>
+                )}
+                {newspaperColumnIndices(chunk.items.length, columnCount, chunk.start === 0).map(
+                  (indices, column) => (
+                    <ul
+                      key={column}
+                      className="newspaper-column m-0 min-w-0 list-none p-0"
+                      aria-label={`Column ${column + 1}`}
+                    >
+                      {indices.map((localIndex) => renderStory(chunk, localIndex))}
+                    </ul>
+                  ),
+                )}
+              </div>
             ) : (
               <div
                 aria-hidden="true"
