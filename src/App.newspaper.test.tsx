@@ -212,6 +212,10 @@ it('requires explicit URL selection to mount/extract; returns scroll, chunks and
   expect(mocks.store!.loadMore).not.toHaveBeenCalled()
   expect(disconnected).toHaveBeenCalled()
   const back = container.querySelector<HTMLButtonElement>('[aria-label="Back"]')!
+  expect(back.textContent).toBe('')
+  expect(back.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
+  expect(back.classList.contains('size-8')).toBe(true)
+  expect(back.type).toBe('button')
   // Shared title/header wrapper wiring, not a pixel-alignment assertion.
   const titleLine = back.parentElement!
   expect(titleLine.classList.contains('flex')).toBe(true)

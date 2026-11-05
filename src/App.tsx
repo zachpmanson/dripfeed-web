@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { dbGetGeneration } from './db'
 import useUrlState from './hooks/useUrlState'
 import useListPreferences from './hooks/useListPreferences'
@@ -17,6 +18,7 @@ import { SettingsModal } from './components/settings/SettingsModal'
 import AppHeader from './components/app/AppHeader'
 import SyncGate from './components/app/SyncGate'
 import ErrorToast from './components/app/ErrorToast'
+import { IconButton } from './components/ui/IconButton'
 import { buildAppViewModel } from './appViewModel'
 import type { NewsItem } from './api/types'
 
@@ -241,15 +243,14 @@ export default function App() {
               item={selected}
               titlePrefix={
                 newspaperReader ? (
-                  <button
+                  <IconButton
                     ref={backRef}
-                    type="button"
-                    aria-label="Back"
-                    className="inline-flex min-h-8 shrink-0 items-center gap-1 border-0 bg-transparent px-1 text-sm text-app-muted hover:text-app-text"
+                    variant="bare"
+                    title="Back"
                     onClick={() => setSelectedId(null)}
                   >
-                    <span aria-hidden="true">←</span> Back
-                  </button>
+                    <ArrowLeftIcon aria-hidden="true" />
+                  </IconButton>
                 ) : undefined
               }
               feedTitle={feedTitle}
