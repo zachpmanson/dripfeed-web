@@ -6,6 +6,7 @@ interface Props {
   onClick: () => void
   children: ReactNode
   disabled?: boolean
+  pressed?: boolean
   border?: boolean
   className?: string
   variant?: 'default' | 'bare'
@@ -13,20 +14,24 @@ interface Props {
 
 /** A small square header/reader icon button (glyph or SVG child). */
 export const IconButton = forwardRef<HTMLButtonElement, Props>(function IconButton(
-  { title, onClick, children, disabled, border = false, className, variant = 'default' },
+  { title, onClick, children, disabled, pressed, border = false, className, variant = 'default' },
   ref,
 ) {
   const tooltipId = useId()
   const variantClasses = variant === 'bare' ? 'bg-transparent' : 'bg-app-panel'
   const borderClasses = border ? 'border border-app-border' : 'border-0'
+  const stateClasses = pressed
+    ? 'text-app-accent hover:text-app-accent'
+    : 'text-app-muted hover:text-app-text'
 
   return (
     <Tooltip.Root disabled={disabled}>
       <Tooltip.Trigger
         ref={ref}
         render={<button type="button" disabled={disabled} />}
-        className={`inline-flex size-8 shrink-0 items-center justify-center rounded p-0 text-app-muted ${variantClasses} ${borderClasses} hover:bg-app-border hover:text-app-text disabled:cursor-default disabled:opacity-55 disabled:hover:bg-transparent disabled:hover:text-app-muted [&>svg]:size-6 ${className ?? ''}`}
+        className={`inline-flex size-8 shrink-0 items-center justify-center rounded p-0 ${stateClasses} ${variantClasses} ${borderClasses} hover:bg-app-border disabled:cursor-default disabled:opacity-55 disabled:hover:bg-transparent disabled:hover:text-app-muted [&>svg]:size-6 ${className ?? ''}`}
         aria-label={title}
+        aria-pressed={pressed}
         aria-describedby={tooltipId}
         onClick={onClick}
       >

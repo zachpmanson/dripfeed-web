@@ -1,6 +1,8 @@
-import { IconStar, IconStarFilled } from '@tabler/icons-react'
+import { IconStar, IconStarFilled, IconCircle, IconCircleFilled } from '@tabler/icons-react'
 import { memo, useMemo, useState } from 'react'
-import type { NewsItem } from '../../api/types'
+import type { NewsItem, NewsFeed } from '../../api/types'
+import { FeedIcon } from '../feed/FeedIcon'
+import { IconButton } from '../ui/IconButton'
 import { previewExcerpt, previewImage, previewTitle } from './newspaperPreview'
 import { newspaperExcerptLimit, type NewspaperRole } from './newspaperPresentation'
 
@@ -10,6 +12,8 @@ export default memo(function NewspaperStory({
   total,
   role,
   feedTitle,
+  feedById,
+  showFavicons = true,
   singleClickRead,
   onSelect,
   onRead,
@@ -20,11 +24,14 @@ export default memo(function NewspaperStory({
   total?: number
   role: NewspaperRole
   feedTitle: (feedId: number) => string
+  feedById?: (feedId: number) => NewsFeed | undefined
+  showFavicons?: boolean
   singleClickRead: boolean
   onSelect: (id: number) => void
   onRead: (item: NewsItem) => void
   onStar?: (item: NewsItem) => void
 }) {
+  const feed = showFavicons ? feedById?.(item.feedId) : undefined
   const excerpt = useMemo(() => previewExcerpt(item, newspaperExcerptLimit(role)), [item, role])
   const image = useMemo(
     () => (role === 'lead' || role === 'feature' || role === 'image' ? previewImage(item) : null),
@@ -61,7 +68,10 @@ export default memo(function NewspaperStory({
     >
       <article dir={item.rtl ? 'rtl' : 'auto'}>
         <div className="mb-3 flex flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-widest text-app-muted">
-          <span>{feedTitle(item.feedId)}</span>
+          <span className="inline-flex min-w-0 max-w-full items-center gap-2">
+            {feed && <FeedIcon feed={feed} />}
+            <span className="min-w-0 [overflow-wrap:anywhere]">{feedTitle(item.feedId)}</span>
+          </span>
           {item.pubDate && (
             <time dateTime={new Date(item.pubDate).toISOString()}>
               {new Date(item.pubDate).toLocaleDateString(undefined, {
@@ -95,26 +105,25 @@ export default memo(function NewspaperStory({
         )}
         {role !== 'image' && imagePreview}
         <div className="mt-4 flex flex-wrap gap-3 text-xs text-app-muted">
-          <button
-            className={`inline-flex min-h-8 items-center gap-1 rounded-none border-0 bg-transparent px-0 hover:text-app-text ${item.starred ? 'text-app-accent' : ''}`}
-            aria-label={`${item.starred ? 'Unstar' : 'Star'}: ${title}`}
-            aria-pressed={item.starred}
+          <IconButton
+            variant="bare"
+            title={`${item.starred ? 'Unstar' : 'Star'}: ${title}`}
+            pressed={item.starred}
             onClick={() => onStar?.(item)}
           >
-            {item.starred ? (
-              <IconStarFilled className="size-4" aria-hidden="true" />
-            ) : (
-              <IconStar className="size-4" aria-hidden="true" />
-            )}
-            {item.starred ? 'Starred' : 'Star'}
-          </button>
-          <button
-            className="min-h-8 rounded-none border-0 bg-transparent px-0 hover:text-app-text"
-            aria-label={`Mark ${item.unread ? 'read' : 'unread'}: ${title}`}
+            {item.starred ? <IconStarFilled aria-hidden="true" /> : <IconStar aria-hidden="true" />}
+          </IconButton>
+          <IconButton
+            variant="bare"
+            title={`Mark ${item.unread ? 'read' : 'unread'}: ${title}`}
             onClick={() => onRead(item)}
           >
-            Mark {item.unread ? 'read' : 'unread'}
-          </button>
+            {item.unread ? (
+              <IconCircleFilled aria-hidden="true" />
+            ) : (
+              <IconCircle aria-hidden="true" />
+            )}
+          </IconButton>
         </div>
       </article>
     </li>

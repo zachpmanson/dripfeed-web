@@ -2,7 +2,7 @@
 import { act, StrictMode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import type { NewsItem } from '../../api/types'
+import type { NewsItem, NewsFeed } from '../../api/types'
 import { ItemList, type ItemListProps } from './ItemList'
 import {
   estimatedChunkHeight,
@@ -674,4 +674,41 @@ it('leaves list mode prefix batching, selected-row inclusion and caller order/fi
   )!
   await act(async () => more.click())
   expect(props.onLoadMore).toHaveBeenCalledTimes(1)
+})
+
+it('forwards feed metadata and favicon preference, groups the name with branding, and falls back safely', async () => {
+  const feed = {
+    id: 1,
+    title: 'Fixture',
+    faviconLink: 'https://fixture.invalid/favicon.png',
+  } as NewsFeed
+  await render({ items: [{ ...item(1), pubDate: 1000 }], feedById: () => feed })
+  const image = host.querySelector<HTMLImageElement>('.feed-icon')!
+  expect(image.getAttribute('src')).toBe(feed.faviconLink)
+  expect(image.alt).toBe('')
+  expect(image.width).toBe(16)
+  const source = image.parentElement!
+  expect(source.textContent).toBe('Fixture')
+  expect(source.classList.contains('inline-flex')).toBe(true)
+  expect(source.classList.contains('items-center')).toBe(true)
+  // Wrapping utility wiring, not native geometry evidence.
+  expect(source.classList.contains('max-w-full')).toBe(true)
+  expect(source.lastElementChild?.classList.contains('[overflow-wrap:anywhere]')).toBe(true)
+  expect(source.parentElement?.classList.contains('flex-wrap')).toBe(true)
+  expect(source.nextElementSibling?.tagName).toBe('TIME')
+  await act(async () => image.dispatchEvent(new Event('error')))
+  expect(host.querySelector('img')).toBeNull()
+  expect(source.querySelector('svg.tabler-icon-rss')?.getAttribute('aria-hidden')).toBe('true')
+  await render({ showFavicons: false })
+  expect(host.querySelector('.feed-icon')).toBeNull()
+  expect(source.textContent).toBe('Fixture')
+  await render({ showFavicons: true, feedById: () => ({ ...feed, faviconLink: null }) })
+  expect(host.querySelector('.feed-icon svg.tabler-icon-rss')).not.toBeNull()
+  expect(host.querySelector('img')).toBeNull()
+  await render({ feedById: () => undefined })
+  expect(host.querySelector('.feed-icon')).toBeNull()
+  expect(source.textContent).toBe('Fixture')
+  await render({ feedById: undefined })
+  expect(host.querySelector('img')).toBeNull()
+  expect(source.textContent).toBe('Fixture')
 })

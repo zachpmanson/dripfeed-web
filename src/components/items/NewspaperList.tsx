@@ -48,6 +48,8 @@ export default function NewspaperList({
   active = true,
   selectedId,
   feedTitle,
+  feedById,
+  showFavicons = true,
   singleClickRead = false,
   onSelect,
   onRead,
@@ -451,6 +453,8 @@ export default function NewspaperList({
       total={items.length}
       role={newspaperRole(chunk.start + localIndex)}
       feedTitle={feedTitle}
+      feedById={feedById}
+      showFavicons={showFavicons}
       singleClickRead={singleClickRead}
       onSelect={selectStory}
       onRead={onRead}

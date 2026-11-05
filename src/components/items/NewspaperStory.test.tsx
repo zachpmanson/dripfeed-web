@@ -178,21 +178,40 @@ it('bounds the lead image height without enlarging later column images', async (
   expect(container.querySelector('img')?.parentElement?.classList.contains('max-h-80')).toBe(false)
 })
 
-it('renders Tabler star states with explicit visible Star/Starred text and unchanged action labels', async () => {
+it('uses icon-only Star and read toggles with unchanged labels, state, accent and 32px targets', async () => {
   await render()
   const star = container.querySelector<HTMLButtonElement>('[aria-label="Star: Headline"]')!
-  expect(star.textContent).toBe('Star')
+  expect(star.textContent).toBe('')
+  expect(star.classList.contains('size-8')).toBe(true)
+  expect(star.classList.contains('text-app-muted')).toBe(true)
+  const read = container.querySelector<HTMLButtonElement>('[aria-label="Mark unread: Headline"]')!
+  expect(read.textContent).toBe('')
+  expect(read.classList.contains('size-8')).toBe(true)
+  expect(read.hasAttribute('aria-pressed')).toBe(false)
+  expect(read.querySelector('svg.tabler-icon-circle')?.getAttribute('aria-hidden')).toBe('true')
   expect(star.querySelector('svg.tabler-icon-star')?.getAttribute('aria-hidden')).toBe('true')
-  const { onStar } = await render({ ...item, starred: true })
+  const changed = { ...item, starred: true, unread: true }
+  const { onStar, onRead } = await render(changed)
   const unstar = container.querySelector<HTMLButtonElement>('[aria-label="Unstar: Headline"]')!
-  expect(unstar.textContent).toBe('Starred')
+  expect(unstar.textContent).toBe('')
+  expect(unstar.classList.contains('text-app-accent')).toBe(true)
+  expect(unstar.classList.contains('text-app-muted')).toBe(false)
+  expect(unstar.classList.contains('hover:text-app-text')).toBe(false)
   expect(unstar.getAttribute('aria-pressed')).toBe('true')
   expect(unstar.querySelector('svg.tabler-icon-star-filled')?.getAttribute('aria-hidden')).toBe(
     'true',
   )
   expect(unstar.querySelector('svg.tabler-icon-star')).toBeNull()
   await act(async () => unstar.click())
-  expect(onStar).toHaveBeenCalledExactlyOnceWith({ ...item, starred: true })
+  expect(onStar).toHaveBeenCalledExactlyOnceWith(changed)
+  const unread = container.querySelector<HTMLButtonElement>('[aria-label="Mark read: Headline"]')!
+  expect(unread.querySelector('svg.tabler-icon-circle-filled')?.getAttribute('aria-hidden')).toBe(
+    'true',
+  )
+  expect(unread.querySelector('svg.tabler-icon-circle')).toBeNull()
+  expect(unread.textContent).toBe('')
+  await act(async () => unread.click())
+  expect(onRead).toHaveBeenCalledExactlyOnceWith(changed)
 })
 
 it('preserves spinner rotation, idle refresh sizing and reduced-motion opt-out', () => {
@@ -205,3 +224,28 @@ it('preserves spinner rotation, idle refresh sizing and reduced-motion opt-out',
     /\.header-right \.sync:not\(\.syncing\) \.spinner\s*\{\s*animation: none/,
   )
 })
+
+it.each(['Star', 'Mark unread'])(
+  'keeps the full long-title %s label in its shared tooltip',
+  async (action) => {
+    const title = 'A long headline '.repeat(30).trim()
+    await render({ ...item, title })
+    const label = `${action}: ${title}`
+    const button = [...container.querySelectorAll('button')].find(
+      (node) => node.getAttribute('aria-label') === label,
+    )!
+    expect(button.textContent).toBe('')
+    expect(button.title).toBe('')
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+      button.focus()
+    })
+    await act(async () => {
+      await vi.waitFor(() => {
+        const tooltip = document.getElementById(button.getAttribute('aria-describedby')!)
+        expect(tooltip?.getAttribute('role')).toBe('tooltip')
+        expect(tooltip?.textContent).toBe(label)
+      })
+    })
+  },
+)
