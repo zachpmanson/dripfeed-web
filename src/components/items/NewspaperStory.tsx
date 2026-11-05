@@ -70,7 +70,7 @@ export default memo(function NewspaperStory({
         <header dir="ltr" className="mb-3 flex items-start justify-between gap-3">
           <div
             dir="auto"
-            className="flex min-h-8 min-w-0 flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-widest text-app-muted"
+            className="flex min-h-[16px] min-w-0 flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-widest text-app-muted"
           >
             <span className="inline-flex min-w-0 max-w-full items-center gap-2">
               {feed && <FeedIcon feed={feed} />}
@@ -88,6 +88,7 @@ export default memo(function NewspaperStory({
           <div className="flex shrink-0 gap-1">
             <IconButton
               variant="bare"
+              size="compact"
               title={`${item.starred ? 'Unstar' : 'Star'}: ${title}`}
               pressed={item.starred}
               onClick={() => onStar?.(item)}
@@ -100,6 +101,7 @@ export default memo(function NewspaperStory({
             </IconButton>
             <IconButton
               variant="bare"
+              size="compact"
               title={`Mark ${item.unread ? 'read' : 'unread'}: ${title}`}
               onClick={() => onRead(item)}
             >

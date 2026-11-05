@@ -99,7 +99,7 @@ it.each(['lead', 'brief'] as const)(
     expect(metadata.getAttribute('dir')).toBe('auto')
     expect(metadata.textContent).toContain('Feed')
     expect(metadata.querySelector('time')).not.toBeNull()
-    expect(metadata.classList.contains('min-h-8')).toBe(true)
+    expect(metadata.classList.contains('min-h-[16px]')).toBe(true)
     expect(metadata.classList.contains('min-w-0')).toBe(true)
     const actions = header.lastElementChild!
     expect(actions.classList.contains('shrink-0')).toBe(true)
@@ -207,15 +207,21 @@ it('bounds the lead image height without enlarging later column images', async (
   expect(container.querySelector('img')?.parentElement?.classList.contains('max-h-80')).toBe(false)
 })
 
-it('uses icon-only Star and read toggles with unchanged labels, state, accent and 32px targets', async () => {
+it('uses favicon-sized Star and read toggles with unchanged labels, state and accent', async () => {
   await render()
   const star = container.querySelector<HTMLButtonElement>('[aria-label="Star: Headline"]')!
   expect(star.textContent).toBe('')
-  expect(star.classList.contains('size-8')).toBe(true)
+  expect(star.classList.contains('size-[16px]')).toBe(true)
+  expect(star.classList.contains('[&>svg]:size-[16px]')).toBe(true)
+  expect(star.classList.contains('size-8')).toBe(false)
+  expect(star.classList.contains('[&>svg]:size-6')).toBe(false)
   expect(star.classList.contains('text-app-muted')).toBe(true)
   const read = container.querySelector<HTMLButtonElement>('[aria-label="Mark unread: Headline"]')!
   expect(read.textContent).toBe('')
-  expect(read.classList.contains('size-8')).toBe(true)
+  expect(read.classList.contains('size-[16px]')).toBe(true)
+  expect(read.classList.contains('[&>svg]:size-[16px]')).toBe(true)
+  expect(read.classList.contains('size-8')).toBe(false)
+  expect(read.classList.contains('[&>svg]:size-6')).toBe(false)
   expect(read.hasAttribute('aria-pressed')).toBe(false)
   expect(read.querySelector('svg.tabler-icon-circle')?.getAttribute('aria-hidden')).toBe('true')
   expect(star.querySelector('svg.tabler-icon-star')?.getAttribute('aria-hidden')).toBe('true')
