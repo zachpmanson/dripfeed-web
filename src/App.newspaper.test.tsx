@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import App from './App'
 import type { AppData } from './hooks'
 import type { NewsFeed, NewsItem } from './api/types'
+import { estimatedChunkHeight } from './components/items/newspaperVirtualization'
 
 const mocks = vi.hoisted(() => ({ store: null as AppData | null }))
 vi.mock('./hooks', () => ({ useStore: () => mocks.store! }))
@@ -88,6 +89,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount())
   container.remove()
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 const render = async () => {
@@ -164,6 +166,7 @@ it('requires explicit URL selection to mount/extract; returns scroll, chunks and
   mocks.store!.feeds.get(1)!.fullTextEnabled = true
   await render()
   expect(container.querySelector('iframe')).toBeNull()
+  expect(container.querySelector('[aria-label="Back"]')).toBeNull()
   expect(mocks.store!.actions.extractFulltext).not.toHaveBeenCalled()
   expect(mocks.store!.actions.setRead).not.toHaveBeenCalled()
   const storyIds = () =>
@@ -200,12 +203,15 @@ it('requires explicit URL selection to mount/extract; returns scroll, chunks and
   await act(async () => resize([], {} as ResizeObserver))
   expect(storyIds().sort((a, b) => b - a)).toEqual(Array.from({ length: 100 }, (_, i) => 120 - i))
   expect(newspaper().querySelectorAll('.newspaper-lead')).toHaveLength(1)
+  const frontUrl = location.search
   newspaperScroll().scrollTop = 900
   await click('[data-story-id="120"]')
   expect(location.search).toContain('item=120')
   expect(container.querySelector('iframe')).not.toBeNull()
   expect(mocks.store!.actions.extractFulltext).toHaveBeenCalledTimes(1)
-  expect(document.activeElement?.getAttribute('aria-label')).toBe('Back')
+  expect(document.activeElement?.tagName).toBe('H2')
+  expect(document.activeElement?.textContent).toBe('Story 120')
+  expect(container.querySelector('[aria-label="Back"]')).toBeNull()
   expect(newspaperScroll().parentElement?.className).toBe('hidden')
   const count = newspaper().querySelectorAll('[data-story-id]').length
   // Even a queued resize delivery after disconnect must stay quiet.
@@ -213,23 +219,19 @@ it('requires explicit URL selection to mount/extract; returns scroll, chunks and
   expect(newspaper().querySelectorAll('[data-story-id]')).toHaveLength(count)
   expect(mocks.store!.loadMore).not.toHaveBeenCalled()
   expect(disconnected).toHaveBeenCalled()
-  const back = container.querySelector<HTMLButtonElement>('[aria-label="Back"]')!
-  expect(back.textContent).toBe('')
-  expect(back.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
-  expect(back.classList.contains('size-8')).toBe(true)
-  expect(back.type).toBe('button')
-  // Shared title/header wrapper wiring, not a pixel-alignment assertion.
-  const titleLine = back.parentElement!
-  expect(titleLine.classList.contains('flex')).toBe(true)
-  expect(titleLine.classList.contains('min-w-0')).toBe(true)
-  expect(titleLine.querySelector('h2')?.textContent).toBe('Story 120')
-  const header = titleLine.parentElement!
+  const header = document.activeElement!.parentElement!
   expect(header.querySelector('[aria-label="Star"]')).not.toBeNull()
   expect(header.querySelector('[aria-label^="Extract full article"]')).not.toBeNull()
   expect(header.querySelector('[aria-label="Mark read"]')).not.toBeNull()
-  expect(header.parentElement?.tagName).toBe('ARTICLE')
-  expect(header.parentElement?.firstElementChild).toBe(header)
-  await act(async () => back.click())
+  // Exercise useUrlState's real history/popstate wiring, not an app-only close action.
+  await act(async () => {
+    const popped = new Promise<void>((resolve) =>
+      window.addEventListener('popstate', () => resolve(), { once: true }),
+    )
+    history.back()
+    await popped
+  })
+  expect(location.search).toBe(frontUrl)
   expect(newspaperScroll().scrollTop).toBe(900)
   expect(document.activeElement?.getAttribute('data-story-id')).toBe('120')
   expect(newspaper().querySelectorAll('[data-story-id]')).toHaveLength(100)
@@ -353,6 +355,69 @@ it('honors deep links/popstate and never opens a fallback for an unavailable exp
   })
   expect(container.querySelector('iframe')).toBeNull()
   expect(newspaperScroll().parentElement?.className).not.toBe('hidden')
+})
+
+it('bounds actual deep URL and hidden popstate selections without a Back control', async () => {
+  // Fake geometry only: exercise navigation/anchor wiring, not native layout.
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(900)
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    let top = this.classList.contains('newspaper-chunks') ? 28 - newspaperScroll().scrollTop : 0
+    const section = this.closest<HTMLElement>('[data-newspaper-chunk]')
+    const h = this.hasAttribute('data-newspaper-chunk')
+      ? estimatedChunkHeight(
+          this.querySelectorAll('[data-story-id]').length,
+          900,
+          this.dataset.newspaperChunk === '0',
+        )
+      : 600
+    if (section && this.hasAttribute('data-story-id')) {
+      const chunk = Number(section.dataset.newspaperChunk)
+      top = 28 - newspaperScroll().scrollTop
+      for (let i = 0; i < chunk; i++) top += estimatedChunkHeight(50, 900, i === 0)
+    }
+    return {
+      top,
+      bottom: top + h,
+      left: 0,
+      right: 900,
+      width: 900,
+      height: h,
+      x: 0,
+      y: top,
+      toJSON() {},
+    }
+  })
+  localStorage.setItem('dripfeed.presentation', 'newspaper')
+  mocks.store!.pool = Array.from({ length: 10_000 }, (_, i) => item(i + 1))
+  history.replaceState(null, '', '/?view=all&item=25')
+  await render()
+  const headlines = () => newspaper().querySelectorAll('[data-story-id]')
+  expect(headlines().length).toBeLessThanOrEqual(250)
+  expect(newspaper().querySelector('[data-story-id="25"]')).not.toBeNull()
+  expect(newspaper().querySelector('[data-story-id="10000"]')).toBeNull()
+  expect(document.activeElement?.tagName).toBe('H2')
+  expect(document.activeElement?.textContent).toBe('Story 25')
+  expect(container.querySelector('[aria-label="Back"]')).toBeNull()
+  await act(async () => {
+    history.replaceState(null, '', '/?view=all&item=5000')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  expect(document.activeElement?.textContent).toBe('Story 5000')
+  expect(newspaper().querySelector('[data-story-id="5000"]')).not.toBeNull()
+  expect(newspaper().querySelector('[data-story-id="10000"]')).toBeNull()
+  expect(headlines().length).toBeLessThanOrEqual(250)
+  await act(async () => {
+    window.dispatchEvent(new Event('resize'))
+    history.replaceState(null, '', '/?view=all')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  expect(container.querySelector('iframe')).toBeNull()
+  expect(document.activeElement?.getAttribute('data-story-id')).toBe('5000')
+  expect(headlines().length).toBeLessThanOrEqual(250)
+  expect(container.querySelector('[aria-label="Back"]')).toBeNull()
 })
 
 it('uses invalid preferences as list and tolerates storage that throws', async () => {

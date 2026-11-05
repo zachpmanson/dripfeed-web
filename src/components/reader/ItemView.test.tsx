@@ -113,7 +113,7 @@ it('omits Back by default and keeps a long title and all actions in the header',
   expect(heading.textContent).toBe(selected.title)
   expect(heading.classList.contains('min-w-0')).toBe(true)
   expect(heading.classList.contains('[overflow-wrap:anywhere]')).toBe(true)
-  const header = heading.parentElement!.parentElement!
+  const header = heading.parentElement!
   expect(header.querySelector('[aria-label="Star"]')).not.toBeNull()
   expect(header.querySelector('[aria-label="Mark read"]')).not.toBeNull()
   expect(header.contains(extractButton())).toBe(true)

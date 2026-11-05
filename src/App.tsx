@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { dbGetGeneration } from './db'
 import useUrlState from './hooks/useUrlState'
 import useListPreferences from './hooks/useListPreferences'
@@ -18,7 +17,6 @@ import { SettingsModal } from './components/settings/SettingsModal'
 import AppHeader from './components/app/AppHeader'
 import SyncGate from './components/app/SyncGate'
 import ErrorToast from './components/app/ErrorToast'
-import { IconButton } from './components/ui/IconButton'
 import { buildAppViewModel } from './appViewModel'
 import type { NewsItem } from './api/types'
 
@@ -33,11 +31,7 @@ export default function App() {
   const [revealNonce, setRevealNonce] = useState(0)
   const { sortMode, setSortMode, showMode, setShowMode } = useListPreferences()
   const { presentation, setPresentation, newspaper } = usePresentation()
-  const backRef = useRef<HTMLButtonElement>(null)
   const store = useStore(settings, view, showMode === 'unread')
-  useEffect(() => {
-    if (newspaper && selectedId !== null) backRef.current?.focus({ preventScroll: true })
-  }, [newspaper, selectedId, store.ready])
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
 
@@ -241,18 +235,7 @@ export default function App() {
               key={readerGeneration}
               ownerGeneration={readerGeneration}
               item={selected}
-              titlePrefix={
-                newspaperReader ? (
-                  <IconButton
-                    ref={backRef}
-                    variant="bare"
-                    title="Back"
-                    onClick={() => setSelectedId(null)}
-                  >
-                    <ArrowLeftIcon aria-hidden="true" />
-                  </IconButton>
-                ) : undefined
-              }
+              focusTitle={newspaperReader}
               feedTitle={feedTitle}
               actions={store.actions}
               articleCssMode={articleCssMode}

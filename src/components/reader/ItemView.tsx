@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { enclosureHtml } from '../../utils'
 import { dbGetGeneration } from '../../db'
 import { dimRepeatedChunks } from '../../boilerplate'
@@ -33,7 +33,7 @@ function baseHrefFor(url: string | null | undefined): string {
 
 interface Props {
   item: NewsItem | null
-  titlePrefix?: ReactNode
+  focusTitle?: boolean
   /** Database generation owning the supplied items, even if this reader mounts after a reset. */
   ownerGeneration?: number
   feedTitle: (feedId: number) => string
@@ -65,7 +65,7 @@ let autoExtractGeneration = dbGetGeneration()
 
 export function ItemView({
   item,
-  titlePrefix,
+  focusTitle,
   feedTitle,
   actions,
   articleCssMode,
@@ -251,7 +251,7 @@ export function ItemView({
     <article className="flex min-h-0 flex-col overflow-y-auto p-4 md:px-6">
       <ReaderHeader
         item={item}
-        titlePrefix={titlePrefix}
+        focusTitle={focusTitle}
         actions={actions}
         extracting={extracting}
         extractError={extractError}

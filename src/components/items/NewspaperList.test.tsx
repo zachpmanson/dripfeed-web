@@ -114,6 +114,18 @@ const scroll = async (top: number) => {
   })
   await flush()
 }
+// Full-range regression cases explicitly expose the cached range by selecting
+// its last chunk; ordinary front-page tests retain progressive exposure.
+const exposeAll = async (next: Partial<ItemListProps> = {}) => {
+  await render({ ...next, selectedId: 10_000 })
+  await render({ selectedId: null })
+}
+const represented = () =>
+  host.querySelectorAll('[data-newspaper-chunk], [data-newspaper-placeholder]').length
+const loadMore = () =>
+  [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent === 'Load more',
+  )!
 const resize = async () => {
   await act(async () => {
     observers.at(-1)!.callback([], {} as ResizeObserver)
@@ -234,7 +246,13 @@ it('bounds 10,000 stories with balanced ranked column tops across chunks and abs
   expect([...ids()].sort((a, b) => a - b)).toEqual(
     Array.from({ length: 100 }, (_, index) => index + 1),
   )
-  expect(host.querySelectorAll('[data-newspaper-placeholder]')).toHaveLength(198)
+  expect(host.querySelectorAll('[data-newspaper-placeholder]')).toHaveLength(0)
+  expect(represented()).toBe(2)
+  expect(pane().scrollHeight).toBe(
+    estimatedChunkHeight(50, width - 80, true) + estimatedChunkHeight(50, width - 80, false) + 96,
+  )
+  expect(list().textContent).not.toContain('up to date')
+  await exposeAll()
   expect(host.querySelectorAll('.newspaper-lead')).toHaveLength(1)
   for (const chunk of [1, 80, 199, 100, 3, 197, 0]) {
     await scroll(offset(chunk) + 100)
@@ -251,6 +269,78 @@ it('bounds 10,000 stories with balanced ranked column tops across chunks and abs
   }
   expect(props.onLoadMore).not.toHaveBeenCalled()
 }, 20_000)
+
+it('reveals one local chunk two viewports early, never drains on idle and pauses while hidden', async () => {
+  height = 800
+  await render({ moreServer: true, drained: false })
+  expect(represented()).toBe(2)
+  await scroll(pane().scrollHeight - height - 1700)
+  expect(represented()).toBe(2)
+  await scroll(pane().scrollHeight - height - 1500)
+  expect(represented()).toBe(3)
+  bounds()
+  for (let count = 0; count < 4; count++) await resize()
+  expect(represented()).toBe(3)
+  expect(props.onLoadMore).not.toHaveBeenCalled()
+  await scroll(pane().scrollHeight - height - 1500)
+  expect(represented()).toBe(4)
+  bounds()
+  await render({ active: false })
+  await scroll(pane().scrollHeight - height)
+  await resize()
+  expect(represented()).toBe(4)
+  expect(props.onLoadMore).not.toHaveBeenCalled()
+})
+
+it('does not expose a huge viewport on idle or repeatedly drain a short exposed tail', async () => {
+  height = 10_000_000
+  await render({ moreServer: true, drained: false })
+  for (let count = 0; count < 3; count++) await resize()
+  expect(represented()).toBe(2)
+  await scroll(1)
+  expect(represented()).toBe(3)
+  for (let count = 0; count < 3; count++) await resize()
+  await scroll(2)
+  expect(represented()).toBe(3)
+  expect(props.onLoadMore).not.toHaveBeenCalled()
+  bounds()
+})
+
+it('makes the button local-first and never reports up to date while cached stories are hidden', async () => {
+  await render({ items: pool.slice(0, 175), moreServer: false, drained: true })
+  expect(represented()).toBe(2)
+  expect(list().textContent).not.toContain('up to date')
+  await act(async () => loadMore().click())
+  await flush()
+  expect(represented()).toBe(3)
+  expect(list().textContent).not.toContain('up to date')
+  await act(async () => loadMore().click())
+  await flush()
+  expect(represented()).toBe(4)
+  expect(list().textContent).toContain('up to date')
+  expect(props.onLoadMore).not.toHaveBeenCalled()
+  await render({ moreServer: true, drained: false })
+  await act(async () => loadMore().click())
+  await flush()
+  expect(props.onLoadMore).toHaveBeenCalledTimes(1)
+  bounds()
+})
+
+it('expands a hidden URL target without mounting its prefix and resets exposure only on window remount', async () => {
+  await render()
+  await render({ active: false, selectedId: 9950 })
+  expect(represented()).toBe(199)
+  expect(host.querySelector('[data-story-id="9950"]')).not.toBeNull()
+  expect(host.querySelector('[data-story-id="1"]')).toBeNull()
+  bounds()
+  await render({ active: true, selectedId: null })
+  expect(document.activeElement?.getAttribute('data-story-id')).toBe('9950')
+  await scroll(0)
+  expect(represented()).toBe(199)
+  await render({ windowKey: 'new-scope' })
+  expect(represented()).toBe(2)
+  bounds()
+})
 
 it('redistributes ranked tops into three, two and one stacks on resize without changing rank or roles', async () => {
   await render()
@@ -284,7 +374,7 @@ it('redistributes ranked tops into three, two and one stacks on resize without c
 })
 
 it('readies a full upcoming measured chunk before its leading edge enters the viewport', async () => {
-  await render()
+  await exposeAll()
   expect(host.querySelector('[data-newspaper-chunk="1"]')).not.toBeNull()
   expect(offset(1)).toBeGreaterThan(pane().scrollTop + height)
   await scroll(offset(100) + 200)
@@ -296,7 +386,7 @@ it('readies a full upcoming measured chunk before its leading edge enters the vi
 
 it('prefetches the server two viewports early, without serially draining small pages inside that margin', async () => {
   height = 800
-  await render({ moreServer: true, drained: false })
+  await exposeAll({ moreServer: true, drained: false })
   await scroll(pane().scrollHeight - height - 1700)
   expect(props.onLoadMore).not.toHaveBeenCalled()
   await scroll(pane().scrollHeight - height - 1500)
@@ -311,7 +401,7 @@ it('prefetches the server two viewports early, without serially draining small p
 
 it('caps even a viewport taller than the entire estimated pool and coalesces rapid jumps', async () => {
   height = 10_000_000
-  await render()
+  await exposeAll()
   bounds()
   expect(stories()).toHaveLength(200)
   await act(async () => {
@@ -326,7 +416,7 @@ it('caps even a viewport taller than the entire estimated pool and coalesces rap
 })
 
 it('measures sections and anchors the current chunk through overscan/image reflow, width changes and item removal', async () => {
-  await render()
+  await exposeAll()
   await scroll(offset(100) + 200)
   const before = pane().scrollTop
   const above = nativeHeight(host.querySelector('[data-newspaper-chunk="99"]')!)
@@ -349,7 +439,7 @@ it('measures sections and anchors the current chunk through overscan/image reflo
 
 it('reuses measured heights after eviction instead of retaining story DOM', async () => {
   sectionHeights.set(100, 2400)
-  await render()
+  await exposeAll()
   await scroll(offset(100) + 100)
   expect(host.querySelector('[data-story-id="5001"]')).not.toBeNull()
   bounds()
@@ -366,7 +456,7 @@ it('reuses measured heights after eviction instead of retaining story DOM', asyn
 it('keeps hidden/deep-link selections bounded and restores their chunk and headline on Back', async () => {
   await render({ active: false, selectedId: 9950 })
   bounds()
-  expect(stories()).toHaveLength(150)
+  expect(stories()).toHaveLength(100)
   expect(host.querySelector('[data-story-id="9950"]')).not.toBeNull()
   expect(host.querySelector('[data-story-id="1"]')).toBeNull()
   expect(props.onLoadMore).not.toHaveBeenCalled()
@@ -389,7 +479,7 @@ it('keeps hidden/deep-link selections bounded and restores their chunk and headl
 })
 
 it('preserves clicked scroll/headline return, recovers filtered focused actions, and respects external focus', async () => {
-  await render()
+  await exposeAll()
   await scroll(900)
   await act(async () => host.querySelector<HTMLButtonElement>('[data-story-id="1"]')!.click())
   expect(props.onSelect).toHaveBeenCalledWith(1)
@@ -417,7 +507,7 @@ it('preserves clicked scroll/headline return, recovers filtered focused actions,
 })
 
 it('rejects queued frames and ResizeObserver callbacks after hiding, changing views and unmounting', async () => {
-  await render({ moreServer: true, drained: false })
+  await exposeAll({ moreServer: true, drained: false })
   const oldObserver = observers.at(-1)!
   await act(async () => {
     pane().scrollTop = offset(199) + 7000
@@ -451,7 +541,7 @@ it('rejects queued frames and ResizeObserver callbacks after hiding, changing vi
 })
 
 it('pages only the true server tail, settles no-growth pages, allows explicit retry and rearms on growth', async () => {
-  await render({ moreServer: true, drained: false })
+  await exposeAll({ moreServer: true, drained: false })
   expect(props.onLoadMore).not.toHaveBeenCalled()
   await scroll(offset(100))
   expect(props.onLoadMore).not.toHaveBeenCalled()
@@ -475,6 +565,12 @@ it('pages only the true server tail, settles no-growth pages, allows explicit re
     items: [...pool, ...Array.from({ length: 50 }, (_, index) => item(10_001 + index))],
   })
   expect(props.onLoadMore).toHaveBeenCalledTimes(2)
+  // Server growth is cached but not represented until local-first exposure.
+  await scroll(pane().scrollHeight - height)
+  expect(props.onLoadMore).toHaveBeenCalledTimes(2)
+  await act(async () => loadMore().click())
+  await flush()
+  expect(props.onLoadMore).toHaveBeenCalledTimes(2)
   await scroll(pane().scrollHeight - height)
   expect(props.onLoadMore).toHaveBeenCalledTimes(3)
   await render({ drained: true })
@@ -485,7 +581,7 @@ it('pages only the true server tail, settles no-growth pages, allows explicit re
 })
 
 it('rearms prefetch after reading shrinks the pool or a same-size sync replaces its tail', async () => {
-  await render({ moreServer: true, drained: false })
+  await exposeAll({ moreServer: true, drained: false })
   await scroll(pane().scrollHeight - height)
   expect(props.onLoadMore).toHaveBeenCalledTimes(1)
   await render({ items: pool.slice(5000) })

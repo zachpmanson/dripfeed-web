@@ -187,18 +187,25 @@ layout redesign. Optional JSON/screenshot artifacts follow the other runners.
 
 Newspaper mode uses measured grid sections of 50 ranked stories dealt round-robin
 into 1–3 independent column stacks (17rem minimum width, 1.75rem gap). Only the
-viewport sections plus one whole section ahead/behind are mounted (at most five sections / 250 stories); offscreen sections retain measured
-or width-aware estimated height placeholders. This bounds story rendering, not
-the existing unread fetch, ranking sample, IndexedDB mirror or server cursors.
+viewport sections plus one whole section ahead/behind are mounted (at most five
+sections / 250 stories). Initially only 100 cached stories contribute scroll space;
+each near-tail approach reveals another 50. Unrevealed stories have no placeholders.
+Previously visited offscreen sections retain measured or width-aware estimated
+height placeholders. A deep URL selection can explicitly represent its prefix
+without mounting it. This bounds rendering and the initial scroll range, not the
+existing unread fetch, ranking sample, IndexedDB mirror or server cursors.
 The first section alone contains the spanning lead; remaining ranks are dealt
 A1,4,7 / B2,5,8 / C3,6,9. Each column stays ranked; DOM/keyboard traversal runs
 down columns, not visual row-major order. Variable-height stories are not
 pixel-aligned masonry rows. List mode remains unchanged.
 
-The next section is rendered before its leading edge enters the viewport. Server
-prefetch begins two viewport heights (at least 1200px) before the actual local
-tail. One request per approach/current data window avoids draining history inside
-that margin; no-growth results settle and the explicit Load more button retries.
+The next section is rendered before its leading edge enters the viewport. Local
+reveal and server prefetch use two viewport heights (at least 1200px) of headroom.
+Cached stories are exposed before fetching the server. One step per approach/current
+data window avoids draining history inside that margin; no-growth results settle
+and the explicit Load more button is local-first. There is no app Back control;
+browser Back/popstate restores the front-page scroll and headline, while opening
+an article focuses its heading.
 
 ```sh
 nix develop --command pnpm test src/components/items/NewspaperList.test.tsx src/App.newspaper.test.tsx
@@ -208,7 +215,7 @@ These tests execute queued animation frames and mocked ResizeObserver/scroll
 geometry against a 10,000-story fixture: bounded initial/deep-link/fast-jump DOM,
 both directions, balanced ranked column tops across chunks/resizes, measured-height
 reuse, resize/image-height anchors, early overscan/prefetch, hidden/stale callbacks,
-actions/focus/Back, empty-page settling,
+actions/heading focus/browser history Back, empty-page settling,
 read-removal rearming and ordinary list behavior. They are **not native browser
 grid/stack geometry, frame-rate or screen-reader measurements**. No new Chromium
 harness is included.

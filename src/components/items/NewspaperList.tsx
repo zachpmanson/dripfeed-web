@@ -63,7 +63,25 @@ export default function NewspaperList({
   const listRef = useRef<HTMLUListElement>(null)
   const sentinelRef = useRef<HTMLLIElement>(null)
   const sectionNodes = useRef(new Map<number, HTMLDivElement>())
-  const chunks = useMemo(() => newspaperChunks(items), [items])
+  const selectedIndex = selectedId === null ? -1 : items.findIndex((item) => item.id === selectedId)
+  const selectedCount =
+    selectedIndex < 0
+      ? 0
+      : (Math.floor(selectedIndex / NEWSPAPER_CHUNK_SIZE) + 1) * NEWSPAPER_CHUNK_SIZE
+  const [revealedCount, setRevealedCount] = useState(() =>
+    Math.max(NEWSPAPER_CHUNK_SIZE * 2, selectedCount),
+  )
+  // A hidden URL change must represent its target in this commit, without
+  // ever mounting the prefix. Only the existing windowKey remount resets it.
+  const representedCount = Math.max(revealedCount, selectedCount)
+  useLayoutEffect(() => {
+    if (selectedCount > revealedCount) setRevealedCount(selectedCount)
+  }, [selectedCount, revealedCount])
+  const hiddenLocal = items.length > representedCount
+  const chunks = useMemo(
+    () => newspaperChunks(items.slice(0, representedCount)),
+    [items, representedCount],
+  )
   const [geometry, setGeometry] = useState(() => ({
     width: 900,
     measurements: new Map<string, Measurement>(),
@@ -158,9 +176,13 @@ export default function NewspaperList({
   // can shrink it before a later successful page. The button can always retry.
   const lastAutoWindow = useRef<string | null>(null)
   const tailApproach = useRef(false)
+  // Measurement updates do not arm exposure; a scroll authorizes one local
+  // step, which may become near-tail after a later viewport resize.
+  const localApproach = useRef(false)
   const requestServer = (manual: boolean) => {
     if (
       !enabled.current ||
+      hiddenLocal ||
       !onLoadMore ||
       !moreServer ||
       drained ||
@@ -182,6 +204,16 @@ export default function NewspaperList({
     } catch {
       finish()
     }
+  }
+
+  const revealOrRequest = (manual: boolean) => {
+    if (!enabled.current || loadingMore || pendingRequest.current) return
+    if (hiddenLocal) {
+      if (!manual && !localApproach.current) return
+      localApproach.current = false
+      tailApproach.current = true
+      setRevealedCount((old) => Math.max(old, representedCount) + NEWSPAPER_CHUNK_SIZE)
+    } else requestServer(manual)
   }
 
   const rememberVisualAnchor = useCallback(() => {
@@ -259,7 +291,7 @@ export default function NewspaperList({
     measure()
     const root = scrollRef.current
     if (!root || root.clientHeight <= 0) return
-    // All local chunks are represented; only the true local tail can prefetch.
+    // Expose one local chunk before considering the server tail.
     // Two viewports (at least 1200px) buys time before the reader reaches it.
     const margin = Math.max(1200, root.clientHeight * 2)
     const top = root.scrollTop - contentOrigin()
@@ -269,9 +301,9 @@ export default function NewspaperList({
       top + root.clientHeight + margin >= model.offsets[model.offsets.length - 1] &&
       root.scrollHeight - root.scrollTop - root.clientHeight <= margin
     if (!near) tailApproach.current = false
-    // One automatic request per approach, not a chain of small server pages
+    // One automatic step per approach, not a chain of small server pages
     // just because a generous prefetch margin still contains the new tail.
-    else if (!tailApproach.current) requestServer(false)
+    else if (!tailApproach.current) revealOrRequest(false)
   }
 
   useLayoutEffect(() => {
@@ -429,7 +461,11 @@ export default function NewspaperList({
   return (
     <div
       ref={scrollRef}
-      onScroll={() => scheduleRef.current()}
+      onScroll={() => {
+        if (!enabled.current) return
+        localApproach.current = true
+        scheduleRef.current()
+      }}
       className="newspaper-scroll min-h-0 flex-1 overflow-y-auto bg-app-panel px-10 py-7 [overflow-anchor:none]"
     >
       <ul
@@ -489,9 +525,9 @@ export default function NewspaperList({
         {items.length === 0 && <li className="empty px-3 py-4 text-app-muted">{emptyText}</li>}
         <TrailingRow
           sentinelRef={sentinelRef}
-          onLoadMore={() => requestServer(true)}
-          moreServer={moreServer}
-          drained={drained}
+          onLoadMore={() => revealOrRequest(true)}
+          moreServer={hiddenLocal || moreServer}
+          drained={!hiddenLocal && drained}
           loadingMore={loadingMore}
           paging={paging}
         />
