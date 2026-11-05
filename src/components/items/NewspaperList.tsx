@@ -99,12 +99,15 @@ export default function NewspaperList({
   const columnCount = newspaperColumnCount(geometry.width)
   const [ownershipState, setOwnershipState] = useState(() => ({
     items,
+    dataRevision: 0,
     ownership: newspaperOwnership(items, columnCount),
   }))
   let ownership = ownershipState.ownership
+  let dataRevision = ownershipState.dataRevision
   if (ownershipState.items !== items || ownership.columns !== columnCount) {
     ownership = newspaperOwnership(items, columnCount, ownership)
-    setOwnershipState({ items, ownership })
+    dataRevision++
+    setOwnershipState({ items, ownership, dataRevision })
   }
   const orderedItems = useMemo(() => ownedNewspaperItems(items, ownership), [items, ownership])
   const positions = useMemo(
@@ -513,6 +516,7 @@ export default function NewspaperList({
       ready: geometry.height > 0,
       session: windowKey,
       columns: columnCount,
+      dataRevision,
       snapshot: motionSnapshot,
     },
   )

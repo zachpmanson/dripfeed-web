@@ -21,12 +21,19 @@ let scroll: number
 let session: string
 let ready: boolean
 let columns: number
+let dataRevision: number
 let snapshot: MutableRefObject<NewspaperMotionSnapshot | null> | undefined
 
 function Fixture() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
-  useNewspaperMotion(scrollRef, listRef, active, windowKey, { session, ready, columns, snapshot })
+  useNewspaperMotion(scrollRef, listRef, active, windowKey, {
+    session,
+    ready,
+    columns,
+    dataRevision,
+    snapshot,
+  })
   return (
     <div ref={scrollRef}>
       <ul ref={listRef}>
@@ -61,6 +68,7 @@ beforeEach(() => {
   session = 'first'
   ready = true
   columns = 3
+  dataRevision = 0
   snapshot = undefined
   rects = new Map([
     [1, { top: 0, left: 0 }],
@@ -245,6 +253,19 @@ it('allows responsive redistribution even when sparse sections rebalance into a 
   rects.set(2, { top: 100, left: 300 })
   await render()
   expect(animate.mock.calls[0][0][0]).toEqual({ transform: 'translate(-300px, 100px)' })
+})
+
+it('glides surviving stories when clearing the last story removes a mounted section', async () => {
+  await render()
+  ids = [2, 3]
+  windowKey = '50'
+  dataRevision++
+  rects.set(2, { top: 0, left: 0 })
+  await render()
+  expect(animate).toHaveBeenCalledExactlyOnceWith(
+    [{ transform: 'translate(0px, 200px)' }, { transform: 'translate(0, 0)' }],
+    { duration: 180, easing: 'ease-out' },
+  )
 })
 
 it('does not move an already anchored survivor again after a layout-driven scroll correction', async () => {

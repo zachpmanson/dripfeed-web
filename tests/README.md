@@ -254,6 +254,15 @@ optimistic rollback; existing action tests cover API mutation rollback separatel
 They are **not native browser grid/stack geometry, frame-rate, actual animation
 playback or screen-reader measurements**. No new Chromium harness is included.
 
+A separate, temporary parent-owned Chromium 156 smoke probe verified real 180ms
+animation playback, stable columns/roles and gap closure after a read, removal of
+a lone lead/sparse section, visible common-ID motion across a sort reset,
+reduced-motion suppression and responsive redistribution to two columns. It used
+synthetic local articles, blocked non-fixture requests, and observed no browser
+exceptions; it was not an authenticated account or frame-rate test. Cold font
+loading can cause a subsequent animated reflow after initial mount. Evidence is
+retained at `~/.local/state/slippy/dripfeed-stable-columns/browser-result.json`.
+
 # Interface icon migration
 
 App-owned interface icons use pinned `@tabler/icons-react` components, including
