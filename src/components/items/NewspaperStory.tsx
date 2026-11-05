@@ -67,20 +67,47 @@ export default memo(function NewspaperStory({
       className={`newspaper-story newspaper-${role} mb-6 min-w-0 border-b border-app-border pb-6`}
     >
       <article dir={item.rtl ? 'rtl' : 'auto'}>
-        <div className="mb-3 flex flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-widest text-app-muted">
-          <span className="inline-flex min-w-0 max-w-full items-center gap-2">
-            {feed && <FeedIcon feed={feed} />}
-            <span className="min-w-0 [overflow-wrap:anywhere]">{feedTitle(item.feedId)}</span>
-          </span>
-          {item.pubDate && (
-            <time dateTime={new Date(item.pubDate).toISOString()}>
-              {new Date(item.pubDate).toLocaleDateString(undefined, {
-                day: 'numeric',
-                month: 'short',
-              })}
-            </time>
-          )}
-        </div>
+        <header className="mb-3 flex items-start justify-between gap-3">
+          <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-widest text-app-muted">
+            <span className="inline-flex min-w-0 max-w-full items-center gap-2">
+              {feed && <FeedIcon feed={feed} />}
+              <span className="min-w-0 [overflow-wrap:anywhere]">{feedTitle(item.feedId)}</span>
+            </span>
+            {item.pubDate && (
+              <time dateTime={new Date(item.pubDate).toISOString()}>
+                {new Date(item.pubDate).toLocaleDateString(undefined, {
+                  day: 'numeric',
+                  month: 'short',
+                })}
+              </time>
+            )}
+          </div>
+          <div className="flex shrink-0 gap-1">
+            <IconButton
+              variant="bare"
+              title={`${item.starred ? 'Unstar' : 'Star'}: ${title}`}
+              pressed={item.starred}
+              onClick={() => onStar?.(item)}
+            >
+              {item.starred ? (
+                <IconStarFilled aria-hidden="true" />
+              ) : (
+                <IconStar aria-hidden="true" />
+              )}
+            </IconButton>
+            <IconButton
+              variant="bare"
+              title={`Mark ${item.unread ? 'read' : 'unread'}: ${title}`}
+              onClick={() => onRead(item)}
+            >
+              {item.unread ? (
+                <IconCircleFilled aria-hidden="true" />
+              ) : (
+                <IconCircle aria-hidden="true" />
+              )}
+            </IconButton>
+          </div>
+        </header>
         <h2
           className={`newspaper-headline m-0 mb-3 font-normal ${item.unread ? 'text-app-text' : 'text-app-muted'}`}
         >
@@ -104,27 +131,6 @@ export default memo(function NewspaperStory({
           </p>
         )}
         {role !== 'image' && imagePreview}
-        <div className="mt-4 flex flex-wrap gap-3 text-xs text-app-muted">
-          <IconButton
-            variant="bare"
-            title={`${item.starred ? 'Unstar' : 'Star'}: ${title}`}
-            pressed={item.starred}
-            onClick={() => onStar?.(item)}
-          >
-            {item.starred ? <IconStarFilled aria-hidden="true" /> : <IconStar aria-hidden="true" />}
-          </IconButton>
-          <IconButton
-            variant="bare"
-            title={`Mark ${item.unread ? 'read' : 'unread'}: ${title}`}
-            onClick={() => onRead(item)}
-          >
-            {item.unread ? (
-              <IconCircleFilled aria-hidden="true" />
-            ) : (
-              <IconCircle aria-hidden="true" />
-            )}
-          </IconButton>
-        </div>
       </article>
     </li>
   )

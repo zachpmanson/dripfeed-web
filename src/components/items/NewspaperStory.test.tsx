@@ -83,6 +83,32 @@ it('inherits read/unread headline color, retains RTL, and uses focusable native 
   expect(headline.closest('article')?.getAttribute('dir')).toBe('auto')
 })
 
+it.each(['lead', 'brief'] as const)(
+  'places %s story actions beside feed metadata above the headline, without footer duplicates',
+  async (role) => {
+    await render({ ...item, pubDate: 1000, unread: true }, role)
+    const article = container.querySelector('article')!
+    const header = article.firstElementChild!
+    expect(header.tagName).toBe('HEADER')
+    // Structure/utility wiring only, not native right-edge or pixel geometry.
+    expect(header.classList.contains('justify-between')).toBe(true)
+    expect(header.classList.contains('items-start')).toBe(true)
+    const metadata = header.firstElementChild!
+    expect(metadata.textContent).toContain('Feed')
+    expect(metadata.querySelector('time')).not.toBeNull()
+    expect(metadata.classList.contains('min-h-8')).toBe(true)
+    expect(metadata.classList.contains('min-w-0')).toBe(true)
+    const actions = header.lastElementChild!
+    expect(actions.classList.contains('shrink-0')).toBe(true)
+    expect(actions.querySelectorAll('button')).toHaveLength(2)
+    expect(actions.querySelector('[aria-label="Star: Headline"]')).not.toBeNull()
+    expect(actions.querySelector('[aria-label="Mark read: Headline"]')).not.toBeNull()
+    expect(article.children.item(1)?.tagName).toBe('H2')
+    expect(article.querySelectorAll('button')).toHaveLength(3)
+    expect(article.querySelector('[class~="mt-4"]')).toBeNull()
+  },
+)
+
 it('falls back after an image error, retries changed metadata and omits brief images', async () => {
   await render()
   const image = container.querySelector('img')!
