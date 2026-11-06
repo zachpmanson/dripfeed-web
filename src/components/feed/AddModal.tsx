@@ -11,6 +11,7 @@ import { supportsAppProxy } from '../../api/client'
 interface Props {
   folders: NewsFolder[]
   settings: Settings
+  initialFolderId?: number | null
   onClose: () => void
   onCreated: (kind: 'feed' | 'folder') => void
 }
@@ -22,14 +23,14 @@ type Tab = 'feed' | 'folder'
  * a new folder. Both POST to the News API; onCreated triggers a meta
  * refresh so the sidebar picks up the new item.
  */
-export function AddModal({ folders, settings, onClose, onCreated }: Props) {
+export function AddModal({ folders, settings, initialFolderId = null, onClose, onCreated }: Props) {
   const titleId = useId()
   const authHintId = useId()
   const canUseFeedAuth = supportsAppProxy(settings)
   const inputRef = useRef<HTMLInputElement>(null)
   const [tab, setTab] = useState<Tab>('feed')
   const [url, setUrl] = useState('')
-  const [folderId, setFolderId] = useState<number | null>(null)
+  const [folderId, setFolderId] = useState<number | null>(initialFolderId)
   const [useFeedAuth, setUseFeedAuth] = useState(false)
   const [feedUser, setFeedUser] = useState('')
   const [feedPassword, setFeedPassword] = useState('')
@@ -85,6 +86,10 @@ export function AddModal({ folders, settings, onClose, onCreated }: Props) {
     <Dialog
       labelledBy={titleId}
       onClose={onClose}
+      restoreFocusTo={
+        initialFolderId === null ? undefined : `[data-folder-id="${initialFolderId}"]`
+      }
+      restoreFocusFallback={initialFolderId === null ? undefined : '[data-feed-focus-fallback]'}
       className="fixed left-1/2 top-1/2 z-[1001] w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-[10px] border border-app-border bg-app-panel p-5"
     >
       <div className="mb-3 flex items-center justify-between uppercase tracking-[0.06em]">

@@ -4,6 +4,7 @@ import { IconChevronDown } from '@tabler/icons-react'
 import type { NewsFeed, NewsFolder } from '../../api/types'
 import type { RarityInfo } from '../../rarity'
 import FeedRow from './FeedRow'
+import { FolderContextMenu } from './FolderContextMenu'
 import { sidebarItemClassName } from './sidebarItemStyle'
 
 export default function FolderSection({
@@ -13,6 +14,7 @@ export default function FolderSection({
   selectedFeedId,
   collapsed,
   onSelectFolder,
+  onAddFeed,
   onSelectFeed,
   onToggle,
   menu,
@@ -25,6 +27,7 @@ export default function FolderSection({
   selectedFeedId: number | null
   collapsed: boolean
   onSelectFolder: () => void
+  onAddFeed: () => void
   onSelectFeed: (feedId: number) => void
   onToggle: (folderId: number) => void
   menu: FeedMenuOptions
@@ -36,14 +39,22 @@ export default function FolderSection({
   return (
     <Collapsible.Root className="folder" open={!collapsed} onOpenChange={() => onToggle(folder.id)}>
       <div className="folder-head flex items-center">
-        <button
-          className={`folder-name-btn ${sidebarItemClassName(selected, selected ? 'text-app-text' : 'text-app-muted', 'min-w-0 flex-1 gap-2')}`}
-          aria-current={selected ? 'page' : undefined}
-          onClick={onSelectFolder}
+        <FolderContextMenu
+          folder={folder}
+          settings={menu.settings}
+          onChanged={menu.onChanged}
+          onAddFeed={onAddFeed}
         >
-          <span className="folder-name min-w-0 flex-1 truncate">{folder.name}</span>
-          {unread > 0 && <span className="count">{unread}</span>}
-        </button>
+          <button
+            data-folder-id={folder.id}
+            className={`folder-name-btn ${sidebarItemClassName(selected, selected ? 'text-app-text' : 'text-app-muted', 'min-w-0 flex-1 gap-2')}`}
+            aria-current={selected ? 'page' : undefined}
+            onClick={onSelectFolder}
+          >
+            <span className="folder-name min-w-0 flex-1 truncate">{folder.name}</span>
+            {unread > 0 && <span className="count">{unread}</span>}
+          </button>
+        </FolderContextMenu>
         <span className="folder-right flex items-center">
           <Collapsible.Trigger
             className="icon-btn caret-btn inline-flex size-8 items-center justify-center rounded border-0 p-0 text-app-muted hover:bg-app-border hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"

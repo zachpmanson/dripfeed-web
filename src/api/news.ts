@@ -1,4 +1,4 @@
-import { apiFetchSameOrigin, apiGet, apiPost, apiDelete } from './client'
+import { apiFetch, apiFetchSameOrigin, apiGet, apiPost, apiDelete } from './client'
 import type { FeedsResponse, FoldersResponse, ItemsResponse, ListType, NewsItem } from './types'
 import type { Settings } from '../settings'
 
@@ -85,6 +85,18 @@ export function fetchFolders(settings: Settings): Promise<FoldersResponse> {
 /** Create a folder. Body: { name }. Returns the folder (or array via wrappers). */
 export function createFolder(settings: Settings, name: string): Promise<FoldersResponse> {
   return apiPost<FoldersResponse>(settings, '/folders', { name })
+}
+
+/** Rename a folder. PUT /folders/{folderId} { name }. */
+export async function renameFolder(
+  settings: Settings,
+  folderId: number,
+  name: string,
+): Promise<void> {
+  await apiFetch(settings, `/folders/${folderId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ name }),
+  })
 }
 
 export interface FeedCredentials {

@@ -4,6 +4,7 @@ import type { NewsFolder, NewsFeed, NewsItem } from '../../api/types'
 import { starredCount } from '../../selectors'
 import type { FeedMenuOptions } from './FeedContextMenu'
 import { FeedSettingsModal } from './FeedSettingsModal'
+import { AddModal } from './AddModal'
 import FeedRow from './FeedRow'
 import FolderSection from './FolderSection'
 import { sidebarItemClassName } from './sidebarItemStyle'
@@ -69,6 +70,7 @@ export function Sidebar({
   // Per-feed settings modal, held as an id (not the row object): the poll
   // replaces feed objects, and the modal should follow the live row.
   const [settingsFeedId, setSettingsFeedId] = useState<number | null>(null)
+  const [addRequest, setAddRequest] = useState<{ folderId: number } | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   // Reveal a feed the reader's header jumped to: expand its folder if it's
@@ -181,6 +183,7 @@ export function Sidebar({
             selectedFeedId={view.kind === 'feed' ? view.id : null}
             collapsed={collapsed.has(folder.id)}
             onSelectFolder={() => onSelect({ kind: 'folder', id: folder.id })}
+            onAddFeed={() => setAddRequest({ folderId: folder.id })}
             onSelectFeed={(id) => onSelect({ kind: 'feed', id })}
             onToggle={toggle}
             menu={menu}
@@ -208,6 +211,19 @@ export function Sidebar({
           </div>
         )}
       </div>
+      {addRequest !== null && (
+        <AddModal
+          folders={folders}
+          settings={settings}
+          initialFolderId={addRequest.folderId}
+          onClose={() => setAddRequest(null)}
+          onCreated={() => {
+            onMetaChanged()
+            // A dismissed request may complete after a new form has opened.
+            setAddRequest((current) => (current === addRequest ? null : current))
+          }}
+        />
+      )}
       {settingsFeedId !== null && settings && feeds.get(settingsFeedId) && (
         <FeedSettingsModal
           feed={feeds.get(settingsFeedId)!}

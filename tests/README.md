@@ -173,7 +173,7 @@ nix develop --command node tests/feed-controls.browser.mjs
 
 Checks include pointer/keyboard context invocation and collision bounds, managed
 submenu keys/scrolling, no selection/clickthrough, deferred write errors/retry and
-duplicate guards, native prompt/confirm cancellation, 700ms copy acknowledgement
+duplicate guards, native prompt/confirm cancellation, folder rename cancellation/error/retry and trimmed payloads, pointer/keyboard folder Add handoff with a preselected destination and focus restoration, 700ms copy acknowledgement
 and stale lifetime isolation, settings handoff to replaced/removed persistent
 rows, typed Select/RadioGroup values (including 0/false), modal Select layering
 and Escape, checkbox booleans, Tooltip keyboard labels, keyboard Tabs/auth clearing

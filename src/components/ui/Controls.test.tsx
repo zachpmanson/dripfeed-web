@@ -127,6 +127,7 @@ it('Collapsible keeps folder selection separate and delegates controlled disclos
     selected: false,
     selectedFeedId: null,
     onSelectFolder: select,
+    onAddFeed: vi.fn(),
     onSelectFeed: vi.fn(),
     onToggle: toggle,
     showFavicons: false,

@@ -27,7 +27,7 @@ const server = await createServer({
       load(id) {
         const exports =
           id === '\0fixture-news'
-            ? ['createFeed', 'createFolder', 'deleteFeed', 'moveFeed', 'renameFeed']
+            ? ['createFeed', 'createFolder', 'deleteFeed', 'moveFeed', 'renameFeed', 'renameFolder']
             : id === '\0fixture-actions'
               ? ['markFeedAllRead', 'setFeedFullText']
               : null
@@ -441,6 +441,80 @@ try {
   await page.evaluate(() => fixtureShowError(null))
   await page.waitForTimeout(100)
   assert.equal(await page.getByRole('alert').count(), 0)
+
+  // Folder context menu: persistent trigger, rename retry and Add handoff.
+  await reset()
+  const folderRow = () => page.locator('[data-folder-id="1"]')
+  const folderMenu = () => page.getByRole('menu', { name: 'Actions for folder Destination', exact: true })
+  const openFolder = async (keyboard = false) => {
+    await folderRow().scrollIntoViewIfNeeded()
+    if (keyboard) {
+      await folderRow().focus()
+      await page.keyboard.press('Shift+F10')
+    } else await folderRow().click({ button: 'right' })
+    await folderMenu().waitFor()
+  }
+  await openFolder()
+  assert.equal(await page.evaluate(() => fixtureLog.selected), 0, 'folder right-click does not select')
+  assert.equal(await folderRow().locator('button').count(), 0)
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await item('Rename').click()
+  assert.equal(await page.evaluate(() => fixtureLog.writes.length), 0)
+  await page.evaluate(() => (fixtureLog.mode = 'pending'))
+  page.once('dialog', (dialog) => dialog.accept(' Renamed folder '))
+  await item('Rename').click()
+  await page.keyboard.press('Enter')
+  assert.equal(await page.evaluate(() => fixtureLog.writes.length), 1)
+  await page.evaluate(() => fixtureLog.pending.shift()(true))
+  await page.getByRole('alert').filter({ hasText: 'Fixture write failed' }).waitFor()
+  await page.evaluate(() => (fixtureLog.mode = 'resolve'))
+  page.once('dialog', (dialog) => dialog.accept(' Renamed folder '))
+  await item('Rename').click()
+  await waitAbsent(folderMenu())
+  assert.deepEqual(await page.evaluate(() => fixtureLog.writes.at(-1)), {
+    kind: 'renameFolder', args: [{ baseUrl: '', user: 'fixture', appPassword: 'fixture' }, 1, 'Renamed folder'],
+  })
+  await assertFocus('[data-folder-id="1"]')
+  for (const keyboard of [false, true]) {
+    await openFolder(keyboard)
+    if (keyboard) {
+      await page.keyboard.press('End')
+      await page.keyboard.press('Enter')
+    } else await item('Add feed…').click()
+    const dialog = page.getByRole('dialog', { name: 'Add', exact: true })
+    await dialog.waitFor()
+    await waitAbsent(folderMenu())
+    await assertFocus('.app-dialog input[type="url"]')
+    assert.equal(await dialog.getByRole('combobox', { name: 'Destination folder' }).textContent().then(text => text.includes('Destination')), true)
+    await page.keyboard.press('Escape')
+    await waitAbsent(dialog)
+    await assertFocus('[data-folder-id="1"]')
+  }
+  await openFolder()
+  await item('Add feed…').click()
+  await page.locator('.app-dialog input[type="url"]').fill('https://fixture.invalid/new-feed')
+  await page.getByRole('button', { name: 'Add feed', exact: true }).click()
+  await waitAbsent(page.getByRole('dialog', { name: 'Add', exact: true }))
+  assert.deepEqual(await page.evaluate(() => fixtureLog.writes.at(-1).args.slice(1)), ['https://fixture.invalid/new-feed', 1, undefined])
+  await assertFocus('[data-folder-id="1"]')
+  assert.equal(await page.evaluate(() => fixtureLog.selected), 0)
+  await page.evaluate(() => (fixtureLog.mode = 'pending'))
+  await openFolder()
+  await item('Add feed…').click()
+  await page.locator('.app-dialog input[type="url"]').fill('https://fixture.invalid/pending-feed')
+  await page.getByRole('button', { name: 'Add feed', exact: true }).click()
+  await page.keyboard.press('Escape')
+  await waitAbsent(page.getByRole('dialog', { name: 'Add', exact: true }))
+  await openFolder()
+  await item('Add feed…').click()
+  await page.locator('.app-dialog input[type="url"]').fill('https://fixture.invalid/new-form')
+  await page.evaluate(() => fixtureLog.pending.shift()(false))
+  assert.equal(await page.locator('.app-dialog input[type="url"]').inputValue(), 'https://fixture.invalid/new-form')
+  await page.evaluate(() => fixtureRemoveFolder())
+  await page.keyboard.press('Escape')
+  await waitAbsent(page.getByRole('dialog', { name: 'Add', exact: true }))
+  await assertFocus('[data-feed-focus-fallback]')
+  evidence.checks.push('Folder right-click/Shift+F10, native rename cancel/retry/trim/duplicate guard; pointer and keyboard Add with preselected destination, URL focus, mocked create, stale completion isolation and removed-folder focus fallback')
 
   // Both themes, narrow viewport, long scrolling submenu and larger font.
   for (const width of [360, 1000])

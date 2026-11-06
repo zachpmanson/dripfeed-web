@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createFeed, fetchFeedFullText, fetchFeeds, fetchFulltext, setFeedFullText } from './news'
+import {
+  createFeed,
+  fetchFeedFullText,
+  fetchFeeds,
+  fetchFulltext,
+  renameFolder,
+  setFeedFullText,
+} from './news'
 import type { Settings } from '../settings'
 
 const settings = { baseUrl: '', user: 'remote-reader', appPassword: 'remote-secret' }
@@ -181,6 +188,33 @@ it.each(['https://other-cloud.example', 'https://nextcloud.zachmanson.com/nextcl
     expect(fetchMock.mock.calls[0][0]).toBe(`${baseUrl}/apps/news/api/v1-3/feeds`)
   },
 )
+
+it.each(['', 'https://other-cloud.example/nextcloud'])(
+  'renames folders with a versioned PUT at %j and accepts an empty response',
+  async (baseUrl) => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      renameFolder({ ...settings, baseUrl }, 9, 'Renamed folder'),
+    ).resolves.toBeUndefined()
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`${baseUrl}/apps/news/api/v1-3/folders/9`)
+    expect(init?.method).toBe('PUT')
+    expect(JSON.parse(init?.body as string)).toEqual({ name: 'Renamed folder' })
+    expect(new Headers(init?.headers).get('Content-Type')).toBe('application/json')
+  },
+)
+
+it('propagates folder rename API failures', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 409 })),
+  )
+  await expect(renameFolder(settings, 9, 'Duplicate')).rejects.toThrow('Request failed (409)')
+})
 
 describe('feed subscription credentials', () => {
   it.each([
