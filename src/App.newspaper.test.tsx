@@ -80,6 +80,7 @@ beforeEach(() => {
       setStar: vi.fn(async () => {}),
       extractFulltext: vi.fn(async () => {}),
       clearError: vi.fn(),
+      syncNow: vi.fn(async () => {}),
     },
   } as unknown as AppData
   container = document.createElement('div')
@@ -142,6 +143,65 @@ it.each([360, 768, 1100, 1600])(
     expect(localStorage.getItem('dripfeed.presentation')).toBe('list')
   },
 )
+
+it('rebuilds newspaper positions after manual reload settles, not while clearing or syncing', async () => {
+  await render()
+  await selectNewspaper()
+  expect(
+    container.querySelector('.newspaper-lead [data-story-id]')?.getAttribute('data-story-id'),
+  ).toBe('120')
+  mocks.store!.pool = mocks.store!.pool.filter((story) => story.id !== 120)
+  await render()
+  expect(container.querySelector('.newspaper-lead')).toBeNull()
+  let finish!: () => void
+  mocks.store!.actions.syncNow = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve
+      }),
+  )
+  await click('.sync')
+  await click('.sync')
+  expect(mocks.store!.actions.syncNow).toHaveBeenCalledTimes(1)
+  mocks.store!.pool = [...mocks.store!.pool, item(121)]
+  await render()
+  expect(container.querySelector('.newspaper-lead')).toBeNull()
+  await act(async () => finish())
+  expect(
+    container.querySelector('.newspaper-lead [data-story-id]')?.getAttribute('data-story-id'),
+  ).toBe('121')
+  const scroll = newspaperScroll()
+  await render()
+  expect(newspaperScroll()).toBe(scroll)
+})
+
+it('keeps standard list rendering intact when manually reloading', async () => {
+  await render()
+  const list = container.querySelector('.item-list')
+  await click('.sync')
+  expect(mocks.store!.actions.syncNow).toHaveBeenCalledTimes(1)
+  expect(container.querySelector('.item-list')).toBe(list)
+})
+
+it('does not reset a different newspaper view when an earlier reload completes', async () => {
+  await render()
+  await selectNewspaper()
+  let finish!: () => void
+  mocks.store!.actions.syncNow = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve
+      }),
+  )
+  await click('.sync')
+  await act(async () => {
+    window.history.pushState(null, '', '/?view=starred')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  const otherView = newspaperScroll()
+  await act(async () => finish())
+  expect(newspaperScroll()).toBe(otherView)
+})
 
 it('loads the saved newspaper mode on a narrow window and preserves the open reader on resize', async () => {
   vi.stubGlobal('innerWidth', 360)

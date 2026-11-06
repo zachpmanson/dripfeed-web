@@ -34,6 +34,9 @@ export default function App() {
   const store = useStore(settings, view, showMode === 'unread')
   const [showAdd, setShowAdd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [newspaperReload, setNewspaperReload] = useState({ key: '', nonce: 0 })
+  const manualSyncPending = useRef(false)
+  const refreshOwner = useRef('')
 
   // Credentials rejected (401): the store already wiped localStorage/IDB;
   // drop back to the settings form so the user can re-enter them.
@@ -149,6 +152,24 @@ export default function App() {
     unreadProbing,
     viewKey,
   } = model
+  const owner = `${readerGeneration}:${newspaper}:${viewKey}`
+  refreshOwner.current = owner
+  const syncNow = () => {
+    if (manualSyncPending.current || store.syncing) return
+    manualSyncPending.current = true
+    void store.actions
+      .syncNow()
+      .then(() => {
+        // Re-deal only after refreshed ranking arrives, and never reset a view
+        // or login the user navigated to while the request was in flight.
+        if (newspaper && refreshOwner.current === owner && dbGetGeneration() === readerGeneration) {
+          setNewspaperReload((old) => ({ key: viewKey, nonce: old.nonce + 1 }))
+        }
+      })
+      .finally(() => {
+        manualSyncPending.current = false
+      })
+  }
   const feedTitle = (feedId: number) => feeds.get(feedId)?.title ?? `feed ${feedId}`
   const feedById = (feedId: number) => feeds.get(feedId)
   // The list intentionally falls back to its first item. The front page must
@@ -166,7 +187,7 @@ export default function App() {
         onSortModeChange={setSortMode}
         syncing={store.syncing}
         poolLength={pool.length}
-        onSync={() => void store.actions.syncNow()}
+        onSync={syncNow}
         onAdd={() => setShowAdd(true)}
         onSettings={() => setShowSettings(true)}
       />
@@ -199,7 +220,11 @@ export default function App() {
               void store.actions.setStar(item, !item.starred)
             }}
             items={visibleItems}
-            windowKey={viewKey}
+            windowKey={
+              newspaper && newspaperReload.key === viewKey
+                ? `${viewKey}:reload:${newspaperReload.nonce}`
+                : viewKey
+            }
             selectedId={newspaper ? selectedId : (selected?.id ?? null)}
             feedTitle={feedTitle}
             feedById={feedById}

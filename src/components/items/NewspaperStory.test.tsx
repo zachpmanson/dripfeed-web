@@ -251,7 +251,12 @@ it('uses favicon-sized Star and read toggles with unchanged labels, state and ac
 
 it('preserves spinner rotation, idle refresh sizing and reduced-motion opt-out', () => {
   // Stylesheet invariants only; jsdom does not compute animations or layout.
-  expect(newspaperCss).toMatch(/\.spinner\s*\{[^}]*animation: spin 0\.8s linear infinite/)
+  expect(newspaperCss).toMatch(
+    /\.spinner\s*\{[^}]*animation: dripfeed-spinner 0\.8s linear infinite/,
+  )
+  expect(newspaperCss).toMatch(
+    /@keyframes dripfeed-spinner\s*\{\s*to\s*\{\s*transform: rotate\(-360deg\)/,
+  )
   expect(newspaperCss).toMatch(
     /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.spinner\s*\{\s*animation: none/,
   )
