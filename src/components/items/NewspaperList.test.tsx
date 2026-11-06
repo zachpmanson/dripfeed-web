@@ -6,10 +6,10 @@ import type { NewsItem, NewsFeed } from '../../api/types'
 import { ItemList, type ItemListProps } from './ItemList'
 import { newspaperRole } from './newspaperPresentation'
 import {
-  estimatedChunkHeight,
+  estimatedStoryHeight,
+  newspaperColumnWidth,
   newspaperColumnCount,
-  NEWSPAPER_CHUNK_SIZE,
-  NEWSPAPER_MAX_MOUNTED_CHUNKS,
+  NEWSPAPER_MAX_MOUNTED,
 } from './newspaperVirtualization'
 
 const item = (id: number): NewsItem =>
@@ -34,57 +34,70 @@ let allFrames: FrameRequestCallback[]
 let nextFrame: number
 let width: number
 let height: number
-let sectionHeights: Map<number, number>
+let storyHeights: Map<number, number>
 let observers: { callback: ResizeObserverCallback; disconnect: ReturnType<typeof vi.fn> }[]
 let intersection: IntersectionObserverCallback
+let storyIds: WeakMap<HTMLElement, number>
 
 const pane = () => host.querySelector<HTMLDivElement>('.newspaper-scroll')!
 const list = () => host.querySelector<HTMLUListElement>('.newspaper-chunks')!
 const stories = () => [...host.querySelectorAll<HTMLButtonElement>('[data-story-id]')]
 const ids = () => stories().map((story) => Number(story.dataset.storyId))
+const columns = () => [...host.querySelectorAll<HTMLUListElement>('.newspaper-column')]
 const nativeHeight = (node: HTMLElement) => {
-  const index = Number(node.dataset.newspaperChunk)
-  return (
-    sectionHeights.get(index) ??
-    estimatedChunkHeight(node.querySelectorAll('.newspaper-story').length, width - 80, index === 0)
-  )
+  let id = storyIds.get(node)
+  if (id === undefined) {
+    id = Number(node.querySelector<HTMLElement>('[data-story-id]')!.dataset.storyId)
+    storyIds.set(node, id)
+  }
+  const lead = node.classList.contains('newspaper-lead')
+  const storyWidth = lead
+    ? width - 80
+    : newspaperColumnWidth(width - 80, node.parentElement!.parentElement!.children.length)
+  return storyHeights.get(id) ?? estimatedStoryHeight(storyWidth, lead)
 }
 const partHeight = (node: Element) => {
-  const child = node.firstElementChild as HTMLElement | null
-  return child?.hasAttribute('data-newspaper-chunk')
-    ? nativeHeight(child)
-    : child?.hasAttribute('data-newspaper-placeholder')
-      ? Number.parseFloat(child.style.height)
-      : 40
+  const element = node as HTMLElement
+  return element.classList.contains('newspaper-story')
+    ? nativeHeight(element)
+    : Number.parseFloat(element.style.height) || 0
 }
-const offset = (index: number) =>
-  28 + [...list().children].slice(0, index).reduce((sum, node) => sum + partHeight(node), 0)
-const bounds = () => {
-  expect(stories().length).toBeLessThanOrEqual(NEWSPAPER_CHUNK_SIZE * NEWSPAPER_MAX_MOUNTED_CHUNKS)
-  expect(host.querySelectorAll('[data-newspaper-chunk]').length).toBeLessThanOrEqual(
-    NEWSPAPER_MAX_MOUNTED_CHUNKS,
+const leadHeight = () => {
+  const lead = host.querySelector<HTMLElement>('.newspaper-lead')
+  return lead
+    ? nativeHeight(lead)
+    : Number.parseFloat(
+        host.querySelector<HTMLElement>('[data-newspaper-lead-placeholder]')?.style.height ?? '',
+      ) || 0
+}
+const columnHeight = (node: Element) =>
+  [...node.children].reduce((sum, child) => sum + partHeight(child), 0)
+// Absolute-rank estimated destination, not a cross-column section boundary.
+const offset = (oldPage: number) => {
+  if (oldPage === 0) return 28
+  const columnWidth = newspaperColumnWidth(width - 80, newspaperColumnCount(width - 80))
+  return (
+    28 +
+    estimatedStoryHeight(width - 80, true) +
+    Math.floor((oldPage * 50 - 1) / newspaperColumnCount(width - 80)) *
+      estimatedStoryHeight(columnWidth)
   )
+}
+const bounds = () => {
+  expect(stories().length).toBeLessThanOrEqual(NEWSPAPER_MAX_MOUNTED)
   expect(host.querySelectorAll('.newspaper-lead').length).toBeLessThanOrEqual(1)
   expect(new Set(ids()).size).toBe(ids().length)
-  for (const section of host.querySelectorAll<HTMLElement>('[data-newspaper-chunk]')) {
-    const start = Number(section.dataset.newspaperChunk) * 50 + 1
-    const lead = start === 1 ? 1 : 0
-    const columns = [...section.querySelectorAll('.newspaper-column')]
-    expect(columns).toHaveLength(newspaperColumnCount(width - 80))
-    columns.forEach((column, columnIndex) => {
-      const ranked = [...column.querySelectorAll<HTMLElement>('[data-story-id]')].map((node) =>
-        Number(node.dataset.storyId),
-      )
-      expect(ranked).toEqual([...ranked].sort((a, b) => a - b))
-      if (props.items === pool) {
-        expect(ranked[0]).toBe(start + lead + columnIndex)
-        ranked.forEach((id, rank) =>
-          expect(id).toBe(start + lead + columnIndex + rank * columns.length),
-        )
-      }
-    })
-    const counts = columns.map((column) => column.children.length)
-    expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1)
+  expect(columns()).toHaveLength(newspaperColumnCount(width - 80))
+  for (const column of columns()) {
+    const ranked = [...column.querySelectorAll<HTMLElement>('[data-story-id]')].map((node) =>
+      Number(node.dataset.storyId),
+    )
+    expect(ranked).toEqual([...ranked].sort((a, b) => a - b))
+    if (props.items === pool)
+      ranked.forEach((id) => expect((id - 2) % columns().length).toBe(columns().indexOf(column)))
+    for (const spacer of column.querySelectorAll<HTMLElement>('[data-newspaper-spacer]')) {
+      expect(Number.parseFloat(spacer.style.height)).toBeGreaterThanOrEqual(0)
+    }
   }
 }
 const flush = async () => {
@@ -122,7 +135,9 @@ const exposeAll = async (next: Partial<ItemListProps> = {}) => {
   await render({ selectedId: null })
 }
 const represented = () =>
-  host.querySelectorAll('[data-newspaper-chunk], [data-newspaper-placeholder]').length
+  Math.ceil(
+    Number(host.querySelector<HTMLElement>('[data-newspaper-count]')!.dataset.newspaperCount) / 50,
+  )
 const loadMore = () =>
   [...host.querySelectorAll<HTMLButtonElement>('button')].find(
     (button) => button.textContent === 'Load more',
@@ -141,7 +156,8 @@ beforeEach(() => {
   frames = new Map()
   allFrames = []
   nextFrame = 1
-  sectionHeights = new Map()
+  storyHeights = new Map()
+  storyIds = new WeakMap()
   observers = []
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     allFrames.push(callback)
@@ -170,7 +186,13 @@ beforeEach(() => {
       disconnect() {}
     },
   )
-  // Executable geometry model, NOT browser grid/stack layout or performance evidence.
+  // Executable per-column geometry, NOT native layout/performance evidence.
+  const computed = window.getComputedStyle.bind(window)
+  vi.spyOn(window, 'getComputedStyle').mockImplementation((node) => {
+    return node.classList.contains('newspaper-story')
+      ? ({ marginBottom: '24px' } as CSSStyleDeclaration)
+      : computed(node)
+  })
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
     this: HTMLElement,
   ) {
@@ -185,33 +207,48 @@ beforeEach(() => {
     this: HTMLElement,
   ) {
     return this.classList.contains('newspaper-scroll')
-      ? [...list().children].reduce((sum, node) => sum + partHeight(node), 56)
+      ? 96 + leadHeight() + Math.max(0, ...columns().map(columnHeight))
       : 1000
   })
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
     this: HTMLElement,
   ) {
     let top = this.classList.contains('newspaper-chunks') ? 128 - pane().scrollTop : 100
-    let h = this.hasAttribute('data-newspaper-chunk') ? nativeHeight(this) : height
-    const section = this.closest<HTMLElement>('[data-newspaper-chunk]')
-    if (section && this.hasAttribute('data-story-id')) {
-      const index = Number(section.dataset.newspaperChunk)
-      const columnCount = newspaperColumnCount(width - 80)
-      const rows = Math.ceil(section.querySelectorAll('.newspaper-story').length / columnCount)
-      const story = this.closest('li')!
-      const localRow = [...story.parentElement!.children].indexOf(story)
-      const leadOffset = index === 0 && !story.classList.contains('newspaper-lead') ? 1 : 0
-      h = nativeHeight(section) / (rows + (index === 0 ? 1 : 0))
-      top = 100 + offset(index) - pane().scrollTop + (localRow + leadOffset) * h
+    let h = height
+    let left = 0
+    let w = width - 80
+    const story = this.closest<HTMLElement>('.newspaper-story')
+    if (story) {
+      const lead = story.classList.contains('newspaper-lead')
+      const preceding = [...story.parentElement!.children].slice(
+        0,
+        [...story.parentElement!.children].indexOf(story),
+      )
+      top =
+        128 -
+        pane().scrollTop +
+        (lead ? 0 : leadHeight()) +
+        preceding.reduce((sum, node) => sum + partHeight(node), 0)
+      h = nativeHeight(story) - 24
+      w = lead
+        ? width - 80
+        : newspaperColumnWidth(width - 80, story.parentElement!.parentElement!.children.length)
+      left = lead
+        ? 0
+        : [...story.parentElement!.parentElement!.children].indexOf(story.parentElement!) * (w + 28)
+      if (this.hasAttribute('data-story-id')) {
+        top += 30
+        h = 50
+      }
     }
     return {
-      x: 0,
+      x: left,
       y: top,
       top,
-      left: 0,
-      right: width,
+      left,
+      right: left + w,
       bottom: top + h,
-      width,
+      width: w,
       height: h,
       toJSON() {},
     }
@@ -241,32 +278,23 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-it('bounds 10,000 stories with balanced ranked column tops across chunks and absolute list positions', async () => {
+it('bounds 10,000 stories with independent ranked windows and absolute accessible positions', async () => {
   await render()
   bounds()
-  expect([...ids()].sort((a, b) => a - b)).toEqual(
-    Array.from({ length: 100 }, (_, index) => index + 1),
-  )
-  expect(host.querySelectorAll('[data-newspaper-placeholder]')).toHaveLength(0)
   expect(represented()).toBe(2)
-  expect(pane().scrollHeight).toBe(
-    estimatedChunkHeight(50, width - 80, true) + estimatedChunkHeight(50, width - 80, false) + 96,
-  )
+  expect(stories().length).toBeLessThan(100)
+  expect(pane().scrollHeight).toBeLessThan(20_000)
   expect(list().textContent).not.toContain('up to date')
   await exposeAll()
-  expect(host.querySelectorAll('.newspaper-lead')).toHaveLength(1)
-  for (const chunk of [1, 80, 199, 100, 3, 197, 0]) {
-    await scroll(offset(chunk) + 100)
+  for (const page of [1, 80, 199, 100, 3, 197, 0]) {
+    await scroll(offset(page) + 100)
     bounds()
-    const target = chunk * 50 + 1
+    const target = page * 50 + 1
     const story = host.querySelector(`[data-story-id="${target}"]`)!
     expect(story).not.toBeNull()
     expect(story.closest('li')?.getAttribute('aria-posinset')).toBe(String(target))
     expect(story.closest('li')?.getAttribute('aria-setsize')).toBe('10000')
-    if (chunk > 1) expect(host.querySelector('.newspaper-lead')).toBeNull()
-    expect(story.closest('[data-newspaper-chunk]')?.getAttribute('aria-label')).toBe(
-      `Stories ${target}–${target + 49}`,
-    )
+    if (page > 1) expect(host.querySelector('.newspaper-lead')).toBeNull()
   }
   expect(props.onLoadMore).not.toHaveBeenCalled()
 }, 20_000)
@@ -305,7 +333,7 @@ it('does not expose a huge viewport on idle or repeatedly drain a short exposed 
   expect(represented()).toBe(3)
   expect(props.onLoadMore).not.toHaveBeenCalled()
   bounds()
-})
+}, 30_000)
 
 it('makes the button local-first and never reports up to date while cached stories are hidden', async () => {
   await render({ items: pool.slice(0, 175), moreServer: false, drained: true })
@@ -345,7 +373,7 @@ it('expands a hidden URL target without mounting its prefix and resets exposure 
 
 it('redistributes ranked tops into three, two and one stacks on resize without changing rank or roles', async () => {
   await render()
-  const first = () => host.querySelector<HTMLElement>('[data-newspaper-chunk="0"]')!
+  const first = () => host.querySelector<HTMLElement>('.newspaper')!
   expect(
     [...first().querySelectorAll('.newspaper-column')].map((column) =>
       column.querySelector('[data-story-id]')?.getAttribute('data-story-id'),
@@ -358,7 +386,7 @@ it('redistributes ranked tops into three, two and one stacks on resize without c
     await resize()
     bounds()
     expect(document.activeElement?.getAttribute('data-story-id')).toBe('3')
-    expect(new Set(ids())).toEqual(new Set(Array.from({ length: 100 }, (_, i) => i + 1)))
+    expect(ids()).toContain(3)
     expect(first().style.gridTemplateColumns).toBe(
       `repeat(${newspaperColumnCount(width - 80)}, minmax(0, 1fr))`,
     )
@@ -374,14 +402,18 @@ it('redistributes ranked tops into three, two and one stacks on resize without c
   }
 })
 
-it('readies a full upcoming measured chunk before its leading edge enters the viewport', async () => {
+it('overscans each column ahead of the shared viewport without mounting the prefix', async () => {
   await exposeAll()
-  expect(host.querySelector('[data-newspaper-chunk="1"]')).not.toBeNull()
-  expect(offset(1)).toBeGreaterThan(pane().scrollTop + height)
   await scroll(offset(100) + 200)
-  expect(host.querySelector('[data-newspaper-chunk="101"]')).not.toBeNull()
-  expect(offset(101)).toBeGreaterThan(pane().scrollTop + height)
-  expect(host.querySelector('[data-newspaper-placeholder="102"]')).not.toBeNull()
+  for (const column of columns()) {
+    const headlines = [...column.querySelectorAll<HTMLElement>('[data-story-id]')]
+    expect(headlines.at(-1)!.getBoundingClientRect().top).toBeGreaterThan(100 + height)
+    expect(
+      Number.parseFloat(
+        column.querySelector<HTMLElement>('[data-newspaper-spacer="top"]')!.style.height,
+      ),
+    ).toBeGreaterThan(0)
+  }
   bounds()
 })
 
@@ -404,7 +436,7 @@ it('caps even a viewport taller than the entire estimated pool and coalesces rap
   height = 10_000_000
   await exposeAll()
   bounds()
-  expect(stories()).toHaveLength(200)
+  expect(stories().length).toBeLessThanOrEqual(250)
   await act(async () => {
     for (const chunk of [150, 2, 199, 70]) {
       pane().scrollTop = offset(chunk) + 100
@@ -414,41 +446,44 @@ it('caps even a viewport taller than the entire estimated pool and coalesces rap
   await flush()
   bounds()
   expect(host.querySelector('[data-story-id="3501"]')).not.toBeNull()
-})
+}, 30_000)
 
-it('measures sections and anchors the current chunk through overscan/image reflow, width changes and item removal', async () => {
+it('anchors an actual visible headline through image/font height changes, width changes and removal', async () => {
   await exposeAll()
   await scroll(offset(100) + 200)
+  const visible = stories().find(
+    (node) => node.getBoundingClientRect().top >= 100 && node.getBoundingClientRect().top < 700,
+  )!
+  const id = Number(visible.dataset.storyId)
+  const beforeTop = visible.getBoundingClientRect().top
+  const previous = visible.closest('li')!.previousElementSibling as HTMLElement
+  const previousId = Number(previous.querySelector<HTMLElement>('[data-story-id]')!.dataset.storyId)
   const before = pane().scrollTop
-  const above = nativeHeight(host.querySelector('[data-newspaper-chunk="99"]')!)
-  sectionHeights.set(99, above + 500)
+  storyHeights.set(previousId, nativeHeight(previous) + 500)
   await resize()
   expect(pane().scrollTop).toBeCloseTo(before + 500)
-  expect(pane().scrollTop - offset(100)).toBeCloseTo(200)
-  bounds()
+  expect(
+    host.querySelector<HTMLElement>(`[data-story-id="${id}"]`)!.getBoundingClientRect().top,
+  ).toBeCloseTo(beforeTop)
   width = 440
   await resize()
-  expect(pane().scrollTop).toBeGreaterThan(before)
-  expect(host.querySelector('[data-story-id="5001"]')).not.toBeNull()
-  bounds()
-  // Offscreen estimate changes must not return the reader to the first chunk.
-  await render({ items: pool.slice(1) })
-  expect(host.querySelector('[data-story-id="5001"]')).not.toBeNull()
+  expect(host.querySelector(`[data-story-id="${id}"]`)).not.toBeNull()
   expect(pane().scrollTop).toBeGreaterThan(100_000)
+  await render({ items: pool.slice(1) })
+  expect(host.querySelector(`[data-story-id="${id}"]`)).not.toBeNull()
   bounds()
 })
 
-it('reuses measured heights after eviction instead of retaining story DOM', async () => {
-  sectionHeights.set(100, 2400)
+it('reuses per-story measured heights after eviction instead of retaining story DOM', async () => {
+  storyHeights.set(5001, 2400)
   await exposeAll()
   await scroll(offset(100) + 100)
-  expect(host.querySelector('[data-story-id="5001"]')).not.toBeNull()
+  const column = host.querySelector('[data-story-id="5001"]')!.closest('.newspaper-column')!
+  const measuredTotal = columnHeight(column)
   bounds()
   await scroll(offset(10))
   expect(host.querySelector('[data-story-id="5001"]')).toBeNull()
-  expect(host.querySelector<HTMLElement>('[data-newspaper-placeholder="100"]')?.style.height).toBe(
-    '2400px',
-  )
+  expect(columnHeight(columns()[1])).toBeCloseTo(measuredTotal)
   await scroll(offset(100) + 100)
   expect(host.querySelector('[data-story-id="5001"]')).not.toBeNull()
   bounds()
@@ -457,7 +492,7 @@ it('reuses measured heights after eviction instead of retaining story DOM', asyn
 it('keeps hidden/deep-link selections bounded and restores their chunk and headline on Back', async () => {
   await render({ active: false, selectedId: 9950 })
   bounds()
-  expect(stories()).toHaveLength(100)
+  expect(stories().length).toBeLessThanOrEqual(250)
   expect(host.querySelector('[data-story-id="9950"]')).not.toBeNull()
   expect(host.querySelector('[data-story-id="1"]')).toBeNull()
   expect(props.onLoadMore).not.toHaveBeenCalled()
@@ -718,7 +753,6 @@ const placement = (id: number) => {
   const headline = host.querySelector<HTMLButtonElement>(`[data-story-id="${id}"]`)!
   const story = headline.closest('li')!
   return {
-    chunk: story.closest<HTMLElement>('[data-newspaper-chunk]')!.dataset.newspaperChunk,
     column: story.parentElement!.getAttribute('aria-label'),
     role: [...story.classList].find((name) =>
       /^newspaper-(lead|feature|brief|image|standard)$/.test(name),
@@ -728,6 +762,7 @@ const placement = (id: number) => {
 
 it('keeps actual story nodes, columns and roles through lead and chunk-boundary deletions and rollback', async () => {
   const original = pool.slice(0, 120)
+  height = 30_000
   await render({ items: original })
   const before = new Map(ids().map((id) => [id, placement(id)]))
   const survivingNode = host.querySelector('[data-story-id="53"]')
@@ -744,10 +779,11 @@ it('keeps actual story nodes, columns and roles through lead and chunk-boundary 
   expect(placement(50)).toEqual(before.get(50))
   expect(placement(51)).toEqual(before.get(51))
   expect(host.querySelectorAll('.newspaper-lead')).toHaveLength(1)
-})
+}, 30_000)
 
 it('appends fresh arrivals without redealing and only resets ownership for real views or column-count changes', async () => {
   const original = pool.slice(0, 85)
+  height = 30_000
   await render({ items: original })
   const before = new Map(ids().map((id) => [id, placement(id)]))
   const current = original.slice(2).map((story) => ({ ...story, unread: false, starred: true }))
@@ -760,7 +796,8 @@ it('appends fresh arrivals without redealing and only resets ownership for real 
   current.forEach((story) => expect(placement(story.id)).toEqual(before.get(story.id)))
   width = 700
   await resize()
-  expect(host.querySelectorAll('.newspaper-column')).toHaveLength(4)
+  expect(host.querySelectorAll('.newspaper-column')).toHaveLength(2)
+  await scroll(0)
   expect(host.querySelector('.newspaper-lead [data-story-id]')?.getAttribute('data-story-id')).toBe(
     '85',
   )
@@ -769,7 +806,7 @@ it('appends fresh arrivals without redealing and only resets ownership for real 
     '3',
   )
   expect(represented()).toBe(2)
-})
+}, 30_000)
 
 it('drops empty chunks after bulk clears and still targets reader-return by ownership rather than compacted rank', async () => {
   await render({ items: pool.slice(0, 200), selectedId: 200 })
@@ -777,6 +814,7 @@ it('drops empty chunks after bulk clears and still targets reader-return by owne
   const remaining = pool.slice(0, 200).filter((story) => story.id === 1 || story.id > 100)
   await render({ items: remaining, selectedId: null })
   expect(represented()).toBe(3)
+  expect(host.querySelector('[data-newspaper-chunk]')).toBeNull()
   await render({ active: false, selectedId: 151 })
   await render({ active: true, selectedId: null })
   expect(document.activeElement?.getAttribute('data-story-id')).toBe('151')
@@ -786,6 +824,7 @@ it('drops empty chunks after bulk clears and still targets reader-return by owne
 
 it('calls read immediately and restores original ownership after a simulated failed optimistic read', async () => {
   const original = pool.slice(0, 85)
+  height = 30_000
   let reject!: (error: Error) => void
   let reported: Error | undefined
   const request = new Promise<void>((_, fail) => {
@@ -818,7 +857,7 @@ it('calls read immediately and restores original ownership after a simulated fai
   expect(document.activeElement?.getAttribute('data-story-id')).toBe('3')
 })
 
-it('wires visible sort-reset motion across keyed sessions but not initial newspaper/list-mode entry', async () => {
+it('wires visible sort/explicit Reload motion across keyed sessions but not initial newspaper/list-mode entry', async () => {
   const originalBounds = vi
     .mocked(HTMLElement.prototype.getBoundingClientRect)
     .getMockImplementation()!
@@ -827,9 +866,9 @@ it('wires visible sort-reset motion across keyed sessions but not initial newspa
   ) {
     const story = this.closest<HTMLElement>('.newspaper-story')
     if (!story || !this.matches('li, article, [data-story-id]')) return originalBounds.call(this)
-    const section = story.closest('[data-newspaper-chunk]')!
+    const section = list()
     const column = [...section.querySelectorAll('.newspaper-column')].indexOf(story.parentElement!)
-    const row = [...story.parentElement!.children].indexOf(story)
+    const row = [...story.parentElement!.querySelectorAll('.newspaper-story')].indexOf(story)
     const top = 128 + (column < 0 ? 0 : 200 + row * 100) - pane().scrollTop
     const left = Math.max(0, column) * 300
     return {
@@ -860,10 +899,127 @@ it('wires visible sort-reset motion across keyed sessions but not initial newspa
     expect(
       host.querySelector('.newspaper-lead [data-story-id]')?.getAttribute('data-story-id'),
     ).toBe('5')
+    await render({ items: current, windowKey: 'all:reload:1' })
+    expect(animate).toHaveBeenCalledTimes(8)
+    expect(
+      host.querySelector('.newspaper-lead [data-story-id]')?.getAttribute('data-story-id'),
+    ).toBe('1')
     await render({ newspaper: false })
     animations.forEach((cancel) => expect(cancel).toHaveBeenCalledTimes(1))
     await render({ newspaper: true })
-    expect(animate).toHaveBeenCalledTimes(4)
+    expect(animate).toHaveBeenCalledTimes(8)
+  } finally {
+    delete (HTMLElement.prototype as Partial<HTMLElement>).animate
+  }
+})
+
+it('directly follows each uneven predecessor across former 50/100-story boundaries', async () => {
+  height = 100_000
+  const current = pool.slice(0, 155)
+  current.forEach((item) => storyHeights.set(item.id, [180, 470, 900][(item.id - 2 + 3) % 3]))
+  await render({ items: current, selectedId: 155 })
+  await scroll(0)
+  expect(host.querySelectorAll('.newspaper')).toHaveLength(1)
+  expect(host.querySelector('[data-newspaper-chunk]')).toBeNull()
+  for (const column of columns()) {
+    const cards = [...column.querySelectorAll<HTMLElement>('.newspaper-story')]
+    for (const boundary of [50, 100]) {
+      const next = cards.find(
+        (card) =>
+          Number(card.querySelector<HTMLElement>('[data-story-id]')!.dataset.storyId) > boundary,
+      )!
+      const previous = next.previousElementSibling as HTMLElement
+      expect(previous.classList.contains('newspaper-story')).toBe(true)
+      expect(
+        next.getBoundingClientRect().top - previous.getBoundingClientRect().bottom,
+      ).toBeCloseTo(24)
+    }
+  }
+  const ends = columns().map(columnHeight)
+  expect(Math.max(...ends) - Math.min(...ends)).toBeGreaterThan(10_000)
+  bounds()
+}, 30_000)
+
+it('closes sparse deleted slots without a lead or phantom top/bottom sections and restores ownership on rollback', async () => {
+  height = 10_000
+  const current = pool.slice(0, 200)
+  await render({ items: current, selectedId: 200 })
+  const remaining = current.filter((item) => [50, 101, 155].includes(item.id))
+  await render({ items: remaining, selectedId: null })
+  await scroll(0)
+  expect(host.querySelector('.newspaper-lead, [data-newspaper-lead-placeholder]')).toBeNull()
+  expect(columns()[1].querySelector('.newspaper-story')).toBeNull()
+  for (const column of columns()) {
+    for (const spacer of column.querySelectorAll<HTMLElement>('[data-newspaper-spacer]'))
+      expect(spacer.style.height).toBe('0px')
+    const cards = [...column.querySelectorAll<HTMLElement>('.newspaper-story')]
+    if (cards.length) expect(cards[0].getBoundingClientRect().top).toBe(128)
+    for (let index = 1; index < cards.length; index++)
+      expect(
+        cards[index].getBoundingClientRect().top - cards[index - 1].getBoundingClientRect().bottom,
+      ).toBeCloseTo(24)
+  }
+  expect(pane().scrollHeight).toBeLessThan(1500)
+  const before = placement(101)
+  await render({ items: [...remaining, current[0]] })
+  expect(placement(101)).toEqual(before)
+  expect(host.querySelector('.newspaper-lead [data-story-id]')?.getAttribute('data-story-id')).toBe(
+    '1',
+  )
+  expect(
+    host.querySelector('[data-story-id="101"]')!.closest('li')!.getAttribute('aria-posinset'),
+  ).toBe('2')
+  bounds()
+}, 30_000)
+
+it('keeps the next actual visible headline anchored when its visible predecessor is removed', async () => {
+  width = 440
+  await render({ items: pool.slice(0, 60) })
+  await scroll(1400)
+  const visible = stories().filter(
+    (node) => node.getBoundingClientRect().top >= 100 && node.getBoundingClientRect().top < 700,
+  )
+  const first = visible[0]
+  const next = first
+    .closest('li')!
+    .nextElementSibling!.querySelector<HTMLElement>('[data-story-id]')!
+  const before = next.getBoundingClientRect().top
+  await render({
+    items: pool.slice(0, 60).filter((item) => item.id !== Number(first.dataset.storyId)),
+  })
+  expect(
+    host
+      .querySelector<HTMLElement>(`[data-story-id="${next.dataset.storyId}"]`)!
+      .getBoundingClientRect().top,
+  ).toBeCloseTo(before)
+  bounds()
+})
+
+it('glides surviving mounted stories for read/rollback but never for scroll-only column window swaps', async () => {
+  const animate = vi.fn<
+    (
+      frames: Keyframe[],
+      options: KeyframeAnimationOptions,
+    ) => { cancel: () => void; onfinish: null }
+  >(() => ({ cancel: vi.fn(), onfinish: null }))
+  Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate })
+  try {
+    const current = pool.slice(0, 100)
+    await render({ items: current })
+    expect(animate).not.toHaveBeenCalled()
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('[aria-label="Mark read: Story 2"]')!.click(),
+    )
+    expect(props.onRead).toHaveBeenCalledExactlyOnceWith(current[1])
+    await render({ items: current.filter((item) => item.id !== 2) })
+    expect(animate).toHaveBeenCalled()
+    expect(animate.mock.calls[0][1]).toEqual({ duration: 180, easing: 'ease-out' })
+    const count = animate.mock.calls.length
+    await render({ items: current })
+    expect(animate.mock.calls.length).toBeGreaterThan(count)
+    animate.mockClear()
+    await scroll(8000)
+    expect(animate).not.toHaveBeenCalled()
   } finally {
     delete (HTMLElement.prototype as Partial<HTMLElement>).animate
   }

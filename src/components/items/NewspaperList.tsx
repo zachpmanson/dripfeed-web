@@ -7,58 +7,60 @@ import {
   useState,
   type MutableRefObject,
 } from 'react'
+import type { NewsItem } from '../../api/types'
 import type { ItemListProps } from './ItemList'
 import NewspaperStory from './NewspaperStory'
 import TrailingRow from './TrailingRow'
 import { newspaperRole } from './newspaperPresentation'
-import {
-  newspaperOwnership,
-  ownedNewspaperItems,
-  ownedNewspaperChunks,
-  ownedNewspaperColumns,
-} from './newspaperOwnership'
+import { newspaperOwnership, ownedNewspaperItems, ownedNewspaperStacks } from './newspaperOwnership'
 import useNewspaperMotion, {
   newspaperHeadlineBounds,
   type NewspaperMotionSnapshot,
 } from './useNewspaperMotion'
 import {
-  chunkAt,
-  estimatedChunkHeight,
   newspaperColumnCount,
+  newspaperModel,
   newspaperRange,
-  NEWSPAPER_CHUNK_SIZE,
-  type NewspaperChunk,
+  storyAt,
+  NEWSPAPER_EXPOSURE_STEP,
+  NEWSPAPER_OVERSCAN,
+  type NewspaperMeasurement,
+  type NewspaperModel,
 } from './newspaperVirtualization'
 
-type Measurement = { width: number; height: number }
-type Model = { chunks: NewspaperChunk[]; offsets: number[] }
-type Anchor = { id: number; chunk: number; fraction: number }
-type VisualAnchor = { id: string; offset: number; scroll: number }
+type Anchor = { id: number; column: number; index: number; offset: number }
+type VisualAnchor = { id: number; offset: number; scroll: number }
 
-function anchorAt(model: Model, top: number): Anchor | null {
-  const chunk = chunkAt(model.offsets, top)
-  const part = model.chunks[chunk]
-  if (!part) return null
-  return {
-    id: part.items[0].id,
-    chunk,
-    fraction: Math.max(
-      0,
-      Math.min(1, (top - model.offsets[chunk]) / (model.offsets[chunk + 1] - model.offsets[chunk])),
-    ),
+function anchorAt(model: NewspaperModel, top: number): Anchor | null {
+  if (model.lead && top < model.leadHeight) {
+    return { id: model.lead.id, column: -1, index: 0, offset: top }
   }
+  for (const [column, stack] of model.columns.entries()) {
+    const index = storyAt(stack.offsets, top - model.leadHeight)
+    const item = stack.items[index]
+    if (item) {
+      return {
+        id: item.id,
+        column,
+        index,
+        offset: top - model.leadHeight - stack.offsets[index],
+      }
+    }
+  }
+  return null
 }
 
-function anchorTop(model: Model, anchor: Anchor): number {
-  const found = model.chunks.findIndex((part) => part.items.some((item) => item.id === anchor.id))
-  const chunk = found < 0 ? Math.min(anchor.chunk, model.chunks.length - 1) : found
-  return chunk < 0
-    ? 0
-    : model.offsets[chunk] + anchor.fraction * (model.offsets[chunk + 1] - model.offsets[chunk])
+function anchorTop(model: NewspaperModel, anchor: Anchor): number {
+  const found = model.locations.get(anchor.id)
+  if (found) return found.top + anchor.offset
+  const stack = model.columns[Math.max(0, Math.min(anchor.column, model.columns.length - 1))]
+  return (
+    model.leadHeight + stack.offsets[Math.min(anchor.index, stack.items.length)] + anchor.offset
+  )
 }
 
-/** Whole round-robin stack sections are the virtualization unit. Offscreen sections
- * retain measured (or width-aware estimated) height, never their story DOM. */
+/** Independently measured story windows share a scroller, never a page-height
+ * barrier. Unmounted stories contribute only column-local offset spacers. */
 export default function NewspaperList({
   items,
   windowKey,
@@ -82,19 +84,12 @@ export default function NewspaperList({
   const scrollRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
   const sentinelRef = useRef<HTMLLIElement>(null)
-  const sectionNodes = useRef(new Map<number, HTMLDivElement>())
   const [geometry, setGeometry] = useState(() => ({
     width: 900,
-    measurements: new Map<string, Measurement>(),
+    measurements: new Map<number, NewspaperMeasurement>(),
     top: 0,
     height: 0,
-    target:
-      selectedId === null
-        ? null
-        : Math.max(
-            0,
-            Math.floor(items.findIndex((item) => item.id === selectedId) / NEWSPAPER_CHUNK_SIZE),
-          ),
+    target: selectedId,
   }))
   const columnCount = newspaperColumnCount(geometry.width)
   const [ownershipState, setOwnershipState] = useState(() => ({
@@ -110,68 +105,54 @@ export default function NewspaperList({
     setOwnershipState({ items, ownership, dataRevision })
   }
   const orderedItems = useMemo(() => ownedNewspaperItems(items, ownership), [items, ownership])
-  const positions = useMemo(
-    () => new Map(orderedItems.map((item, index) => [item.id, index])),
-    [orderedItems],
-  )
-  const selectedIndex = selectedId === null ? -1 : (positions.get(selectedId) ?? -1)
+  // Accessibility reports the current caller ranking, not tombstone slot numbers.
+  const positions = useMemo(() => new Map(items.map((item, index) => [item.id, index])), [items])
+  const selectedIndex =
+    selectedId === null ? -1 : orderedItems.findIndex((item) => item.id === selectedId)
   const selectedCount =
     selectedIndex < 0
       ? 0
-      : (Math.floor(selectedIndex / NEWSPAPER_CHUNK_SIZE) + 1) * NEWSPAPER_CHUNK_SIZE
+      : (Math.floor(selectedIndex / NEWSPAPER_EXPOSURE_STEP) + 1) * NEWSPAPER_EXPOSURE_STEP
   const [revealedCount, setRevealedCount] = useState(() =>
-    Math.max(NEWSPAPER_CHUNK_SIZE * 2, selectedCount),
+    Math.max(NEWSPAPER_EXPOSURE_STEP * 2, selectedCount),
   )
-  // Exposure counts live stories, not vacant ownership slots. Empty sections
-  // disappear instead of accumulating scroll space after many reads.
+  // Exposure counts live stories, not vacant ownership slots.
   const representedCount = Math.max(revealedCount, selectedCount)
   useLayoutEffect(() => {
     if (selectedCount > revealedCount) setRevealedCount(selectedCount)
   }, [selectedCount, revealedCount])
   const hiddenLocal = items.length > representedCount
-  const chunks = useMemo(
-    () => ownedNewspaperChunks(orderedItems.slice(0, representedCount), ownership),
+  const stacks = useMemo(
+    () => ownedNewspaperStacks(orderedItems.slice(0, representedCount), ownership),
     [orderedItems, representedCount, ownership],
   )
-  const chunkFor = useCallback(
-    (id: number) => chunks.findIndex((chunk) => chunk.items.some((item) => item.id === id)),
-    [chunks],
+  const model = useMemo(
+    () => newspaperModel(stacks, geometry.width, geometry.measurements),
+    [stacks, geometry.measurements, geometry.width],
   )
-  const model = useMemo<Model>(() => {
-    const offsets = [0]
-    for (const chunk of chunks) {
-      const measured = geometry.measurements.get(chunk.signature)
-      const height =
-        measured?.width === geometry.width
-          ? measured.height
-          : estimatedChunkHeight(
-              chunk.items.length,
-              geometry.width,
-              chunk.slots[0] === 0,
-              Math.max(...ownedNewspaperColumns(chunk, columnCount).map((column) => column.length)),
-            )
-      offsets.push(offsets[offsets.length - 1] + height)
-    }
-    return { chunks, offsets }
-  }, [chunks, geometry.measurements, geometry.width, columnCount])
   const previousModel = useRef(model)
   const pendingAnchor = useRef<Anchor | null>(null)
-  const visualAnchor = useRef<VisualAnchor | null>(null)
-  let rangeTarget = geometry.target
-  if (rangeTarget === null && previousModel.current !== model) {
-    // Keep the anchor's section mounted during the measurement commit itself.
-    // Using the old pixel top with new width/height estimates could otherwise
-    // evict it before the layout effect gets a chance to restore its position.
+  // Retain more than one visible headline so removing the first anchor can
+  // preserve a surviving visible neighbour instead of a fractional page.
+  const visualAnchors = useRef<VisualAnchor[]>([])
+  const savedVisual = visualAnchors.current.find(
+    (anchor) =>
+      model.locations.has(anchor.id) &&
+      Math.abs(anchor.scroll - (scrollRef.current?.scrollTop ?? 0)) < 1,
+  )
+  let rangeTop = geometry.top
+  const targetLocation = geometry.target === null ? null : model.locations.get(geometry.target)
+  if (targetLocation) rangeTop = targetLocation.top
+  else if (previousModel.current !== model) {
     const anchor = pendingAnchor.current ?? anchorAt(previousModel.current, geometry.top)
-    const visual = visualAnchor.current
-    const id =
-      visual && Math.abs(visual.scroll - (scrollRef.current?.scrollTop ?? 0)) < 1
-        ? Number(visual.id)
-        : anchor?.id
-    const found = chunks.findIndex((part) => part.items.some((item) => item.id === id))
-    rangeTarget = found < 0 ? Math.min(anchor?.chunk ?? 0, Math.max(0, chunks.length - 1)) : found
+    if (savedVisual) rangeTop = model.locations.get(savedVisual.id)!.top - savedVisual.offset
+    else if (anchor) rangeTop = anchorTop(model, anchor)
   }
-  const range = newspaperRange(model.offsets, geometry.top, geometry.height, rangeTarget)
+  const ranges = model.columns.map(({ offsets }) =>
+    newspaperRange(offsets, rangeTop - model.leadHeight, geometry.height, columnCount),
+  )
+  const mountedWindow = ranges.map(({ first, last }) => `${first}:${last}`).join(',')
+  const showLead = model.lead !== null && rangeTop <= model.leadHeight + NEWSPAPER_OVERSCAN
   const returnTo = useRef<{ id: number; scroll: number | null } | null>(
     selectedId === null ? null : { id: selectedId, scroll: null },
   )
@@ -201,29 +182,20 @@ export default function NewspaperList({
     return () => document.removeEventListener('focusin', onFocus)
   }, [])
 
-  // Keep hidden deep-link selections bounded too. A clicked selection already
-  // has an exact scroll return; a new URL selection maps directly to its chunk.
+  // Hidden deep links jump straight to a bounded window, never mount a prefix.
   useLayoutEffect(() => {
     if (!active && selectedId !== null && returnTo.current?.id !== selectedId) {
       returnTo.current = { id: selectedId, scroll: null }
-      const target = chunkFor(selectedId)
-      setGeometry((old) => ({
-        ...old,
-        target: Math.max(0, target),
-      }))
+      setGeometry((old) => ({ ...old, target: selectedId }))
     }
-  }, [active, selectedId, chunkFor])
+  }, [active, selectedId])
 
   const refreshRef = useRef<() => void>(() => {})
   const scheduleRef = useRef<() => void>(() => {})
   const pendingRequest = useRef(false)
-  // An empty/filtered page must not create an automatic cursor loop. Compare
-  // the current window, not a count high-water mark: reading/removing stories
-  // can shrink it before a later successful page. The button can always retry.
+  // No-growth/filtered pages must not create an automatic cursor loop.
   const lastAutoWindow = useRef<string | null>(null)
   const tailApproach = useRef(false)
-  // Measurement updates do not arm exposure; a scroll authorizes one local
-  // step, which may become near-tail after a later viewport resize.
   const localApproach = useRef(false)
   const requestServer = (manual: boolean) => {
     if (
@@ -258,7 +230,7 @@ export default function NewspaperList({
       if (!manual && !localApproach.current) return
       localApproach.current = false
       tailApproach.current = true
-      setRevealedCount((old) => Math.max(old, representedCount) + NEWSPAPER_CHUNK_SIZE)
+      setRevealedCount((old) => Math.max(old, representedCount) + NEWSPAPER_EXPOSURE_STEP)
     } else requestServer(manual)
   }
 
@@ -267,18 +239,15 @@ export default function NewspaperList({
     if (!root) return
     const bounds = root.getBoundingClientRect()
     const headlines = listRef.current?.querySelectorAll<HTMLButtonElement>('[data-story-id]') ?? []
-    for (const headline of headlines) {
-      const rect = newspaperHeadlineBounds(headline)
-      if (rect.bottom > bounds.top && rect.top < bounds.bottom) {
-        visualAnchor.current = {
-          id: headline.dataset.storyId!,
-          offset: rect.top - bounds.top,
-          scroll: root.scrollTop,
-        }
-        return
-      }
-    }
-    visualAnchor.current = null
+    visualAnchors.current = [...headlines]
+      .map((headline) => ({ headline, rect: newspaperHeadlineBounds(headline) }))
+      .filter(({ rect }) => rect.bottom > bounds.top && rect.top < bounds.bottom)
+      .sort((a, b) => a.rect.top - b.rect.top)
+      .map(({ headline, rect }) => ({
+        id: Number(headline.dataset.storyId),
+        offset: rect.top - bounds.top,
+        scroll: root.scrollTop,
+      }))
   }, [])
 
   const measure = useCallback(() => {
@@ -287,35 +256,34 @@ export default function NewspaperList({
     if (!active || !root || !list) return
     const width = list.clientWidth || Math.max(0, root.clientWidth - 80) || geometry.width
     let measurements = geometry.measurements
-    for (const [index, node] of sectionNodes.current) {
-      const chunk = chunks[index]
-      if (!chunk) continue
-      const height = node.getBoundingClientRect().height
-      const old = measurements.get(chunk.signature)
-      if (height > 0 && (!old || old.width !== width || Math.abs(old.height - height) >= 1)) {
+    for (const node of list.querySelectorAll<HTMLElement>('.newspaper-story')) {
+      const id = Number(node.querySelector<HTMLElement>('[data-story-id]')!.dataset.storyId)
+      const rect = node.getBoundingClientRect()
+      const height = rect.height + (Number.parseFloat(getComputedStyle(node).marginBottom) || 0)
+      const old = measurements.get(id)
+      if (
+        rect.width > 0 &&
+        height > 0 &&
+        (!old || Math.abs(old.width - rect.width) >= 1 || Math.abs(old.height - height) >= 1)
+      ) {
         if (measurements === geometry.measurements) {
-          // Retain only this dataset/width, bounding the measurement cache too.
-          const signatures = new Set(chunks.map((part) => part.signature))
-          measurements = new Map(
-            [...measurements].filter(
-              ([key, value]) => signatures.has(key) && value.width === width,
-            ),
-          )
+          // Only live represented IDs survive; offscreen visits retain heights,
+          // never DOM, and a bulk clear cannot leave phantom placeholders.
+          measurements = new Map([...measurements].filter(([id]) => model.locations.has(id)))
         }
-        measurements.set(chunk.signature, { width, height })
+        measurements.set(id, { width: rect.width, height })
       }
     }
     const top = Math.max(0, root.scrollTop - contentOrigin())
     if (measurements !== geometry.measurements || width !== geometry.width) {
       pendingAnchor.current = anchorAt(model, top)
-      const saved = visualAnchor.current
       if (
-        !saved ||
-        Math.abs(saved.scroll - root.scrollTop) >= 1 ||
-        !list.querySelector(`[data-story-id="${saved.id}"]`)
+        !visualAnchors.current.some(
+          (saved) =>
+            Math.abs(saved.scroll - root.scrollTop) < 1 &&
+            list.querySelector(`[data-story-id="${saved.id}"]`),
+        )
       ) {
-        // A fast jump may have evicted the old anchor. Capture a newly mounted
-        // visible headline before committing the corrected placeholder heights.
         rememberVisualAnchor()
       }
     }
@@ -324,31 +292,25 @@ export default function NewspaperList({
       width !== geometry.width ||
       top !== geometry.top ||
       root.clientHeight !== geometry.height ||
-      geometry.target !== null ||
-      rangeTarget !== geometry.target
+      geometry.target !== null
     ) {
       setGeometry({ width, measurements, top, height: root.clientHeight, target: null })
     }
     if (measurements === geometry.measurements && width === geometry.width) rememberVisualAnchor()
-  }, [active, chunks, geometry, model, rangeTarget, contentOrigin, rememberVisualAnchor])
+  }, [active, geometry, model, contentOrigin, rememberVisualAnchor])
 
   refreshRef.current = () => {
     if (!enabled.current) return
     measure()
     const root = scrollRef.current
     if (!root || root.clientHeight <= 0) return
-    // Expose one local chunk before considering the server tail.
-    // Two viewports (at least 1200px) buys time before the reader reaches it.
     const margin = Math.max(1200, root.clientHeight * 2)
     const top = root.scrollTop - contentOrigin()
     const near =
-      (chunks.length === 0 || range.last === chunks.length - 1) &&
       top >= -margin &&
-      top + root.clientHeight + margin >= model.offsets[model.offsets.length - 1] &&
+      top + root.clientHeight + margin >= model.height &&
       root.scrollHeight - root.scrollTop - root.clientHeight <= margin
     if (!near) tailApproach.current = false
-    // One automatic step per approach, not a chain of small server pages
-    // just because a generous prefetch margin still contains the new tail.
     else if (!tailApproach.current) revealOrRequest(false)
   }
 
@@ -364,20 +326,21 @@ export default function NewspaperList({
     }
     if (returning) {
       const saved = returnTo.current
-      const index = saved ? chunkFor(saved.id) : -1
-      root.scrollTop = saved?.scroll ?? (index < 0 ? 0 : model.offsets[index] + contentOrigin())
+      root.scrollTop =
+        saved?.scroll ?? ((saved ? model.locations.get(saved.id)?.top : 0) ?? 0) + contentOrigin()
       focusReturn.current = true
       pendingAnchor.current = null
       rememberVisualAnchor()
     } else if (previousModel.current !== model) {
-      const visual = visualAnchor.current
-      const headline =
-        visual && Math.abs(visual.scroll - root.scrollTop) < 1
-          ? list.querySelector<HTMLButtonElement>(`[data-story-id="${visual.id}"]`)
-          : null
+      const visual = visualAnchors.current.find(
+        (saved) =>
+          Math.abs(saved.scroll - root.scrollTop) < 1 &&
+          list.querySelector(`[data-story-id="${saved.id}"]`),
+      )
+      const headline = visual
+        ? list.querySelector<HTMLButtonElement>(`[data-story-id="${visual.id}"]`)
+        : null
       if (headline && visual) {
-        // Preserve an actual visible headline through column reflow.
-        // Fractional chunk anchoring is the fallback for evicted/deleted nodes.
         root.scrollTop +=
           newspaperHeadlineBounds(headline).top - root.getBoundingClientRect().top - visual.offset
       } else {
@@ -388,21 +351,16 @@ export default function NewspaperList({
     }
     previousModel.current = model
     measure()
-    // Width-driven stack redistribution needs a commit before revealing a
-    // hidden-pane URL selection; the old columns may place it at another row.
     const width = list.clientWidth || Math.max(0, root.clientWidth - 80) || geometry.width
     if (focusReturn.current && width === geometry.width) {
-      const story = returnTo.current
-        ? list.querySelector<HTMLButtonElement>(`[data-story-id="${returnTo.current.id}"]`)
+      const saved = returnTo.current
+      const story = saved
+        ? list.querySelector<HTMLButtonElement>(`[data-story-id="${saved.id}"]`)
         : null
-      // A range update may need one synchronous commit before the target exists.
-      const target = returnTo.current ? chunkFor(returnTo.current.id) : -1
-      if (!story && target >= 0 && (target < range.first || target > range.last)) {
-        setGeometry((old) => ({ ...old, target }))
+      if (!story && saved && model.locations.has(saved.id)) {
+        setGeometry((old) => ({ ...old, target: saved.id }))
       } else {
-        if (story && returnTo.current?.scroll === null) {
-          // A URL selection has no saved pixel position. Reveal its headline,
-          // not just the beginning of a potentially very tall section.
+        if (story && saved?.scroll === null) {
           root.scrollTop +=
             newspaperHeadlineBounds(story).top - root.getBoundingClientRect().top - contentOrigin()
           measure()
@@ -416,8 +374,6 @@ export default function NewspaperList({
     if (focused && !focused.node.isConnected) {
       focusedStory.current = null
       if (!document.activeElement || document.activeElement === document.body) {
-        // Stack DOM order differs from rank. Recover the same (or next ranked)
-        // headline when redistribution/removal disconnects the focused node.
         const stories = [...list.querySelectorAll<HTMLButtonElement>('[data-story-id]')].sort(
           (a, b) =>
             Number(a.closest('li')?.getAttribute('aria-posinset')) -
@@ -438,11 +394,9 @@ export default function NewspaperList({
     items,
     geometry.top,
     geometry.width,
-    range.first,
-    range.last,
+    mountedWindow,
     contentOrigin,
     rememberVisualAnchor,
-    chunkFor,
   ])
 
   // One generation-scoped rAF coalesces scroll, resize, image/font reflow and
@@ -461,7 +415,9 @@ export default function NewspaperList({
     scheduleRef.current = schedule
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
     if (scrollRef.current) observer?.observe(scrollRef.current)
-    for (const node of sectionNodes.current.values()) observer?.observe(node)
+    if (listRef.current) observer?.observe(listRef.current)
+    for (const node of listRef.current?.querySelectorAll('.newspaper-story') ?? [])
+      observer?.observe(node)
     window.addEventListener('resize', schedule)
     schedule()
     return () => {
@@ -471,7 +427,7 @@ export default function NewspaperList({
       window.removeEventListener('resize', schedule)
       scheduleRef.current = () => {}
     }
-  }, [active, range.first, range.last, chunks])
+  }, [active, mountedWindow, stacks])
 
   useEffect(() => {
     scheduleRef.current()
@@ -485,13 +441,13 @@ export default function NewspaperList({
     [onSelect],
   )
 
-  const renderStory = (chunk: NewspaperChunk, localIndex: number) => (
+  const renderStory = (item: NewsItem) => (
     <NewspaperStory
-      key={chunk.items[localIndex].id}
-      item={chunk.items[localIndex]}
-      index={positions.get(chunk.items[localIndex].id)}
+      key={item.id}
+      item={item}
+      index={positions.get(item.id)}
       total={items.length}
-      role={newspaperRole(chunk.slots[localIndex])}
+      role={newspaperRole(ownership.slots.get(item.id)!)}
       feedTitle={feedTitle}
       feedById={feedById}
       showFavicons={showFavicons}
@@ -502,24 +458,13 @@ export default function NewspaperList({
     />
   )
 
-  // The first measured width may change column count before the first paint;
-  // that initial distribution is not a user-visible layout transition.
-  useNewspaperMotion(
-    scrollRef,
-    listRef,
-    active,
-    chunks
-      .slice(range.first, range.last + 1)
-      .map((chunk) => chunk.start)
-      .join(','),
-    {
-      ready: geometry.height > 0,
-      session: windowKey,
-      columns: columnCount,
-      dataRevision,
-      snapshot: motionSnapshot,
-    },
-  )
+  useNewspaperMotion(scrollRef, listRef, active, mountedWindow, {
+    ready: geometry.height > 0,
+    session: windowKey,
+    columns: columnCount,
+    dataRevision,
+    snapshot: motionSnapshot,
+  })
 
   return (
     <div
@@ -545,44 +490,51 @@ export default function NewspaperList({
             : null
         }}
       >
-        {chunks.map((chunk, index) => (
-          <li key={chunk.start} className="flow-root list-none" role="presentation">
-            {index >= range.first && index <= range.last ? (
-              <div
-                ref={(node) => {
-                  if (node) sectionNodes.current.set(index, node)
-                  else sectionNodes.current.delete(index)
-                }}
-                className="newspaper grid items-start gap-x-7"
-                style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
-                role="group"
-                aria-label={`Stories ${positions.get(chunk.items[0].id)! + 1}–${positions.get(chunk.items.at(-1)!.id)! + 1}`}
-                data-newspaper-chunk={index}
-              >
-                {chunk.slots[0] === 0 && (
-                  <ul className="col-span-full m-0 list-none p-0" aria-label="Lead story">
-                    {renderStory(chunk, 0)}
-                  </ul>
-                )}
-                {ownedNewspaperColumns(chunk, columnCount).map((indices, column) => (
-                  <ul
-                    key={column}
-                    className="newspaper-column m-0 min-w-0 list-none p-0"
-                    aria-label={`Column ${column + 1}`}
-                  >
-                    {indices.map((localIndex) => renderStory(chunk, localIndex))}
-                  </ul>
-                ))}
-              </div>
-            ) : (
+        <li className="list-none" role="presentation">
+          {showLead ? (
+            <ul className="m-0 flow-root list-none p-0" aria-label="Lead story">
+              {renderStory(model.lead!)}
+            </ul>
+          ) : (
+            model.lead && (
               <div
                 aria-hidden="true"
-                data-newspaper-placeholder={index}
-                style={{ height: model.offsets[index + 1] - model.offsets[index] }}
+                data-newspaper-lead-placeholder
+                style={{ height: model.leadHeight }}
               />
-            )}
-          </li>
-        ))}
+            )
+          )}
+          <div
+            className="newspaper grid items-start gap-x-7"
+            data-newspaper-count={Math.min(orderedItems.length, representedCount)}
+            style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
+          >
+            {model.columns.map((column, index) => {
+              const range = ranges[index]
+              return (
+                <ul
+                  key={index}
+                  className="newspaper-column m-0 flow-root min-w-0 list-none p-0"
+                  aria-label={`Column ${index + 1}`}
+                >
+                  <li
+                    role="presentation"
+                    aria-hidden="true"
+                    data-newspaper-spacer="top"
+                    style={{ height: column.offsets[range.first] }}
+                  />
+                  {column.items.slice(range.first, range.last + 1).map(renderStory)}
+                  <li
+                    role="presentation"
+                    aria-hidden="true"
+                    data-newspaper-spacer="bottom"
+                    style={{ height: column.offsets.at(-1)! - column.offsets[range.last + 1] }}
+                  />
+                </ul>
+              )
+            })}
+          </div>
+        </li>
         {items.length === 0 && <li className="empty px-3 py-4 text-app-muted">{emptyText}</li>}
         <TrailingRow
           sentinelRef={sentinelRef}

@@ -1,16 +1,17 @@
 import type { NewsItem } from '../../api/types'
+import type { NewspaperStacks } from './newspaperOwnership'
 
-export const NEWSPAPER_CHUNK_SIZE = 50
-export const NEWSPAPER_OVERSCAN = 1
-// Even a very tall viewport or an inaccurate estimate cannot mount the pool.
-export const NEWSPAPER_MAX_VISIBLE_CHUNKS = 3
-export const NEWSPAPER_MAX_MOUNTED_CHUNKS = NEWSPAPER_MAX_VISIBLE_CHUNKS + NEWSPAPER_OVERSCAN * 2
-
-export interface NewspaperChunk {
-  start: number
-  items: NewsItem[]
-  slots: number[]
-  signature: string
+export const NEWSPAPER_EXPOSURE_STEP = 50
+export const NEWSPAPER_MAX_MOUNTED = 250
+export const NEWSPAPER_OVERSCAN = 1200
+export type NewspaperMeasurement = { width: number; height: number }
+export type NewspaperColumn = { items: NewsItem[]; offsets: number[] }
+export type NewspaperModel = {
+  lead: NewsItem | null
+  leadHeight: number
+  columns: NewspaperColumn[]
+  locations: Map<number, { column: number; index: number; top: number }>
+  height: number
 }
 
 // Match the 17rem minimum column width and 1.75rem gap at the app's 16px root.
@@ -18,44 +19,75 @@ export function newspaperColumnCount(width: number): number {
   return Math.max(1, Math.min(3, Math.floor((width + 28) / (272 + 28))))
 }
 
-/** Local indices retain absolute rank/roles even though DOM traversal is down columns. */
-export function newspaperColumnIndices(count: number, columns: number, lead: boolean): number[][] {
-  const stacks = Array.from({ length: columns }, () => [] as number[])
-  const start = lead && count > 0 ? 1 : 0
-  for (let index = start; index < count; index++) stacks[(index - start) % columns].push(index)
-  return stacks
+export function newspaperColumnWidth(width: number, columns: number): number {
+  return (width - (columns - 1) * 28) / columns
 }
 
-export function estimatedChunkHeight(
-  count: number,
+export function estimatedStoryHeight(width: number, lead = false): number {
+  return lead ? 300 : Math.max(220, Math.min(750, 420 * Math.sqrt(300 / Math.max(1, width))))
+}
+
+/** Offsets include the story's trailing margin. No maximum across columns is
+ * used until the final tail, so there is no cross-column pagination barrier. */
+export function newspaperModel(
+  stacks: NewspaperStacks,
   width: number,
-  lead: boolean,
-  tallestColumn = Math.ceil(count / newspaperColumnCount(width)),
-): number {
-  return tallestColumn * 420 + (lead ? 300 : 0)
+  measurements: Map<number, NewspaperMeasurement>,
+): NewspaperModel {
+  const extent = (item: NewsItem, width: number, lead = false) => {
+    const saved = measurements.get(item.id)
+    return saved && Math.abs(saved.width - width) < 1
+      ? saved.height
+      : estimatedStoryHeight(width, lead)
+  }
+  const leadHeight = stacks.lead ? extent(stacks.lead, width, true) : 0
+  const locations: NewspaperModel['locations'] = new Map()
+  if (stacks.lead) locations.set(stacks.lead.id, { column: -1, index: 0, top: 0 })
+  const columnWidth = newspaperColumnWidth(width, stacks.columns.length)
+  const columns = stacks.columns.map((items, column) => {
+    const offsets = [0]
+    items.forEach((item, index) => {
+      locations.set(item.id, { column, index, top: leadHeight + offsets[index] })
+      offsets.push(offsets[index] + extent(item, columnWidth))
+    })
+    return { items, offsets }
+  })
+  return {
+    lead: stacks.lead,
+    leadHeight,
+    columns,
+    locations,
+    height: leadHeight + Math.max(0, ...columns.map(({ offsets }) => offsets.at(-1)!)),
+  }
 }
 
-export function chunkAt(offsets: number[], top: number): number {
-  let index = 0
-  while (index + 1 < offsets.length - 1 && offsets[index + 1] <= top) index++
-  return index
+export function storyAt(offsets: number[], top: number): number {
+  let low = 0
+  let high = Math.max(0, offsets.length - 2)
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2)
+    if (offsets[middle] <= top) low = middle
+    else high = middle - 1
+  }
+  return low
 }
 
-export function newspaperRange(
-  offsets: number[],
-  top: number,
-  height: number,
-  target: number | null,
-) {
-  const last = Math.max(0, offsets.length - 2)
-  const firstVisible = Math.min(last, target ?? chunkAt(offsets, top))
-  const lastVisible = Math.min(
-    last,
-    firstVisible + NEWSPAPER_MAX_VISIBLE_CHUNKS - 1,
-    target === null ? chunkAt(offsets, top + height) : firstVisible,
+/** The shared scroll position windows each stack independently. Reserve one
+ * global lead slot, not another 250-story budget for every column. */
+export function newspaperRange(offsets: number[], top: number, height: number, columns: number) {
+  const limit = Math.floor((NEWSPAPER_MAX_MOUNTED - 1) / columns)
+  const visible = storyAt(offsets, top)
+  const first = Math.max(
+    0,
+    storyAt(offsets, top - NEWSPAPER_OVERSCAN),
+    visible - Math.floor(limit / 4),
   )
   return {
-    first: Math.max(0, firstVisible - NEWSPAPER_OVERSCAN),
-    last: Math.min(last, lastVisible + NEWSPAPER_OVERSCAN),
+    first,
+    last: Math.min(
+      offsets.length - 2,
+      storyAt(offsets, top + height + NEWSPAPER_OVERSCAN),
+      first + limit - 1,
+    ),
   }
 }

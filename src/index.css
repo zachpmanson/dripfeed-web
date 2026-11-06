@@ -869,8 +869,7 @@
 }
 
 /* Newspaper chrome only; reader HTML and user article CSS stay in their iframe.
-   Each measured chunk deals ranked stories into independent round-robin stacks.
-   Natural story heights need neither per-card measurement nor fixed grid rows. */
+   Continuous round-robin columns use measured story offsets, not balanced rows. */
 .newspaper-headline,
 .newspaper-excerpt {
   font-family: 'Paper Serif', Georgia, serif;

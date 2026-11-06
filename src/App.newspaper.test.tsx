@@ -5,7 +5,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import App from './App'
 import type { AppData } from './hooks'
 import type { NewsFeed, NewsItem } from './api/types'
-import { estimatedChunkHeight } from './components/items/newspaperVirtualization'
+import {
+  newspaperColumnWidth,
+  estimatedStoryHeight,
+} from './components/items/newspaperVirtualization'
 
 const mocks = vi.hoisted(() => ({ store: null as AppData | null }))
 vi.mock('./hooks', () => ({ useStore: () => mocks.store! }))
@@ -233,8 +236,12 @@ it('requires explicit URL selection to mount/extract; returns scroll, chunks and
     [...newspaper().querySelectorAll('[data-story-id]')].map((node) =>
       Number(node.getAttribute('data-story-id')),
     )
-  expect(storyIds().sort((a, b) => b - a)).toEqual(Array.from({ length: 100 }, (_, i) => 120 - i))
-  expect(newspaper().querySelectorAll('.newspaper')).toHaveLength(2)
+  const initialIds = storyIds()
+  expect(initialIds.length).toBeLessThanOrEqual(100)
+  expect(
+    newspaper().querySelector('[data-newspaper-count]')?.getAttribute('data-newspaper-count'),
+  ).toBe('100')
+  expect(newspaper().querySelectorAll('.newspaper')).toHaveLength(1)
   expect(newspaper().querySelectorAll('.newspaper-lead')).toHaveLength(1)
   expect(newspaper().parentElement).toBe(newspaperScroll())
   expect(newspaperScroll().classList.contains('overflow-y-auto')).toBe(true)
@@ -242,18 +249,15 @@ it('requires explicit URL selection to mount/extract; returns scroll, chunks and
   expect(newspaper().classList.contains('overflow-y-auto')).toBe(false)
   expect(newspaper().classList.contains('flex-1')).toBe(false)
   expect(newspaper().classList.contains('grid')).toBe(false)
-  expect(newspaper().querySelectorAll('.col-span-full')).toHaveLength(1)
-  expect(newspaper().querySelectorAll('.newspaper-column')).toHaveLength(6)
+  expect(newspaper().querySelectorAll('[aria-label="Lead story"]')).toHaveLength(1)
+  expect(newspaper().querySelectorAll('.newspaper-column')).toHaveLength(3)
   expect(storyIds().slice(0, 4)).toEqual([120, 119, 116, 113])
   expect([...newspaper().children].every((node) => !(node as HTMLElement).style.gridRowEnd)).toBe(
     true,
   )
   expect(
-    newspaper()
-      .querySelector('[data-story-id="120"]')
-      ?.closest('ul')
-      ?.classList.contains('col-span-full'),
-  ).toBe(true)
+    newspaper().querySelector('[data-story-id="120"]')?.closest('ul')?.getAttribute('aria-label'),
+  ).toBe('Lead story')
   expect(
     newspaper()
       .querySelector('[data-story-id="116"]')
@@ -261,7 +265,7 @@ it('requires explicit URL selection to mount/extract; returns scroll, chunks and
       ?.classList.contains('newspaper-feature'),
   ).toBe(true)
   await act(async () => resize([], {} as ResizeObserver))
-  expect(storyIds().sort((a, b) => b - a)).toEqual(Array.from({ length: 100 }, (_, i) => 120 - i))
+  expect(storyIds()).toEqual(initialIds)
   expect(newspaper().querySelectorAll('.newspaper-lead')).toHaveLength(1)
   const frontUrl = location.search
   newspaperScroll().scrollTop = 900
@@ -294,7 +298,7 @@ it('requires explicit URL selection to mount/extract; returns scroll, chunks and
   expect(location.search).toBe(frontUrl)
   expect(newspaperScroll().scrollTop).toBe(900)
   expect(document.activeElement?.getAttribute('data-story-id')).toBe('120')
-  expect(newspaper().querySelectorAll('[data-story-id]')).toHaveLength(100)
+  expect(newspaper().querySelectorAll('[data-story-id]')).toHaveLength(initialIds.length)
   expect(container.querySelector('iframe')).toBeNull()
   expect(mocks.store!.actions.setRead).not.toHaveBeenCalled()
 })
@@ -425,25 +429,39 @@ it('bounds actual deep URL and hidden popstate selections without a Back control
     this: HTMLElement,
   ) {
     let top = this.classList.contains('newspaper-chunks') ? 28 - newspaperScroll().scrollTop : 0
-    const section = this.closest<HTMLElement>('[data-newspaper-chunk]')
-    const h = this.hasAttribute('data-newspaper-chunk')
-      ? estimatedChunkHeight(
-          this.querySelectorAll('[data-story-id]').length,
-          900,
-          this.dataset.newspaperChunk === '0',
-        )
-      : 600
-    if (section && this.hasAttribute('data-story-id')) {
-      const chunk = Number(section.dataset.newspaperChunk)
-      top = 28 - newspaperScroll().scrollTop
-      for (let i = 0; i < chunk; i++) top += estimatedChunkHeight(50, 900, i === 0)
+    const story = this.closest<HTMLElement>('.newspaper-story')
+    const lead = newspaper().querySelector('.newspaper-lead')
+    const leadHeight = lead
+      ? 300
+      : Number.parseFloat(
+          newspaper().querySelector<HTMLElement>('[data-newspaper-lead-placeholder]')?.style
+            .height ?? '',
+        ) || 0
+    const extent = (node: Element) =>
+      node.classList.contains('newspaper-story')
+        ? node.classList.contains('newspaper-lead')
+          ? 300
+          : estimatedStoryHeight(newspaperColumnWidth(900, 3))
+        : Number.parseFloat((node as HTMLElement).style.height) || 0
+    let h = 600
+    let w = 900
+    if (story) {
+      const isLead = story.classList.contains('newspaper-lead')
+      w = isLead ? 900 : newspaperColumnWidth(900, 3)
+      h = isLead ? 300 : estimatedStoryHeight(w)
+      const siblings = [...story.parentElement!.children]
+      top =
+        28 -
+        newspaperScroll().scrollTop +
+        (isLead ? 0 : leadHeight) +
+        siblings.slice(0, siblings.indexOf(story)).reduce((sum, node) => sum + extent(node), 0)
     }
     return {
       top,
       bottom: top + h,
       left: 0,
       right: 900,
-      width: 900,
+      width: w,
       height: h,
       x: 0,
       y: top,

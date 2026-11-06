@@ -183,29 +183,37 @@ and session tests remain separate. Menu geometry compares page width to the
 fixture's inherited desktop-header baseline; it does not claim a responsive app
 layout redesign. Optional JSON/screenshot artifacts follow the other runners.
 
-# Newspaper chunk virtualization
+# Continuous newspaper column virtualization
 
-Newspaper mode uses measured grid sections of 50 ranked stories dealt round-robin
-into 1–3 independent column stacks (17rem minimum width, 1.75rem gap). Only the
-viewport sections plus one whole section ahead/behind are mounted (at most five
-sections / 250 stories). Initially only 100 cached stories contribute scroll space;
-each near-tail approach reveals another 50. Unrevealed stories have no placeholders.
-Previously visited offscreen sections retain measured or width-aware estimated
-height placeholders. A deep URL selection can explicitly represent its prefix
-without mounting it. This bounds rendering and the initial scroll range, not the
-existing unread fetch, ranking sample, IndexedDB mirror or server cursors.
-On entry, the first section contains the spanning lead; remaining ranks are dealt
-A1,4,7 / B2,5,8 / C3,6,9. Story IDs then retain their section, column and visual
-role through removals, read/star refreshes and arrivals (new IDs append after the
-existing owners, even if newer in the caller's ranking). Removing the lead does
-not promote another story. Empty sections disappear; gaps are not backfilled
-from other columns/sections. Exposure counts surviving stories, so repeated reads
-do not strand the cached tail behind empty slots. View/sort/filter switches and
-column-count changes rebalance; ordinary width changes within the same count do
-not. Removed IDs retain metadata until reset so rollback restores their ownership.
-Each column stays ranked; accessible positions use the surviving ownership order.
-DOM/keyboard traversal runs down columns, not visual row-major order.
-Variable-height stories are not pixel-aligned masonry rows. List mode remains unchanged.
+Newspaper mode deals stories into 1–3 continuous round-robin stacks (17rem minimum
+width, 1.75rem gap), below a full-width lead. Source indices 50/100/etc. have no
+layout significance: each story directly follows its own column's predecessor,
+regardless of the other columns' heights. There is no CSS multicol balancing or
+cross-column page barrier. Each column independently windows the shared scroller's
+vertical position, with 1200px overscan and measured/width-aware estimated top and
+bottom spacers. Measurements include each story's trailing margin. ResizeObserver
+watches mounted stories, the list and the pane for image/font/width reflow.
+The global cap is 250 mounted stories, including the lead (not 250 per column).
+Exceptionally tall viewports still respect that cap; they can exceed the rendered
+window. Deep URL selection explicitly represents its prefix using offsets, never
+by mounting all preceding articles.
+
+Initially only 100 cached stories contribute scroll space; each near-tail approach
+reveals another 50. Unrevealed stories have no placeholders. This bounds rendering
+and the initial scroll range, not the existing unread fetch, ranking sample,
+IndexedDB mirror or server cursors. The spanning lead owns slot 0; remaining slots
+are dealt A1,4,7 / B2,5,8 / C3,6,9 continuously across the entire exposed dataset.
+Story IDs retain their column, order and visual role through removals, read/star
+refreshes and arrivals (new IDs append after existing owners, even if newer in the
+caller's ranking). Removing the lead does not promote another story. Removed slots
+leave no vertical space; no stories are moved in from other columns. Exposure counts
+surviving stories, so repeated reads cannot strand a cached tail behind tombstones.
+View/sort/filter/explicit Reload switches and column-count changes re-deal; ordinary
+width changes within the same count do not. Removed IDs retain ownership metadata
+until reset so rollback restores their column and role. Accessible positions use
+current caller-ranked indices. DOM/keyboard traversal runs down columns, not
+visual row-major order. Variable-height stories are not pixel-aligned masonry rows.
+List mode remains unchanged.
 
 Newspaper layout changes use a 180ms Web Animations translation of surviving,
 currently mounted articles. A read calls the existing mutation immediately;
@@ -226,7 +234,7 @@ also accounts for layout-driven scroll corrections. This is position-only motion
 not height/role/image morphing or an exit effect. A read toggle that leaves layout
 unchanged (e.g. in all-items mode) does not animate.
 
-The next section is rendered before its leading edge enters the viewport. Local
+Each column overscans stories before their leading edges enter the viewport. Local
 reveal and server prefetch use two viewport heights (at least 1200px) of headroom.
 Cached stories are exposed before fetching the server. One step per approach/current
 data window avoids draining history inside that margin; no-growth results settle
@@ -235,33 +243,28 @@ browser Back/popstate restores the front-page scroll and headline, while opening
 an article focuses its heading.
 
 ```sh
-nix develop --command pnpm test src/components/items/NewspaperList.test.tsx src/components/items/newspaperOwnership.test.ts src/components/items/useNewspaperMotion.test.tsx src/App.newspaper.test.tsx --maxWorkers=2
+nix develop --command pnpm test src/components/items/NewspaperList.test.tsx src/components/items/newspaperOwnership.test.ts src/components/items/newspaperVirtualization.test.ts src/components/items/useNewspaperMotion.test.tsx src/App.newspaper.test.tsx --maxWorkers=2
 ```
 
 These tests execute queued animation frames and mocked ResizeObserver/scroll
-geometry against a 10,000-story fixture: bounded initial/deep-link/fast-jump DOM,
-both directions, balanced ranked column tops across chunks/resizes, measured-height
-reuse, resize/image-height anchors, early overscan/prefetch, hidden/stale callbacks,
-actions/heading focus/browser history Back, empty-page settling,
-read-removal rearming and ordinary list behavior. Ownership tests additionally
-cover lead/chunk-boundary/bulk removals, new arrivals, read/star updates, rollback,
-responsive and explicit view resets. Motion tests use mocked rectangles and Web
-Animations to check ID-keyed translations, unaffected columns, no initial/entry/
-scroll animation, cancellation, reduced motion, cross-session visible-ID sorting,
-responsive sparse-window resets, rapid retargeting and untransformed anchors. A
-component regression checks immediate read dispatch, focus and a simulated
-optimistic rollback; existing action tests cover API mutation rollback separately.
-They are **not native browser grid/stack geometry, frame-rate, actual animation
-playback or screen-reader measurements**. No new Chromium harness is included.
-
-A separate, temporary parent-owned Chromium 156 smoke probe verified real 180ms
-animation playback, stable columns/roles and gap closure after a read, removal of
-a lone lead/sparse section, visible common-ID motion across a sort reset,
-reduced-motion suppression and responsive redistribution to two columns. It used
-synthetic local articles, blocked non-fixture requests, and observed no browser
-exceptions; it was not an authenticated account or frame-rate test. Cold font
-loading can cause a subsequent animated reflow after initial mount. Evidence is
-retained at `~/.local/state/slippy/dripfeed-stable-columns/browser-result.json`.
+geometry against a 10,000-story fixture. They cover independently bounded initial,
+deep-link and fast-jump DOM in both directions, enormous viewports, per-story
+measured-height reuse, actual visible headline anchoring through resize/image/font
+height changes and removal, overscan/prefetch, hidden/stale callbacks, actions,
+heading focus/browser history Back, empty-page settling, read-removal rearming and
+ordinary list behavior. Explicit uneven-height fixtures assert normal 24px spacing
+in every column across former 50/100-story boundaries; sparse bulk deletions assert
+zero empty-slot placeholders. Ownership tests cover lead/boundary/bulk removals,
+new arrivals, read/star updates, rollback, responsive and explicit view resets.
+Motion tests retain the ID-keyed 180ms translations, unaffected columns, no
+initial/entry/scroll animation, cleanup, reduced motion, visible-ID keyed resets,
+rapid retargeting and untransformed anchors. Component regressions check immediate
+read dispatch, focus, simulated optimistic rollback, real read/rollback motion
+wiring, and explicit Reload re-dealing after sync settles. Existing action tests
+cover API mutation rollback separately. These are **mock geometry/wiring tests,
+not native browser stack geometry, actual animation playback, frame-rate or
+screen-reader measurements**. No new Chromium harness or browser run is included
+in this implementation; independent native geometry review is required.
 
 # Interface icon migration
 
