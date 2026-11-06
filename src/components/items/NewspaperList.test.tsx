@@ -387,6 +387,16 @@ it('redistributes ranked tops into three, two and one stacks on resize without c
     bounds()
     expect(document.activeElement?.getAttribute('data-story-id')).toBe('3')
     expect(ids()).toContain(3)
+    const count = newspaperColumnCount(width - 80)
+    const extent = estimatedStoryHeight(newspaperColumnWidth(width - 80, count))
+    for (let column = 0; column < count; column++) {
+      for (let row = 0; 2 + column + row * count <= 100; row++) {
+        const top = 128 - pane().scrollTop + leadHeight() + row * extent
+        if (top + extent > 100 && top < 100 + height) {
+          expect(ids()).toContain(2 + column + row * count)
+        }
+      }
+    }
     expect(first().style.gridTemplateColumns).toBe(
       `repeat(${newspaperColumnCount(width - 80)}, minmax(0, 1fr))`,
     )
@@ -414,6 +424,22 @@ it('overscans each column ahead of the shared viewport without mounting the pref
       ),
     ).toBeGreaterThan(0)
   }
+  bounds()
+})
+
+it('reveals cached stories at a short column tail without waiting for the longest column or draining automatically', async () => {
+  const items = pool.slice(0, 400)
+  items.forEach((story, index) =>
+    storyHeights.set(story.id, index === 0 ? 300 : [180, 470, 900][(index - 1) % 3]),
+  )
+  await render({ items, moreServer: true, drained: false })
+  expect(represented()).toBe(2)
+  for (let top = 500; top <= 6500 && represented() === 2; top += 500) await scroll(top)
+  expect(represented()).toBe(3)
+  expect(pane().scrollHeight - pane().scrollTop - height).toBeGreaterThan(1200)
+  expect(props.onLoadMore).not.toHaveBeenCalled()
+  for (let repeat = 0; repeat < 3; repeat++) await resize()
+  expect(represented()).toBe(3)
   bounds()
 })
 
@@ -465,9 +491,19 @@ it('anchors an actual visible headline through image/font height changes, width 
   expect(
     host.querySelector<HTMLElement>(`[data-story-id="${id}"]`)!.getBoundingClientRect().top,
   ).toBeCloseTo(beforeTop)
+  // Height anchoring can change which column owns the topmost visible
+  // headline. Resize must preserve that current anchor, not every visible ID.
+  const resizeAnchor = stories()
+    .map((node) => ({ id: node.dataset.storyId!, rect: node.getBoundingClientRect() }))
+    .filter(({ rect }) => rect.bottom > 100 && rect.top < 100 + height)
+    .sort((a, b) => a.rect.top - b.rect.top)[0]
   width = 440
   await resize()
   expect(host.querySelector(`[data-story-id="${id}"]`)).not.toBeNull()
+  expect(
+    host.querySelector<HTMLElement>(`[data-story-id="${resizeAnchor.id}"]`)!.getBoundingClientRect()
+      .top,
+  ).toBeCloseTo(resizeAnchor.rect.top)
   expect(pane().scrollTop).toBeGreaterThan(100_000)
   await render({ items: pool.slice(1) })
   expect(host.querySelector(`[data-story-id="${id}"]`)).not.toBeNull()
@@ -568,12 +604,20 @@ it('rejects queued frames and ResizeObserver callbacks after hiding, changing vi
   await flush()
   expect(ids()[0]).toBe(1)
   expect(props.onLoadMore).not.toHaveBeenCalled()
+  const currentObserver = observers.at(-1)!
+  await act(async () => pane().dispatchEvent(new Event('scroll', { bubbles: true })))
+  const currentFrame = allFrames.at(-1)!
+  expect(frames.size).toBeGreaterThan(0)
   await act(async () => root.render(null))
+  expect(currentObserver.disconnect).toHaveBeenCalled()
   await act(async () => {
+    currentFrame(0)
+    currentObserver.callback([], {} as ResizeObserver)
     oldFrame(0)
     oldObserver.callback([], {} as ResizeObserver)
   })
   expect(frames.size).toBe(0)
+  expect(props.onLoadMore).not.toHaveBeenCalled()
 })
 
 it('pages only the true server tail, settles no-growth pages, allows explicit retry and rearms on growth', async () => {

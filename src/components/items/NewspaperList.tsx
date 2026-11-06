@@ -306,10 +306,20 @@ export default function NewspaperList({
     if (!root || root.clientHeight <= 0) return
     const margin = Math.max(1200, root.clientHeight * 2)
     const top = root.scrollTop - contentOrigin()
+    // A short stack must not wait for the longest stack to receive cached
+    // successors. Server paging still requires the true overall tail.
     const near =
       top >= -margin &&
-      top + root.clientHeight + margin >= model.height &&
-      root.scrollHeight - root.scrollTop - root.clientHeight <= margin
+      (hiddenLocal
+        ? model.columns.some(
+            (column) =>
+              column.items.length > 0 &&
+              top + root.clientHeight + margin >= model.leadHeight + column.offsets.at(-1)!,
+          )
+        : top + root.clientHeight + margin >= model.height &&
+          root.scrollHeight - root.scrollTop - root.clientHeight <= margin)
+    // Keep the approach guard for local exposure too: an enormous viewport
+    // or tiny repeated scrolls must not drain every cached page.
     if (!near) tailApproach.current = false
     else if (!tailApproach.current) revealOrRequest(false)
   }

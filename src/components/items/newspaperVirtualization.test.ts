@@ -90,6 +90,36 @@ it('bounds the combined column windows for 10,000 stories, rapid/deep jumps and 
   }
 })
 
+it('selects different visible windows for independently measured unequal columns in a normal viewport', () => {
+  const items = Array.from({ length: 10_000 }, (_, i) => ({ id: i + 1 }) as NewsItem)
+  const widths = newspaperColumnWidth(900, 3)
+  const extents = [180, 470, 900]
+  const measurements = new Map(
+    items.map((item, index) => [
+      item.id,
+      {
+        width: index === 0 ? 900 : widths,
+        height: index === 0 ? 300 : extents[(index - 1) % 3],
+      },
+    ]),
+  )
+  const model = newspaperModel(
+    ownedNewspaperStacks(items, newspaperOwnership(items, 3)),
+    900,
+    measurements,
+  )
+  const ranges = model.columns.map((column) => newspaperRange(column.offsets, 6000, 600, 3))
+  expect(ranges.map((range) => range.first)).toEqual([26, 10, 5])
+  expect(ranges.map((range) => range.last)).toEqual([43, 16, 8])
+  ranges.forEach((range, column) => {
+    expect(range.first).toBeLessThanOrEqual(Math.floor(6000 / extents[column]))
+    expect(range.last).toBeGreaterThanOrEqual(Math.floor(6600 / extents[column]))
+  })
+  expect(
+    1 + ranges.reduce((total, range) => total + range.last - range.first + 1, 0),
+  ).toBeLessThanOrEqual(NEWSPAPER_MAX_MOUNTED)
+})
+
 it('has zero-height empty columns and no phantom ownership-slot gaps after sparse clears', () => {
   const items = Array.from({ length: 155 }, (_, i) => ({ id: i + 1 }) as NewsItem)
   const ownership = newspaperOwnership(items, 3)

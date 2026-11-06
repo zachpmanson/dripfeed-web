@@ -236,8 +236,10 @@ unchanged (e.g. in all-items mode) does not animate.
 
 Each column overscans stories before their leading edges enter the viewport. Local
 reveal and server prefetch use two viewport heights (at least 1200px) of headroom.
-Cached stories are exposed before fetching the server. One step per approach/current
-data window avoids draining history inside that margin; no-growth results settle
+Cached stories are exposed when any nonempty column approaches its tail; a shorter
+column never waits for the tallest one to expose cached successors. Server prefetch
+still requires the overall tail. Both paths retain one step per approach/current
+data window to avoid draining history inside that margin; no-growth results settle
 and the explicit Load more button is local-first. There is no app Back control;
 browser Back/popstate restores the front-page scroll and headline, while opening
 an article focuses its heading.
@@ -263,8 +265,20 @@ read dispatch, focus, simulated optimistic rollback, real read/rollback motion
 wiring, and explicit Reload re-dealing after sync settles. Existing action tests
 cover API mutation rollback separately. These are **mock geometry/wiring tests,
 not native browser stack geometry, actual animation playback, frame-rate or
-screen-reader measurements**. No new Chromium harness or browser run is included
-in this implementation; independent native geometry review is required.
+screen-reader measurements**. Additional regressions distinguish unequal-column
+windows at a normal viewport, verify current-session unmount cancellation and assert
+responsive visible coverage plus the current anchor's viewport offset.
+
+A separate temporary Chromium 156 fixture with 3,000 synthetic articles verified
+normal spacing across the old 50-story boundary in all three unequal-height columns,
+stable columns/roles and native motion after clearing, reduced-motion suppression,
+hidden selection 2900 reveal/focus and responsive two-column layout. It mounted at
+most 41 stories in those sampled states (the general cap remains 250). A deliberately
+skewed-headline probe reproduced the longest-column cached-exposure barrier; the
+correction exposed 150 stories before a shorter column ran out. Browser exceptions
+and non-fixture requests were absent. Probe/result/failure evidence is retained at
+`~/.local/state/slippy/dripfeed-continuous-columns/`; no permanent harness/dependency
+is added here. This is not an authenticated-account or frame-rate measurement.
 
 # Interface icon migration
 
