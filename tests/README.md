@@ -228,7 +228,9 @@ long flights from overscanned or deep stories after scroll resets. Unsupported
 Web Animations and reduced-motion users get immediate layout; changing to reduced
 motion cancels in-flight animations. Animations are canceled on removal/hiding/
 unmount and keep neither story DOM nor pending timers alive. Rapid consecutive
-changes retarget from the current animated position. Scroll anchors use
+changes retarget from the current animated position. Height/width measurement
+revisions preserve in-flight motion when recalculation changes the mounted range;
+true scroll-only window swaps still cancel it. Scroll anchors use
 untransformed layout coordinates, not the temporary article translation; motion
 also accounts for layout-driven scroll corrections. This is position-only motion,
 not height/role/image morphing or an exit effect. A read toggle that leaves layout
@@ -279,6 +281,14 @@ correction exposed 150 stories before a shorter column ran out. Browser exceptio
 and non-fixture requests were absent. Probe/result/failure evidence is retained at
 `~/.local/state/slippy/dripfeed-continuous-columns/`; no permanent harness/dependency
 is added here. This is not an authenticated-account or frame-rate measurement.
+
+A follow-up temporary Chromium probe for Reload records native animation state
+and painted transforms, not just `Element.animate` calls. Before correction, all
+four attempted transitions were cancelled before paint. With measurement revisions,
+four transitions remain running after animation frames, have nonzero translated
+computed transforms and finish natively (zero cancellations in the sampled run).
+The fixture exercises the same keyed `ItemList` reset as Reload, not an authenticated
+sync. Evidence: `~/.local/state/slippy/dripfeed-reload-motion/`.
 
 # Interface icon migration
 

@@ -22,6 +22,7 @@ let session: string
 let ready: boolean
 let columns: number
 let dataRevision: number
+let measurementRevision: number
 let snapshot: MutableRefObject<NewspaperMotionSnapshot | null> | undefined
 
 function Fixture() {
@@ -32,6 +33,7 @@ function Fixture() {
     ready,
     columns,
     dataRevision,
+    measurementRevision,
     snapshot,
   })
   return (
@@ -69,6 +71,7 @@ beforeEach(() => {
   ready = true
   columns = 3
   dataRevision = 0
+  measurementRevision = 0
   snapshot = undefined
   rects = new Map([
     [1, { top: 0, left: 0 }],
@@ -244,6 +247,38 @@ it('animates common visible IDs across keyed sort resets without carrying nodes,
   await render()
   expect(snapshot.current).toBeNull()
   expect(animate).toHaveBeenCalledTimes(1)
+})
+
+it('keeps reload motion alive through measurement-driven window changes but cancels true scroll swaps', async () => {
+  snapshot = { current: null }
+  await render()
+  session = 'first:reload:1'
+  ready = false
+  rects.set(2, { top: 100, left: 300 })
+  await render()
+  ready = true
+  await render()
+  expect(animate).toHaveBeenCalledTimes(1)
+  const initial = animations[0]
+  windowKey = '0:9,0:8,0:7'
+  measurementRevision++
+  await render()
+  expect(initial.cancel).not.toHaveBeenCalled()
+  expect(animate).toHaveBeenCalledTimes(1)
+  // A later height correction retargets, rather than losing the transition.
+  windowKey = '0:10,0:9,0:7'
+  measurementRevision++
+  rects.set(2, { top: 80, left: 300 })
+  await render()
+  expect(animate).toHaveBeenCalledTimes(2)
+  expect(initial.cancel).toHaveBeenCalledTimes(1)
+  expect(animate.mock.calls[1][0][0]).toEqual({ transform: 'translate(0px, 20px)' })
+  scroll = 100
+  await render()
+  windowKey = '1:11,1:10,1:8'
+  await render()
+  expect(animate).toHaveBeenCalledTimes(2)
+  expect(animations[1].cancel).toHaveBeenCalledTimes(1)
 })
 
 it('allows responsive redistribution even when sparse sections rebalance into a different window', async () => {

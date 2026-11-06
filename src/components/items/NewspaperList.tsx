@@ -87,6 +87,7 @@ export default function NewspaperList({
   const [geometry, setGeometry] = useState(() => ({
     width: 900,
     measurements: new Map<number, NewspaperMeasurement>(),
+    measurementRevision: 0,
     top: 0,
     height: 0,
     target: selectedId,
@@ -294,7 +295,16 @@ export default function NewspaperList({
       root.clientHeight !== geometry.height ||
       geometry.target !== null
     ) {
-      setGeometry({ width, measurements, top, height: root.clientHeight, target: null })
+      setGeometry({
+        width,
+        measurements,
+        measurementRevision:
+          geometry.measurementRevision +
+          (measurements !== geometry.measurements || width !== geometry.width ? 1 : 0),
+        top,
+        height: root.clientHeight,
+        target: null,
+      })
     }
     if (measurements === geometry.measurements && width === geometry.width) rememberVisualAnchor()
   }, [active, geometry, model, contentOrigin, rememberVisualAnchor])
@@ -473,6 +483,7 @@ export default function NewspaperList({
     session: windowKey,
     columns: columnCount,
     dataRevision,
+    measurementRevision: geometry.measurementRevision,
     snapshot: motionSnapshot,
   })
 

@@ -6,6 +6,7 @@ export type NewspaperMotionSnapshot = {
   session: string
   columns: number
   dataRevision: number
+  measurementRevision: number
   scroll: number
   positions: Map<string, Position>
 }
@@ -33,12 +34,14 @@ export default function useNewspaperMotion(
     session = '',
     columns = 0,
     dataRevision = 0,
+    measurementRevision = 0,
     snapshot,
   }: {
     ready?: boolean
     session?: string
     columns?: number
     dataRevision?: number
+    measurementRevision?: number
     snapshot?: MutableRefObject<NewspaperMotionSnapshot | null>
   } = {},
 ) {
@@ -86,13 +89,14 @@ export default function useNewspaperMotion(
     const present = new Set<HTMLElement>()
     const saved = previous.current
     const reset = saved !== null && saved.session !== session
-    // A changed mounted window can also mean its last story was removed,
-    // not just that scrolling mounted another section.
+    // Data and height/width measurement changes can resize a mounted window
+    // without scrolling. Keep their geometry/animations through those commits.
     const old =
       saved &&
       (saved.window === window ||
         saved.columns !== columns ||
         saved.dataRevision !== dataRevision ||
+        saved.measurementRevision !== measurementRevision ||
         reset)
         ? saved
         : null
@@ -143,6 +147,14 @@ export default function useNewspaperMotion(
         running.delete(article)
       }
     }
-    previous.current = { window, session, columns, dataRevision, scroll: root.scrollTop, positions }
+    previous.current = {
+      window,
+      session,
+      columns,
+      dataRevision,
+      measurementRevision,
+      scroll: root.scrollTop,
+      positions,
+    }
   })
 }
