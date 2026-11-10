@@ -5,7 +5,7 @@ export const NEWSPAPER_EXPOSURE_STEP = 50
 export const NEWSPAPER_MAX_MOUNTED = 250
 export const NEWSPAPER_OVERSCAN = 1200
 export type NewspaperMeasurement = { width: number; height: number }
-export type NewspaperColumn = { items: NewsItem[]; offsets: number[] }
+export type NewspaperColumn = { items: NewsItem[]; offsets: number[]; top: number }
 export type NewspaperModel = {
   lead: NewsItem | null
   leadHeight: number
@@ -40,24 +40,27 @@ export function newspaperModel(
       ? saved.height
       : estimatedStoryHeight(width, lead)
   }
-  const leadHeight = stacks.lead ? extent(stacks.lead, width, true) : 0
+  const columnWidth = newspaperColumnWidth(width, stacks.columns.length)
+  const leadWidth =
+    columnWidth * Math.min(2, stacks.columns.length) + (stacks.columns.length > 1 ? 28 : 0)
+  const leadHeight = stacks.lead ? extent(stacks.lead, leadWidth, true) : 0
   const locations: NewspaperModel['locations'] = new Map()
   if (stacks.lead) locations.set(stacks.lead.id, { column: -1, index: 0, top: 0 })
-  const columnWidth = newspaperColumnWidth(width, stacks.columns.length)
   const columns = stacks.columns.map((items, column) => {
+    const top = column < 2 ? leadHeight : 0
     const offsets = [0]
     items.forEach((item, index) => {
-      locations.set(item.id, { column, index, top: leadHeight + offsets[index] })
+      locations.set(item.id, { column, index, top: top + offsets[index] })
       offsets.push(offsets[index] + extent(item, columnWidth))
     })
-    return { items, offsets }
+    return { items, offsets, top }
   })
   return {
     lead: stacks.lead,
     leadHeight,
     columns,
     locations,
-    height: leadHeight + Math.max(0, ...columns.map(({ offsets }) => offsets.at(-1)!)),
+    height: Math.max(leadHeight, ...columns.map(({ top, offsets }) => top + offsets.at(-1)!)),
   }
 }
 

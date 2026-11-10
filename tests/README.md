@@ -188,7 +188,13 @@ layout redesign. Optional JSON/screenshot artifacts follow the other runners.
 # Continuous newspaper column virtualization
 
 Newspaper mode deals stories into 1–3 continuous round-robin stacks (17rem minimum
-width, 1.75rem gap), below a full-width lead. Source indices 50/100/etc. have no
+width, 1.75rem gap). On wide screens the lead spans the first TWO columns, with
+the THIRD story stack alongside on its RIGHT starting at the lead's top. The first
+two stacks continue directly below the lead, independently of the right stack's
+height. At narrower widths the lead spans both available columns, or the single
+available column. Each stack has its own vertical origin: the measured lead extent
+for the first two, zero for the third. Lead measurements use its actual two-column
+width, not the whole newspaper width. Source indices 50/100/etc. have no
 layout significance: each story directly follows its own column's predecessor,
 regardless of the other columns' heights. There is no CSS multicol balancing or
 cross-column page barrier. Each column independently windows the shared scroller's
@@ -252,6 +258,10 @@ an article focuses its heading.
 nix develop --command pnpm test src/components/items/NewspaperList.test.tsx src/components/items/newspaperOwnership.test.ts src/components/items/newspaperVirtualization.test.ts src/components/items/useNewspaperMotion.test.tsx src/App.newspaper.test.tsx --maxWorkers=2
 ```
 
+The focused headline model/component regressions additionally cover per-column
+origins/tails, tall-lead right-column deep windows, two-column lead measurement
+reuse/invalidation, lead eviction placeholders, removal/rollback and resize.
+
 These tests execute queued animation frames and mocked ResizeObserver/scroll
 geometry against a 10,000-story fixture. They cover independently bounded initial,
 deep-link and fast-jump DOM in both directions, enormous viewports, per-story
@@ -273,7 +283,25 @@ screen-reader measurements**. Additional regressions distinguish unequal-column
 windows at a normal viewport, verify current-session unmount cancellation and assert
 responsive visible coverage plus the current anchor's viewport offset.
 
-A separate temporary Chromium 156 fixture with 3,000 synthetic articles verified
+`newspaper-headline.browser.mjs` is a permanent dependency-free Chromium/CDP
+regression with the real StrictMode ItemList and CSS, using 3,000 local synthetic
+articles. It verifies exact 2+1 geometry, a deliberately tall right story without
+a left continuation barrier, 3/2/1 responsive spans and no horizontal overflow,
+lead removal/rollback and eviction placeholders, a deep right-column window beside
+a 6,000px lead, deep reader-return focus and responsive headline anchoring. All
+non-fixture requests (including `/apps`) are blocked. Optional JSON evidence and
+screenshots are written to `TEST_ARTIFACT_DIR` (the wide screenshot deliberately
+uses skewed story heights). This is native layout/focus evidence,
+not an authenticated account, animation playback, frame-rate or screen-reader check.
+
+```sh
+CHROMIUM_PATH=/path/to/chromium \
+TEST_ARTIFACT_DIR=/tmp/newspaper-headline \
+nix develop --command node tests/newspaper-headline.browser.mjs
+```
+
+Historical continuous-stack evidence (before the 2+1 headline change): a separate
+temporary Chromium 156 fixture with 3,000 synthetic articles verified
 normal spacing across the old 50-story boundary in all three unequal-height columns,
 stable columns/roles and native motion after clearing, reduced-motion suppression,
 hidden selection 2900 reveal/focus and responsive two-column layout. It mounted at

@@ -44,6 +44,11 @@ const list = () => host.querySelector<HTMLUListElement>('.newspaper-chunks')!
 const stories = () => [...host.querySelectorAll<HTMLButtonElement>('[data-story-id]')]
 const ids = () => stories().map((story) => Number(story.dataset.storyId))
 const columns = () => [...host.querySelectorAll<HTMLUListElement>('.newspaper-column')]
+const leadWidth = () => {
+  const count = newspaperColumnCount(width - 80)
+  return newspaperColumnWidth(width - 80, count) * Math.min(2, count) + (count > 1 ? 28 : 0)
+}
+const columnOrigin = (index: number) => (index < 2 ? leadHeight() : 0)
 const nativeHeight = (node: HTMLElement) => {
   let id = storyIds.get(node)
   if (id === undefined) {
@@ -52,8 +57,8 @@ const nativeHeight = (node: HTMLElement) => {
   }
   const lead = node.classList.contains('newspaper-lead')
   const storyWidth = lead
-    ? width - 80
-    : newspaperColumnWidth(width - 80, node.parentElement!.parentElement!.children.length)
+    ? leadWidth()
+    : newspaperColumnWidth(width - 80, newspaperColumnCount(width - 80))
   return storyHeights.get(id) ?? estimatedStoryHeight(storyWidth, lead)
 }
 const partHeight = (node: Element) => {
@@ -207,7 +212,11 @@ beforeEach(() => {
     this: HTMLElement,
   ) {
     return this.classList.contains('newspaper-scroll')
-      ? 96 + leadHeight() + Math.max(0, ...columns().map(columnHeight))
+      ? 96 +
+          Math.max(
+            leadHeight(),
+            ...columns().map((column, index) => columnOrigin(index) + columnHeight(column)),
+          )
       : 1000
   })
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
@@ -227,15 +236,11 @@ beforeEach(() => {
       top =
         128 -
         pane().scrollTop +
-        (lead ? 0 : leadHeight()) +
+        (lead ? 0 : columnOrigin(columns().indexOf(story.parentElement as HTMLUListElement))) +
         preceding.reduce((sum, node) => sum + partHeight(node), 0)
       h = nativeHeight(story) - 24
-      w = lead
-        ? width - 80
-        : newspaperColumnWidth(width - 80, story.parentElement!.parentElement!.children.length)
-      left = lead
-        ? 0
-        : [...story.parentElement!.parentElement!.children].indexOf(story.parentElement!) * (w + 28)
+      w = lead ? leadWidth() : newspaperColumnWidth(width - 80, newspaperColumnCount(width - 80))
+      left = lead ? 0 : columns().indexOf(story.parentElement as HTMLUListElement) * (w + 28)
       if (this.hasAttribute('data-story-id')) {
         top += 30
         h = 50
@@ -303,9 +308,11 @@ it('reveals one local chunk two viewports early, never drains on idle and pauses
   height = 800
   await render({ moreServer: true, drained: false })
   expect(represented()).toBe(2)
-  await scroll(pane().scrollHeight - height - 1700)
+  const shortestTail = () =>
+    96 + Math.min(...columns().map((column, index) => columnOrigin(index) + columnHeight(column)))
+  await scroll(shortestTail() - height - 1700)
   expect(represented()).toBe(2)
-  await scroll(pane().scrollHeight - height - 1500)
+  await scroll(shortestTail() - height - 1500)
   expect(represented()).toBe(3)
   bounds()
   for (let count = 0; count < 4; count++) await resize()
@@ -391,7 +398,7 @@ it('redistributes ranked tops into three, two and one stacks on resize without c
     const extent = estimatedStoryHeight(newspaperColumnWidth(width - 80, count))
     for (let column = 0; column < count; column++) {
       for (let row = 0; 2 + column + row * count <= 100; row++) {
-        const top = 128 - pane().scrollTop + leadHeight() + row * extent
+        const top = 128 - pane().scrollTop + columnOrigin(column) + row * extent
         if (top + extent > 100 && top < 100 + height) {
           expect(ids()).toContain(2 + column + row * count)
         }
@@ -477,9 +484,11 @@ it('caps even a viewport taller than the entire estimated pool and coalesces rap
 it('anchors an actual visible headline through image/font height changes, width changes and removal', async () => {
   await exposeAll()
   await scroll(offset(100) + 200)
-  const visible = stories().find(
-    (node) => node.getBoundingClientRect().top >= 100 && node.getBoundingClientRect().top < 700,
-  )!
+  const visible = stories()
+    .filter(
+      (node) => node.getBoundingClientRect().bottom > 100 && node.getBoundingClientRect().top < 700,
+    )
+    .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0]
   const id = Number(visible.dataset.storyId)
   const beforeTop = visible.getBoundingClientRect().top
   const previous = visible.closest('li')!.previousElementSibling as HTMLElement
@@ -1067,4 +1076,78 @@ it('glides surviving mounted stories for read/rollback but never for scroll-only
   } finally {
     delete (HTMLElement.prototype as Partial<HTMLElement>).animate
   }
+})
+
+it('windows the top-origin right column deeply even while a tall lead occupies the left region', async () => {
+  storyHeights.set(1, 6000)
+  await exposeAll()
+  await scroll(4200)
+  expect(host.querySelector('.newspaper-lead')).not.toBeNull()
+  const right = columns()[2]
+  const headlines = [...right.querySelectorAll<HTMLElement>('[data-story-id]')]
+  expect(
+    headlines.some(
+      (node) => node.getBoundingClientRect().top >= 100 && node.getBoundingClientRect().top < 700,
+    ),
+  ).toBe(true)
+  expect(headlines.at(-1)!.getBoundingClientRect().top).toBeGreaterThan(700)
+  expect(
+    Number.parseFloat(
+      right.querySelector<HTMLElement>('[data-newspaper-spacer="top"]')!.style.height,
+    ),
+  ).toBeGreaterThan(0)
+  expect(
+    columns()[0].querySelector<HTMLElement>('.newspaper-story')!.getBoundingClientRect().top,
+  ).toBeGreaterThan(700)
+  bounds()
+})
+
+it('retains a two-column lead placeholder on eviction and closes only left origins on lead removal/rollback', async () => {
+  storyHeights.set(1, 1100)
+  const current = pool.slice(0, 100)
+  await render({ items: current })
+  const right = host.querySelector<HTMLElement>('[data-story-id="4"]')!
+  expect(right.closest('li')!.getBoundingClientRect().top).toBe(128)
+  expect(
+    host.querySelector<HTMLElement>('.newspaper-lead')!.getBoundingClientRect().width,
+  ).toBeCloseTo(leadWidth())
+  const leftTop = () =>
+    host.querySelector<HTMLElement>('[data-story-id="2"]')!.closest('li')!.getBoundingClientRect()
+      .top
+  expect(leftTop()).toBe(1228)
+  await render({ items: current.slice(1) })
+  expect(host.querySelector('.newspaper-lead')).toBeNull()
+  expect(leftTop()).toBe(128)
+  expect(host.querySelector('[data-story-id="4"]')).toBe(right)
+  expect(right.closest('li')!.getBoundingClientRect().top).toBe(128)
+  await render({ items: current })
+  await scroll(3000)
+  expect(host.querySelector('.newspaper-lead')).toBeNull()
+  expect(host.querySelector<HTMLElement>('[data-newspaper-lead-placeholder]')!.style.height).toBe(
+    '1100px',
+  )
+  width = 1000 // Same three-column ownership; the lead's measured width changes.
+  await resize()
+  await scroll(0)
+  expect(
+    host.querySelector<HTMLElement>('.newspaper-lead')!.getBoundingClientRect().width,
+  ).toBeCloseTo(leadWidth())
+  expect(leftTop()).toBe(1228)
+  bounds()
+})
+
+it('reveals cached successors at the right-column tail without adding the tall left lead to its origin', async () => {
+  storyHeights.set(1, 10_000)
+  await render({ items: pool.slice(0, 400), moreServer: true, drained: false })
+  expect(represented()).toBe(2)
+  const rightTail = 96 + columnHeight(columns()[2])
+  await scroll(rightTail - height - 1100)
+  expect(represented()).toBe(3)
+  expect(columnOrigin(0) + columnHeight(columns()[0]) - pane().scrollTop - height).toBeGreaterThan(
+    1200,
+  )
+  expect(props.onLoadMore).not.toHaveBeenCalled()
+  await resize()
+  expect(represented()).toBe(3)
+  bounds()
 })

@@ -36,14 +36,14 @@ function anchorAt(model: NewspaperModel, top: number): Anchor | null {
     return { id: model.lead.id, column: -1, index: 0, offset: top }
   }
   for (const [column, stack] of model.columns.entries()) {
-    const index = storyAt(stack.offsets, top - model.leadHeight)
+    const index = storyAt(stack.offsets, top - stack.top)
     const item = stack.items[index]
     if (item) {
       return {
         id: item.id,
         column,
         index,
-        offset: top - model.leadHeight - stack.offsets[index],
+        offset: top - stack.top - stack.offsets[index],
       }
     }
   }
@@ -54,9 +54,7 @@ function anchorTop(model: NewspaperModel, anchor: Anchor): number {
   const found = model.locations.get(anchor.id)
   if (found) return found.top + anchor.offset
   const stack = model.columns[Math.max(0, Math.min(anchor.column, model.columns.length - 1))]
-  return (
-    model.leadHeight + stack.offsets[Math.min(anchor.index, stack.items.length)] + anchor.offset
-  )
+  return stack.top + stack.offsets[Math.min(anchor.index, stack.items.length)] + anchor.offset
 }
 
 /** Independently measured story windows share a scroller, never a page-height
@@ -149,8 +147,8 @@ export default function NewspaperList({
     if (savedVisual) rangeTop = model.locations.get(savedVisual.id)!.top - savedVisual.offset
     else if (anchor) rangeTop = anchorTop(model, anchor)
   }
-  const ranges = model.columns.map(({ offsets }) =>
-    newspaperRange(offsets, rangeTop - model.leadHeight, geometry.height, columnCount),
+  const ranges = model.columns.map(({ offsets, top }) =>
+    newspaperRange(offsets, rangeTop - top, geometry.height, columnCount),
   )
   const mountedWindow = ranges.map(({ first, last }) => `${first}:${last}`).join(',')
   const showLead = model.lead !== null && rangeTop <= model.leadHeight + NEWSPAPER_OVERSCAN
@@ -324,7 +322,7 @@ export default function NewspaperList({
         ? model.columns.some(
             (column) =>
               column.items.length > 0 &&
-              top + root.clientHeight + margin >= model.leadHeight + column.offsets.at(-1)!,
+              top + root.clientHeight + margin >= column.top + column.offsets.at(-1)!,
           )
         : top + root.clientHeight + margin >= model.height &&
           root.scrollHeight - root.scrollTop - root.clientHeight <= margin)
@@ -478,6 +476,31 @@ export default function NewspaperList({
     />
   )
 
+  const renderColumn = (column: NewspaperModel['columns'][number], index: number) => {
+    const range = ranges[index]
+    return (
+      <ul
+        key={index}
+        className="newspaper-column m-0 flow-root min-w-0 list-none p-0"
+        aria-label={`Column ${index + 1}`}
+      >
+        <li
+          role="presentation"
+          aria-hidden="true"
+          data-newspaper-spacer="top"
+          style={{ height: column.offsets[range.first] }}
+        />
+        {column.items.slice(range.first, range.last + 1).map(renderStory)}
+        <li
+          role="presentation"
+          aria-hidden="true"
+          data-newspaper-spacer="bottom"
+          style={{ height: column.offsets.at(-1)! - column.offsets[range.last + 1] }}
+        />
+      </ul>
+    )
+  }
+
   useNewspaperMotion(scrollRef, listRef, active, mountedWindow, {
     ready: geometry.height > 0,
     session: windowKey,
@@ -512,48 +535,37 @@ export default function NewspaperList({
         }}
       >
         <li className="list-none" role="presentation">
-          {showLead ? (
-            <ul className="m-0 flow-root list-none p-0" aria-label="Lead story">
-              {renderStory(model.lead!)}
-            </ul>
-          ) : (
-            model.lead && (
-              <div
-                aria-hidden="true"
-                data-newspaper-lead-placeholder
-                style={{ height: model.leadHeight }}
-              />
-            )
-          )}
           <div
             className="newspaper grid items-start gap-x-7"
             data-newspaper-count={Math.min(orderedItems.length, representedCount)}
             style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
           >
-            {model.columns.map((column, index) => {
-              const range = ranges[index]
-              return (
-                <ul
-                  key={index}
-                  className="newspaper-column m-0 flow-root min-w-0 list-none p-0"
-                  aria-label={`Column ${index + 1}`}
-                >
-                  <li
-                    role="presentation"
-                    aria-hidden="true"
-                    data-newspaper-spacer="top"
-                    style={{ height: column.offsets[range.first] }}
-                  />
-                  {column.items.slice(range.first, range.last + 1).map(renderStory)}
-                  <li
-                    role="presentation"
-                    aria-hidden="true"
-                    data-newspaper-spacer="bottom"
-                    style={{ height: column.offsets.at(-1)! - column.offsets[range.last + 1] }}
-                  />
+            {/* Keep the lead and left stacks in one region: the right stack's
+                height must never impose a grid-row barrier below the lead. */}
+            <div className="min-w-0" style={{ gridColumn: `span ${Math.min(2, columnCount)}` }}>
+              {showLead ? (
+                <ul className="m-0 flow-root list-none p-0" aria-label="Lead story">
+                  {renderStory(model.lead!)}
                 </ul>
-              )
-            })}
+              ) : (
+                model.lead && (
+                  <div
+                    aria-hidden="true"
+                    data-newspaper-lead-placeholder
+                    style={{ height: model.leadHeight }}
+                  />
+                )
+              )}
+              <div
+                className="grid items-start gap-x-7"
+                style={{
+                  gridTemplateColumns: `repeat(${Math.min(2, columnCount)}, minmax(0, 1fr))`,
+                }}
+              >
+                {model.columns.slice(0, 2).map(renderColumn)}
+              </div>
+            </div>
+            {model.columns.slice(2).map((column, index) => renderColumn(column, index + 2))}
           </div>
         </li>
         {items.length === 0 && <li className="empty px-3 py-4 text-app-muted">{emptyText}</li>}

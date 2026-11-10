@@ -35,7 +35,10 @@ it('builds continuous, independently measured offsets across every former 50-sto
     const measurements = new Map(
       items.map((item) => [
         item.id,
-        { width: item.id === 1 ? 900 : width, height: item.id % 3 === 0 ? 1200 : 180 },
+        {
+          width: item.id === 1 ? width * Math.min(2, count) + (count > 1 ? 28 : 0) : width,
+          height: item.id % 3 === 0 ? 1200 : 180,
+        },
       ]),
     )
     const model = newspaperModel(stacks, 900, measurements)
@@ -58,7 +61,7 @@ it('builds continuous, independently measured offsets across every former 50-sto
       })
     })
     expect(model.height).toBe(
-      model.leadHeight + Math.max(...model.columns.map((column) => column.offsets.at(-1)!)),
+      Math.max(...model.columns.map((column) => column.top + column.offsets.at(-1)!)),
     )
   }
 })
@@ -74,8 +77,8 @@ it('bounds the combined column windows for 10,000 stories, rapid/deep jumps and 
     for (const id of [1, 9950, 5000, 2, 10000, 7000]) {
       const top = model.locations.get(id)!.top
       for (const height of [0, 600, 10_000_000]) {
-        const ranges = model.columns.map(({ offsets }) =>
-          newspaperRange(offsets, top - model.leadHeight, height, count),
+        const ranges = model.columns.map(({ offsets, top: origin }) =>
+          newspaperRange(offsets, top - origin, height, count),
         )
         expect(
           1 + ranges.reduce((sum, range) => sum + range.last - range.first + 1, 0),
@@ -98,7 +101,7 @@ it('selects different visible windows for independently measured unequal columns
     items.map((item, index) => [
       item.id,
       {
-        width: index === 0 ? 900 : widths,
+        width: index === 0 ? widths * 2 + 28 : widths,
         height: index === 0 ? 300 : extents[(index - 1) % 3],
       },
     ]),
@@ -133,4 +136,58 @@ it('has zero-height empty columns and no phantom ownership-slot gaps after spars
   for (const column of model.columns) expect(column.offsets.length).toBe(column.items.length + 1)
   expect(model.locations.get(50)!.top).toBe(0)
   expect(model.locations.get(101)!.top).toBeGreaterThan(0)
+})
+
+it('spans exactly two columns and gives the right stack its own origin, deep window and tail', () => {
+  const items = Array.from({ length: 301 }, (_, index) => ({ id: index + 1 }) as NewsItem)
+  const ownership = newspaperOwnership(items, 3)
+  const width = newspaperColumnWidth(900, 3)
+  const measurements = new Map(
+    items.map((item) => [
+      item.id,
+      {
+        width: item.id === 1 ? width * 2 + 28 : width,
+        height: item.id === 1 ? 3000 : item.id % 3 === 1 ? 500 : 100,
+      },
+    ]),
+  )
+  const model = newspaperModel(ownedNewspaperStacks(items, ownership), 900, measurements)
+  expect(model.leadHeight).toBe(3000)
+  expect(model.columns.map((column) => column.top)).toEqual([3000, 3000, 0])
+  expect([2, 3, 4].map((id) => model.locations.get(id)!.top)).toEqual([3000, 3000, 0])
+  const right = model.columns[2]
+  const range = newspaperRange(right.offsets, 20_000 - right.top, 600, 3)
+  expect(range.first).toBe(37)
+  expect(range.last).toBe(43)
+  expect(model.locations.get(right.items[40].id)!.top).toBe(20_000)
+  expect(model.height).toBe(50_000)
+
+  const removed = newspaperModel(ownedNewspaperStacks(items.slice(1), ownership), 900, measurements)
+  expect(removed.lead).toBeNull()
+  expect(removed.columns.map((column) => column.top)).toEqual([0, 0, 0])
+  expect(removed.locations.get(2)!.top).toBe(0)
+  expect(removed.locations.get(4)!.top).toBe(0)
+  expect(removed.height).toBe(50_000)
+  // A stale full-width lead measurement must not survive the new span width.
+  measurements.set(1, { width: 900, height: 9999 })
+  expect(newspaperModel(ownedNewspaperStacks(items, ownership), 900, measurements).leadHeight).toBe(
+    300,
+  )
+})
+
+it('measures the lead at the full available width only in one/two-column layouts', () => {
+  const items = [{ id: 1 }, { id: 2 }] as NewsItem[]
+  for (const [width, count] of [
+    [360, 1],
+    [700, 2],
+  ]) {
+    const model = newspaperModel(
+      ownedNewspaperStacks(items, newspaperOwnership(items, count)),
+      width,
+      new Map([[1, { width, height: 1234 }]]),
+    )
+    expect(model.leadHeight).toBe(1234)
+    expect(model.columns.map((column) => column.top)).toEqual(Array(count).fill(1234))
+    expect(model.locations.get(2)!.top).toBe(1234)
+  }
 })
