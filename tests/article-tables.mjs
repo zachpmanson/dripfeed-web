@@ -30,6 +30,18 @@ try {
     await page.setViewportSize({ width, height: 900 })
     await page.goto(`${server.resolvedUrls.local[0]}tests/fixtures/article-tables.html`)
     await page.frameLocator('iframe').locator('#overflow').waitFor()
+    const titleTypography = await page.locator('h2').evaluate(async (heading) => {
+      const fonts = await document.fonts.load('400 18px "Paper Serif"')
+      const style = getComputedStyle(heading)
+      return {
+        family: style.fontFamily,
+        weight: style.fontWeight,
+        loaded: fonts.length > 0 && fonts.every((font) => font.status === 'loaded'),
+      }
+    })
+    assert.match(titleTypography.family, /^"?Paper Serif"?, Georgia, serif$/)
+    assert.equal(titleTypography.weight, '400')
+    assert.equal(titleTypography.loaded, true, `${width}px: bundled reader-title font loads`)
     const metrics = await page
       .frameLocator('iframe')
       .locator('body')
@@ -55,10 +67,13 @@ try {
           viewport,
           documentWidth: doc.documentElement.scrollWidth,
           proseWidth: prose.width,
+          bodyFont: getComputedStyle(body).fontFamily,
           tables,
         }
       })
-    evidence.layouts.push({ width, ...metrics })
+    assert.match(metrics.bodyFont, /^Charter,/)
+    assert.ok(!metrics.bodyFont.includes('Paper Serif'), `${width}px: body typography unchanged`)
+    evidence.layouts.push({ width, titleTypography, ...metrics })
     for (const table of metrics.tables) {
       assert.ok(
         Math.abs(table.center - metrics.viewport / 2) <= 1,

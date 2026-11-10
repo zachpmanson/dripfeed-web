@@ -3,7 +3,9 @@
 `article-tables.mjs` renders the real `ItemView` with narrow, multi-column and
 non-wrapping tables. Chromium checks centering at 360px, 1000px and 1600px,
 viewport gutters, constrained prose, no page-level horizontal overflow, and
-reachable content through a wide table's own scrollbar.
+reachable content through a wide table's own scrollbar. It also loads the real app
+CSS and verifies the reader title uses the bundled Paper Serif (Libre Caslon Text)
+at weight400 while the article iframe retains its Charter font stack.
 
 ```sh
 PLAYWRIGHT_MODULE=/path/to/node_modules/playwright \

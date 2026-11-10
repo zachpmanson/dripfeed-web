@@ -39,7 +39,7 @@ export default function ReaderHeader({
       <h2
         ref={titleRef}
         tabIndex={-1}
-        className="m-0 min-w-0 text-[1.15rem] leading-[1.3] font-bold [overflow-wrap:anywhere]"
+        className="m-0 min-w-0 font-['Paper_Serif',Georgia,serif] text-[1.15rem] leading-[1.3] font-normal [overflow-wrap:anywhere]"
       >
         <a
           className="text-app-text no-underline hover:underline"

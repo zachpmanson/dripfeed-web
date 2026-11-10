@@ -121,6 +121,37 @@ it('omits Back by default and keeps a long title and all actions in the header',
   expect(container.querySelector('article')?.firstElementChild).toBe(header)
 })
 
+it.each([false, true])(
+  'uses the newspaper serif for the reader title without changing article typography (newspaper=%s)',
+  async (focusTitle) => {
+    await act(async () => {
+      root.render(
+        <ItemView
+          item={item()}
+          actions={actions}
+          feedTitle={() => 'Feed'}
+          articleCssMode="default"
+          articleCss=""
+          dimBoilerplate={false}
+          recentBodies={[]}
+          autoExtract={false}
+          focusTitle={focusTitle}
+          onFeedClick={() => {}}
+        />,
+      )
+    })
+    const heading = container.querySelector('h2')!
+    expect(heading.classList.contains("font-['Paper_Serif',Georgia,serif]")).toBe(true)
+    expect(heading.classList.contains('font-normal')).toBe(true)
+    expect(heading.classList.contains('font-bold')).toBe(false)
+    const articleHtml = container.querySelector('iframe')!.srcdoc
+    expect(articleHtml).toContain(
+      "font-family: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif",
+    )
+    expect(articleHtml).not.toContain('Paper Serif')
+  },
+)
+
 describe('auto extraction session deduplication', () => {
   it('extracts once across recreated item objects, revisits and same-session remounts', async () => {
     await render()
