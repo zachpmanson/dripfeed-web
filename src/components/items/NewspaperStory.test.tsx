@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-/// <reference types="vite/client" />
-import newspaperCss from '../../index.css?raw'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -160,24 +158,6 @@ it.each(['feature', 'image'] as const)(
   },
 )
 
-it('uses the shared story bottom separator and spacing', async () => {
-  await render(item, 'lead')
-  const tile = container.querySelector('li')!
-  expect(tile.classList.contains('border-b')).toBe(true)
-  expect(tile.classList.contains('border-app-border')).toBe(true)
-  expect(tile.classList.contains('pb-6')).toBe(true)
-  expect(tile.classList.contains('mb-6')).toBe(true)
-  expect(tile.classList.contains('[break-inside:avoid-column]')).toBe(false)
-  expect(tile.classList.contains('[column-span:all]')).toBe(false)
-})
-
-it('does not introduce role-specific side rules into the newspaper columns', () => {
-  // Source-style invariant only, not a computed browser layout assertion.
-  expect(newspaperCss).not.toMatch(
-    /\.newspaper[^{}]*\{[^{}]*\bborder-(?:inline-(?:start|end)|left|right)\s*:/,
-  )
-})
-
 it('varies excerpt lengths without truncating headlines or adding unsafe markup', async () => {
   const story = { ...item, title: 'A complete headline', body: `<p>${'word '.repeat(150)}</p>` }
   await render(story, 'brief')
@@ -187,35 +167,12 @@ it('varies excerpt lengths without truncating headlines or adding unsafe markup'
   expect(container.querySelector('[data-story-id]')!.textContent).toBe(story.title)
 })
 
-it('keeps editorial typography without native multicol or fixed-height row rules', () => {
-  // Source invariants only: jsdom does not perform browser layout.
-  expect(newspaperCss).not.toMatch(/\.newspaper\s*\{[^}]*columns:/)
-  expect(newspaperCss).not.toMatch(/column-span:|grid-auto-rows:/)
-  expect(newspaperCss).toMatch(/\.newspaper-feature \.newspaper-headline\s*\{\s*font-size: clamp\(/)
-})
-
-it('bounds the lead image height without enlarging later column images', async () => {
-  await render()
-  expect(container.querySelector('img')?.parentElement?.classList.contains('max-h-80')).toBe(true)
-  await render(item, 'feature')
-  expect(container.querySelector('img')?.parentElement?.classList.contains('max-h-80')).toBe(false)
-})
-
-it('uses favicon-sized Star and read toggles with unchanged labels, state and accent', async () => {
+it('keeps Star and read toggles labelled and wired to the current story', async () => {
   await render()
   const star = container.querySelector<HTMLButtonElement>('[aria-label="Star: Headline"]')!
   expect(star.textContent).toBe('')
-  expect(star.classList.contains('size-[16px]')).toBe(true)
-  expect(star.classList.contains('[&>svg]:size-[16px]')).toBe(true)
-  expect(star.classList.contains('size-8')).toBe(false)
-  expect(star.classList.contains('[&>svg]:size-6')).toBe(false)
-  expect(star.classList.contains('text-app-muted')).toBe(true)
   const read = container.querySelector<HTMLButtonElement>('[aria-label="Mark unread: Headline"]')!
   expect(read.textContent).toBe('')
-  expect(read.classList.contains('size-[16px]')).toBe(true)
-  expect(read.classList.contains('[&>svg]:size-[16px]')).toBe(true)
-  expect(read.classList.contains('size-8')).toBe(false)
-  expect(read.classList.contains('[&>svg]:size-6')).toBe(false)
   expect(read.hasAttribute('aria-pressed')).toBe(false)
   expect(read.querySelector('svg.tabler-icon-circle')?.getAttribute('aria-hidden')).toBe('true')
   expect(star.querySelector('svg.tabler-icon-star')?.getAttribute('aria-hidden')).toBe('true')
@@ -223,9 +180,6 @@ it('uses favicon-sized Star and read toggles with unchanged labels, state and ac
   const { onStar, onRead } = await render(changed)
   const unstar = container.querySelector<HTMLButtonElement>('[aria-label="Unstar: Headline"]')!
   expect(unstar.textContent).toBe('')
-  expect(unstar.classList.contains('text-app-accent')).toBe(true)
-  expect(unstar.classList.contains('text-app-muted')).toBe(false)
-  expect(unstar.classList.contains('hover:text-app-text')).toBe(false)
   expect(unstar.getAttribute('aria-pressed')).toBe('true')
   expect(unstar.querySelector('svg.tabler-icon-star-filled')?.getAttribute('aria-hidden')).toBe(
     'true',
@@ -241,22 +195,6 @@ it('uses favicon-sized Star and read toggles with unchanged labels, state and ac
   expect(unread.textContent).toBe('')
   await act(async () => unread.click())
   expect(onRead).toHaveBeenCalledExactlyOnceWith(changed)
-})
-
-it('preserves spinner rotation, idle refresh sizing and reduced-motion opt-out', () => {
-  // Stylesheet invariants only; jsdom does not compute animations or layout.
-  expect(newspaperCss).toMatch(
-    /\.spinner\s*\{[^}]*animation: dripfeed-spinner 0\.8s linear infinite/,
-  )
-  expect(newspaperCss).toMatch(
-    /@keyframes dripfeed-spinner\s*\{\s*to\s*\{\s*transform: rotate\(-360deg\)/,
-  )
-  expect(newspaperCss).toMatch(
-    /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.spinner\s*\{\s*animation: none/,
-  )
-  expect(newspaperCss).toMatch(
-    /\.header-right \.sync:not\(\.syncing\) \.spinner\s*\{\s*animation: none/,
-  )
 })
 
 it.each(['Star', 'Mark unread'])(

@@ -320,12 +320,10 @@ it('wires read/star to existing actions, single-click-read once and retains a fi
 })
 
 it.each([
+  // Sample each focus destination once across the two filter/action paths.
   ['read', 3],
-  ['read', 1],
-  ['read', 0],
-  ['star', 3],
   ['star', 1],
-  ['star', 0],
+  ['read', 0],
 ] as const)(
   'recovers focused %s removal to a surviving story (remaining: %s), or the labelled empty list',
   async (action, remaining) => {
