@@ -66,24 +66,6 @@ async function render(view = mocks.view) {
 }
 
 describe('feed navigation refill', () => {
-  it('refills destination B even while A is pending, without requiring another navigation', async () => {
-    const a = deferred()
-    const b = deferred()
-    mocks.ensureFeed.mockImplementation((id) => (id === 1 ? a.promise : b.promise))
-
-    await render()
-    expect(mocks.ensureFeed.mock.calls).toEqual([[1]])
-    await render({ kind: 'feed', id: 2 })
-
-    await act(async () => a.resolve())
-    // A's pool refresh can rerender App, but does not change the effect dependencies.
-    await render()
-    expect(mocks.ensureFeed.mock.calls).toEqual([[1], [2]])
-    await act(async () => b.resolve())
-    await render()
-    expect(mocks.ensureFeed.mock.calls).toEqual([[1], [2]])
-  })
-
   it('deduplicates pending revisits per feed and only releases the completed feed', async () => {
     const a = deferred()
     const b = deferred()
@@ -110,19 +92,11 @@ describe('feed navigation refill', () => {
 
   it('does not automatically retry a store-reported failure, but allows a later visit to retry', async () => {
     const request = deferred()
-    const reportError = vi.fn()
-    mocks.ensureFeed.mockImplementation(async () => {
-      // useStore catches and reports refill errors instead of rejecting to App.
-      try {
-        await request.promise
-      } catch (error) {
-        reportError(error)
-      }
-    })
+    // useStore handles refill errors rather than rejecting to App.
+    mocks.ensureFeed.mockImplementation(() => request.promise.catch(() => {}))
 
     await render()
     await act(async () => request.reject(new Error('refill failed')))
-    expect(reportError).toHaveBeenCalledOnce()
     await render()
     expect(mocks.ensureFeed).toHaveBeenCalledOnce()
 

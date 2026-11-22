@@ -38,21 +38,25 @@ describe('parsePositiveSafeInteger', () => {
 
 describe('parseUrlState', () => {
   for (const kind of ['feed', 'folder']) {
-    it.each(invalidIds)(`${kind} %j falls back to all items`, (id) => {
+    // The integer parser above owns the full input matrix; here check URL fallback wiring.
+    it.each([null, 'NaN', '9007199254740992'])(`${kind} %j falls back to all items`, (id) => {
       const params = new URLSearchParams({ view: kind, item: '7' })
       if (id !== null) params.set('id', id)
       expect(parseUrlState(params.toString())).toEqual({ view: { kind: 'all' }, selectedId: 7 })
     })
   }
 
-  it.each(invalidIds)('item %j falls back to null without changing the view', (id) => {
-    const params = new URLSearchParams({ view: 'feed', id: '8' })
-    if (id !== null) params.set('item', id)
-    expect(parseUrlState(params.toString())).toEqual({
-      view: { kind: 'feed', id: 8 },
-      selectedId: null,
-    })
-  })
+  it.each([null, '1.5', '9007199254740992'])(
+    'item %j falls back to null without changing the view',
+    (id) => {
+      const params = new URLSearchParams({ view: 'feed', id: '8' })
+      if (id !== null) params.set('item', id)
+      expect(parseUrlState(params.toString())).toEqual({
+        view: { kind: 'feed', id: 8 },
+        selectedId: null,
+      })
+    },
+  )
 
   it.each(['all', 'allUnread', 'starred', 'feed', 'folder'])('accepts view %s', (kind) => {
     expect(parseUrlState(`?view=${kind}&id=9007199254740991&item=9007199254740991`)).toEqual({

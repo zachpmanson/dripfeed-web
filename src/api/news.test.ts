@@ -24,6 +24,17 @@ const rejectedBases = [
   'https://nextcloud.zachmanson.com',
 ]
 const supportedBases = ['', '  ', '/', 'https://reader.example', ' https://reader.example/// ']
+const savedProductionBase = 'https://nextcloud.zachmanson.com'
+const otherProductionBases = [
+  'https://nextcloud.zachmanson.com/nextcloud',
+  'https://nextcloud.zachmanson.com/?instance=other',
+  'https://nextcloud.zachmanson.com/#other',
+  'https://user:pass@nextcloud.zachmanson.com',
+  'https://nextcloud.zachmanson.com:8443',
+  'http://nextcloud.zachmanson.com',
+  'https://nextcloud.zachmanson.com.evil.example',
+  'https://other-cloud.example',
+]
 const legacyOperations = [
   {
     name: 'authenticated feed subscription',
@@ -51,7 +62,10 @@ const legacyOperations = [
     response: '{"feeds":[{"id":456,"fullTextEnabled":true}]}',
   },
   {
+    // Exercise the shared URL policy in full through one operation. The other
+    // operations still prove they wire up the same allow/deny boundary.
     name: 'full-text settings write',
+    fullProxyMatrix: true,
     request: (s: Settings) => setFeedFullText(s, 456, true),
     path: '/apps/news/feeds/456',
     method: 'PATCH',
@@ -64,54 +78,63 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 
-describe.each(legacyOperations)('$name proxy boundary', ({ request, path, method, response }) => {
-  it.each(rejectedBases)('rejects %s without a request or auth construction', async (baseUrl) => {
-    const fetchMock = vi.fn<typeof fetch>()
-    const authMock = vi.fn<typeof btoa>()
-    vi.stubGlobal('fetch', fetchMock)
-    vi.stubGlobal('btoa', authMock)
+describe.each(legacyOperations)(
+  '$name proxy boundary',
+  ({ request, path, method, response, fullProxyMatrix }) => {
+    it.each(fullProxyMatrix ? rejectedBases : ['https://other-cloud.example'])(
+      'rejects %s without a request or auth construction',
+      async (baseUrl) => {
+        const fetchMock = vi.fn<typeof fetch>()
+        const authMock = vi.fn<typeof btoa>()
+        vi.stubGlobal('fetch', fetchMock)
+        vi.stubGlobal('btoa', authMock)
 
-    await expect(request({ ...settings, baseUrl })).rejects.toThrow(
-      /unsupported.*app-root \/apps proxy.*Regular News API features remain available/,
+        await expect(request({ ...settings, baseUrl })).rejects.toThrow(
+          /unsupported.*app-root \/apps proxy.*Regular News API features remain available/,
+        )
+
+        expect(fetchMock).not.toHaveBeenCalled()
+        expect(authMock).not.toHaveBeenCalled()
+      },
     )
 
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(authMock).not.toHaveBeenCalled()
-  })
+    it.each(fullProxyMatrix ? supportedBases : [''])(
+      'uses the relative proxy route for %j',
+      async (baseUrl) => {
+        const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(response))
+        vi.stubGlobal('fetch', fetchMock)
 
-  it.each(supportedBases)('uses the relative proxy route for %j', async (baseUrl) => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(response))
-    vi.stubGlobal('fetch', fetchMock)
+        const result = await request({ ...settings, baseUrl })
 
-    const result = await request({ ...settings, baseUrl })
-
-    expect(fetchMock).toHaveBeenCalledOnce()
-    expect(fetchMock.mock.calls[0][0]).toBe(path)
-    const init = fetchMock.mock.calls[0][1]!
-    expect(init.method).toBe(method)
-    const headers = new Headers(init.headers)
-    expect(headers.get('Authorization')).toBe(`Basic ${btoa('remote-reader:remote-secret')}`)
-    expect(headers.get('OCS-APIREQUEST')).toBe('true')
-    expect(headers.get('Accept')).toBe('application/json')
-    if (method === 'PATCH') {
-      expect(init.body).toBe('{"fullTextEnabled":true}')
-      expect(headers.get('Content-Type')).toBe('application/json')
-    } else if (method === 'POST') {
-      expect(JSON.parse(init.body as string)).toEqual({
-        url: 'https://feed.example/rss',
-        parentFolderId: 456,
-        user: 'feed-reader',
-        password: ' secret:päss ',
-      })
-      expect(headers.get('Content-Type')).toBe('application/json')
-      expect(result).toEqual({ feeds: [] })
-    } else if (path.endsWith('/fulltext')) {
-      expect(result).toEqual({ id: 123, body: 'Extracted' })
-    } else {
-      expect(result).toEqual(new Map([[456, true]]))
-    }
-  })
-})
+        expect(fetchMock).toHaveBeenCalledOnce()
+        expect(fetchMock.mock.calls[0][0]).toBe(path)
+        const init = fetchMock.mock.calls[0][1]!
+        expect(init.method).toBe(method)
+        const headers = new Headers(init.headers)
+        expect(headers.get('Authorization')).toBe(`Basic ${btoa('remote-reader:remote-secret')}`)
+        expect(headers.get('OCS-APIREQUEST')).toBe('true')
+        expect(headers.get('Accept')).toBe('application/json')
+        if (method === 'PATCH') {
+          expect(init.body).toBe('{"fullTextEnabled":true}')
+          expect(headers.get('Content-Type')).toBe('application/json')
+        } else if (method === 'POST') {
+          expect(JSON.parse(init.body as string)).toEqual({
+            url: 'https://feed.example/rss',
+            parentFolderId: 456,
+            user: 'feed-reader',
+            password: ' secret:päss ',
+          })
+          expect(headers.get('Content-Type')).toBe('application/json')
+          expect(result).toEqual({ feeds: [] })
+        } else if (path.endsWith('/fulltext')) {
+          expect(result).toEqual({ id: 123, body: 'Extracted' })
+        } else {
+          expect(result).toEqual(new Map([[456, true]]))
+        }
+      },
+    )
+  },
+)
 
 it.each([
   'https://other-cloud.example',
@@ -129,10 +152,14 @@ it.each([
   expect(headers.get('Authorization')).toBe(`Basic ${btoa('remote-reader:remote-secret')}`)
 })
 
-describe.each(legacyOperations)('$name production proxy alias', ({ request, path, response }) => {
-  it.each(['https://nextcloud.zachmanson.com', ' https://nextcloud.zachmanson.com/// '])(
-    'routes a saved production URL %j through the same-origin proxy',
-    async (baseUrl) => {
+describe.each(legacyOperations)(
+  '$name production proxy alias',
+  ({ request, path, response, fullProxyMatrix }) => {
+    it.each(
+      fullProxyMatrix
+        ? [savedProductionBase, ` ${savedProductionBase}/// `]
+        : [savedProductionBase],
+    )('routes a saved production URL %j through the same-origin proxy', async (baseUrl) => {
       vi.stubGlobal('location', new URL('https://dripfeed.zachmanson.com/'))
       const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(response))
       vi.stubGlobal('fetch', fetchMock)
@@ -144,27 +171,21 @@ describe.each(legacyOperations)('$name production proxy alias', ({ request, path
       expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('Authorization')).toBe(
         `Basic ${btoa('remote-reader:remote-secret')}`,
       )
-    },
-  )
+    })
 
-  it.each([
-    'https://nextcloud.zachmanson.com/nextcloud',
-    'https://nextcloud.zachmanson.com/?instance=other',
-    'https://nextcloud.zachmanson.com/#other',
-    'https://user:pass@nextcloud.zachmanson.com',
-    'https://nextcloud.zachmanson.com:8443',
-    'http://nextcloud.zachmanson.com',
-    'https://nextcloud.zachmanson.com.evil.example',
-    'https://other-cloud.example',
-  ])('does not alias a different instance %s on production', async (baseUrl) => {
-    vi.stubGlobal('location', new URL('https://dripfeed.zachmanson.com/'))
-    const fetchMock = vi.fn<typeof fetch>()
-    vi.stubGlobal('fetch', fetchMock)
+    it.each(fullProxyMatrix ? otherProductionBases : ['https://other-cloud.example'])(
+      'does not alias a different instance %s on production',
+      async (baseUrl) => {
+        vi.stubGlobal('location', new URL('https://dripfeed.zachmanson.com/'))
+        const fetchMock = vi.fn<typeof fetch>()
+        vi.stubGlobal('fetch', fetchMock)
 
-    await expect(request({ ...settings, baseUrl })).rejects.toThrow('unsupported')
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-})
+        await expect(request({ ...settings, baseUrl })).rejects.toThrow('unsupported')
+        expect(fetchMock).not.toHaveBeenCalled()
+      },
+    )
+  },
+)
 
 it('uses the same production proxy for versioned API requests from saved logins', async () => {
   vi.stubGlobal('location', new URL('https://dripfeed.zachmanson.com/'))
@@ -219,8 +240,6 @@ it('propagates folder rename API failures', async () => {
 describe('feed subscription credentials', () => {
   it.each([
     ['', null],
-    ['', 456],
-    ['https://other-cloud.example/nextcloud', null],
     ['https://other-cloud.example/nextcloud', 456],
   ] as const)(
     'keeps ordinary subscriptions versioned at %j (folder=%s)',

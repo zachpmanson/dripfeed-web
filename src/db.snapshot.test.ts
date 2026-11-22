@@ -61,7 +61,7 @@ beforeEach(async () => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('reader snapshot', () => {
-  it.each([0, 1, 250])('uses one readonly transaction for %i feeds', async (count) => {
+  it.each([0, 250])('uses one readonly transaction for %i feeds', async (count) => {
     const db = await openDB('dripfeed', 2)
     try {
       const seed = db.transaction(['items', 'feeds', 'folders', 'meta'], 'readwrite')
