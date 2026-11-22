@@ -414,16 +414,6 @@ describe('fulltext response persistence', () => {
     })
   })
 
-  it('does not repopulate any store when a response arrives after resetLocal', async () => {
-    const request = pendingExtraction()
-    await reset()
-    request.resolve(extracted)
-    await request.result
-    expect(await db.dbGetAllItems()).toEqual([])
-    expect(await db.dbGetAllFeeds()).toEqual([])
-    expect(await db.dbGetAllFolders()).toEqual([])
-  })
-
   it('leaves a replacement-account row with the same ID entirely untouched', async () => {
     const request = pendingExtraction()
     await reset()

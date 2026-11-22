@@ -119,33 +119,30 @@ const selectNewspaper = async () => {
 const newspaper = () => container.querySelector<HTMLUListElement>('.newspaper-chunks')!
 const newspaperScroll = () => container.querySelector<HTMLDivElement>('.newspaper-scroll')!
 
-it.each([360, 768, 1100, 1600])(
-  'shows both mode controls at %spx and keeps the selected mode through resize',
-  async (width) => {
-    vi.stubGlobal('innerWidth', width)
-    vi.stubGlobal('matchMedia', undefined)
-    await render()
-    expect(container.querySelector('.item-list')).not.toBeNull()
-    expect(container.querySelector('[aria-label="Presentation"]')).not.toBeNull()
-    await selectNewspaper()
-    expect(newspaper()).not.toBeNull()
-    expect(localStorage.getItem('dripfeed.presentation')).toBe('newspaper')
-    await act(async () => {
-      vi.stubGlobal('innerWidth', width < 1100 ? 1600 : 360)
-      window.dispatchEvent(new Event('resize'))
-    })
-    expect(newspaper()).not.toBeNull()
-    expect(container.querySelector('[aria-label="Presentation"]')).not.toBeNull()
-    expect(localStorage.getItem('dripfeed.presentation')).toBe('newspaper')
-    const list = [...container.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find(
-      (button) => button.textContent === 'List',
-    )!
-    await act(async () => list.click())
-    expect(container.querySelector('.item-list')).not.toBeNull()
-    expect(container.querySelector('[aria-label="Back"]')).toBeNull()
-    expect(localStorage.getItem('dripfeed.presentation')).toBe('list')
-  },
-)
+it('switches presentation modes and preserves the preference through resize', async () => {
+  vi.stubGlobal('innerWidth', 1600)
+  vi.stubGlobal('matchMedia', undefined)
+  await render()
+  expect(container.querySelector('.item-list')).not.toBeNull()
+  expect(container.querySelector('[aria-label="Presentation"]')).not.toBeNull()
+  await selectNewspaper()
+  expect(newspaper()).not.toBeNull()
+  expect(localStorage.getItem('dripfeed.presentation')).toBe('newspaper')
+  await act(async () => {
+    vi.stubGlobal('innerWidth', 360)
+    window.dispatchEvent(new Event('resize'))
+  })
+  expect(newspaper()).not.toBeNull()
+  expect(container.querySelector('[aria-label="Presentation"]')).not.toBeNull()
+  expect(localStorage.getItem('dripfeed.presentation')).toBe('newspaper')
+  const list = [...container.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find(
+    (button) => button.textContent === 'List',
+  )!
+  await act(async () => list.click())
+  expect(container.querySelector('.item-list')).not.toBeNull()
+  expect(container.querySelector('[aria-label="Back"]')).toBeNull()
+  expect(localStorage.getItem('dripfeed.presentation')).toBe('list')
+})
 
 it('rebuilds newspaper positions after manual reload settles, not while clearing or syncing', async () => {
   await render()

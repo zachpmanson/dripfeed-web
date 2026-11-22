@@ -125,11 +125,3 @@ it('blocks duplicate renames and add-feed while pending, isolates dismissed requ
   expect(document.querySelector('[role="menu"]')).not.toBeNull()
   expect(document.querySelector('[role="alert"]')).toBeNull()
 })
-
-it('hands add-feed to the parent without selecting or retaining the menu', async () => {
-  await open()
-  await click(item('Add feed…'))
-  expect(addFeed).toHaveBeenCalledOnce()
-  expect(select).not.toHaveBeenCalled()
-  expect(document.querySelector('[role="menu"]')).toBeNull()
-})

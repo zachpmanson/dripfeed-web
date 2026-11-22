@@ -48,23 +48,10 @@ async function traverse(direction: 'back' | 'forward') {
   })
 }
 
-const invalidIds = [
-  '',
-  ' ',
-  'NaN',
-  'Infinity',
-  '-Infinity',
-  'nope',
-  '0',
-  '-1',
-  '1.5',
-  '9007199254740992',
-  '9007199254740993',
-]
-
 describe('initial URL cleanup', () => {
   for (const kind of ['feed', 'folder']) {
-    it.each(invalidIds)(
+    // Numeric edge cases are covered by urlState.test.ts. Keep history behavior here.
+    it.each(['NaN', '9007199254740992'])(
       `replaces invalid ${kind} %j without exposing an invalid ID`,
       async (id) => {
         const params = new URLSearchParams({ view: kind, id, item: '7', keep: 'yes' })
@@ -85,8 +72,8 @@ describe('initial URL cleanup', () => {
     )
   }
 
-  it.each(invalidIds)('replaces invalid item %j without changing a valid view', async (item) => {
-    const params = new URLSearchParams({ view: 'folder', id: '2', item })
+  it('replaces an invalid item without changing a valid view', async () => {
+    const params = new URLSearchParams({ view: 'folder', id: '2', item: '1.5' })
     window.history.replaceState(null, '', `/reader?${params}`)
     const push = vi.spyOn(window.history, 'pushState')
     await mount()

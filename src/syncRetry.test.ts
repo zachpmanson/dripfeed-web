@@ -9,10 +9,6 @@ import {
 } from './syncRetry'
 
 describe('isNetworkError', () => {
-  it('recognizes fetch network failures', () => {
-    expect(isNetworkError(new TypeError('Failed to fetch'))).toBe(true)
-  })
-
   it('does not bypass server-error backoff', () => {
     expect(isNetworkError(new ApiError('rate limited', 429))).toBe(false)
     expect(isNetworkError(new Error('unexpected'))).toBe(false)

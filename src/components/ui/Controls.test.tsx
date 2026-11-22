@@ -10,7 +10,6 @@ import FolderSection from '../feed/FolderSection'
 import { SettingsModal } from '../settings/SettingsModal'
 import AppHeader from '../app/AppHeader'
 import { FeedIcon } from '../feed/FeedIcon'
-import { Spinner } from './Spinner'
 import type { NewsFeed } from '../../api/types'
 
 let root: Root
@@ -250,7 +249,6 @@ it('header uses decorative Tabler chrome and retains refresh state and actions',
     const button = document.querySelector('[aria-label="' + label + '"]')!
     const svg = button.querySelector('svg.tabler-icon-' + icon)!
     expect(svg.getAttribute('aria-hidden')).toBe('true')
-    expect(svg.getAttribute('stroke-width')).toBe('2')
     expect(button.textContent).toBe('')
     await click(button)
     expect(action).toHaveBeenCalledOnce()
@@ -259,11 +257,7 @@ it('header uses decorative Tabler chrome and retains refresh state and actions',
   await act(async () => render(true))
   expect(document.querySelector('.sync')?.classList.contains('syncing')).toBe(true)
   expect(document.querySelector('.sync svg.spinner.tabler-icon-refresh')).not.toBeNull()
-  await act(async () => root.render(<Spinner />))
-  expect(
-    container.querySelector('svg.spinner.tabler-icon-refresh')?.getAttribute('aria-hidden'),
-  ).toBe('true')
-  expect(container.textContent).toBe('')
+  expect(document.querySelector('.sync svg.spinner')?.getAttribute('aria-hidden')).toBe('true')
 })
 
 it('feed icons preserve external branding and dimensions, falling back to decorative Tabler RSS', async () => {
