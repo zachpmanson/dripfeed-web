@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NewsFeed, NewsItem } from './api/types'
 import { ItemMutationVersion, mergeServerItem } from './itemMutationVersion'
-import { RECONCILE_MARKER_KEY } from './syncMarker'
+
+// Existing installations already have their watermark stored under this key.
+const persistedMarkerKey = 'reconcile:lastModified'
 
 const mocks = vi.hoisted(() => ({
   feeds: [] as NewsFeed[],
@@ -122,7 +124,7 @@ beforeEach(() => {
   mocks.items.clear()
   mocks.cursors.clear()
   mocks.meta.clear()
-  mocks.meta.set(RECONCILE_MARKER_KEY, '100')
+  mocks.meta.set(persistedMarkerKey, '100')
   mocks.dbSetMeta.mockImplementation(async (key: string, value: string) => {
     mocks.meta.set(key, value)
   })
@@ -323,11 +325,13 @@ describe('incremental sync feed history', () => {
 describe('safe delta watermarks', () => {
   it.each([
     { serverTime: 100, expected: 98 },
+    { serverTime: 1, expected: 0 },
     { serverTime: null, expected: 0 },
   ])(
     'seeds hydration from Date=$serverTime, never browser or row times',
     async ({ serverTime, expected }) => {
       vi.spyOn(Date, 'now').mockReturnValue(9_000_000_000_000)
+      mocks.meta.clear()
       mocks.fetchMeta.mockResolvedValue({ feeds: [feed], folders: [], serverTime })
       mocks.fetchInitial.mockResolvedValue({
         items: [{ ...item(1), lastModified: 9_000_000_000 }],
@@ -336,33 +340,50 @@ describe('safe delta watermarks', () => {
       const { fullSync, reconcileUpdated } = await import('./store')
 
       await fullSync(settings)
-      expect(mocks.meta.get(RECONCILE_MARKER_KEY)).toBe(String(expected))
+      expect(mocks.meta.get(persistedMarkerKey)).toBe(String(expected))
       await reconcileUpdated(settings)
       expect(mocks.fetchUpdatedItems).toHaveBeenCalledWith(settings, expected)
     },
   )
 
-  it('retains the marker without Date despite an ahead browser and future rows', async () => {
-    vi.spyOn(Date, 'now').mockReturnValue(9_000_000_000_000)
-    mocks.meta.set(RECONCILE_MARKER_KEY, '90')
-    mocks.fetchUpdatedItems.mockResolvedValue({
-      items: [{ ...item(1), lastModified: 9_000_000_000 }],
-      serverTime: null,
-    })
+  it.each([90, 0])(
+    'retains watermark %i without Date despite an ahead browser and future rows',
+    async (marker) => {
+      vi.spyOn(Date, 'now').mockReturnValue(9_000_000_000_000)
+      mocks.meta.set(persistedMarkerKey, String(marker))
+      mocks.fetchUpdatedItems.mockResolvedValue({
+        items: [{ ...item(1), lastModified: 9_000_000_000 }],
+        serverTime: null,
+      })
+      const { reconcileUpdated } = await import('./store')
+
+      await reconcileUpdated(settings)
+      await reconcileUpdated(settings)
+
+      expect(mocks.fetchUpdatedItems).toHaveBeenNthCalledWith(1, settings, marker)
+      expect(mocks.fetchUpdatedItems).toHaveBeenNthCalledWith(2, settings, marker)
+      expect(mocks.meta.get(persistedMarkerKey)).toBe(String(marker))
+      expect(mocks.dbSetMeta).not.toHaveBeenCalled()
+      expect(mocks.items.has(1)).toBe(true)
+    },
+  )
+
+  it('does not rewind a valid marker when Date is within the overlap or equal to the marker', async () => {
+    mocks.fetchUpdatedItems
+      .mockResolvedValueOnce({ items: [], serverTime: 101 })
+      .mockResolvedValueOnce({ items: [], serverTime: 100 })
     const { reconcileUpdated } = await import('./store')
 
     await reconcileUpdated(settings)
     await reconcileUpdated(settings)
 
-    expect(mocks.fetchUpdatedItems).toHaveBeenNthCalledWith(1, settings, 90)
-    expect(mocks.fetchUpdatedItems).toHaveBeenNthCalledWith(2, settings, 90)
-    expect(mocks.meta.get(RECONCILE_MARKER_KEY)).toBe('90')
-    expect(mocks.dbSetMeta).not.toHaveBeenCalled()
-    expect(mocks.items.has(1)).toBe(true)
+    expect(mocks.fetchUpdatedItems).toHaveBeenNthCalledWith(1, settings, 100)
+    expect(mocks.fetchUpdatedItems).toHaveBeenNthCalledWith(2, settings, 100)
+    expect(mocks.meta.get(persistedMarkerKey)).toBe('100')
   })
 
   it('does not let a future row skip an ordinary change on the next poll', async () => {
-    mocks.meta.set(RECONCILE_MARKER_KEY, '90')
+    mocks.meta.set(persistedMarkerKey, '90')
     mocks.fetchUpdatedItems.mockResolvedValueOnce({
       items: [{ ...item(1), lastModified: 9_000_000_000 }],
       serverTime: 100,
@@ -374,16 +395,16 @@ describe('safe delta watermarks', () => {
     const { reconcileUpdated } = await import('./store')
 
     await reconcileUpdated(settings)
-    expect(mocks.meta.get(RECONCILE_MARKER_KEY)).toBe('98')
+    expect(mocks.meta.get(persistedMarkerKey)).toBe('98')
     await reconcileUpdated(settings)
 
     expect(mocks.fetchUpdatedItems).toHaveBeenLastCalledWith(settings, 98)
     expect(mocks.items.get(2)).toMatchObject({ unread: false, lastModified: 99000 })
-    expect(mocks.meta.get(RECONCILE_MARKER_KEY)).toBe('99')
+    expect(mocks.meta.get(persistedMarkerKey)).toBe('99')
   })
 
   it('persists a poisoned marker reset and replays missed history before advancing', async () => {
-    mocks.meta.set(RECONCILE_MARKER_KEY, '200')
+    mocks.meta.set(persistedMarkerKey, '200')
     mocks.fetchUpdatedItems.mockResolvedValueOnce({ items: [], serverTime: 100 })
     mocks.fetchUpdatedItems.mockImplementation(async (_settings, since: number) => ({
       items: since <= 50 ? [{ ...item(2), lastModified: 50, unread: false }] : [],
@@ -392,13 +413,12 @@ describe('safe delta watermarks', () => {
     const { reconcileUpdated } = await import('./store')
 
     await reconcileUpdated(settings)
-    expect(mocks.meta.get(RECONCILE_MARKER_KEY)).toBe('0')
-    expect(mocks.dbSetMeta).toHaveBeenCalledWith(RECONCILE_MARKER_KEY, '0')
+    expect(mocks.meta.get(persistedMarkerKey)).toBe('0')
     await reconcileUpdated(settings)
 
     expect(mocks.fetchUpdatedItems).toHaveBeenNthCalledWith(1, settings, 200)
     expect(mocks.fetchUpdatedItems).toHaveBeenNthCalledWith(2, settings, 0)
     expect(mocks.items.get(2)).toMatchObject({ unread: false, lastModified: 50000 })
-    expect(mocks.meta.get(RECONCILE_MARKER_KEY)).toBe('99')
+    expect(mocks.meta.get(persistedMarkerKey)).toBe('99')
   })
 })

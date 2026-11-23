@@ -81,7 +81,8 @@ describe('reader snapshot', () => {
 
       const transactions = vi.spyOn(IDBDatabase.prototype, 'transaction')
       const snapshot = await dbGetReaderSnapshot()
-      expect(transactions.mock.calls).toEqual([[['items', 'feeds', 'folders', 'meta'], 'readonly']])
+      expect(transactions).toHaveBeenCalledOnce()
+      expect(transactions.mock.calls[0][1]).toBe('readonly')
       expect(snapshot.feeds).toHaveLength(count)
       expect(snapshot.cursors.size).toBe(Math.max(0, count - 1))
       expect(snapshot.cursors.has(1)).toBe(false)

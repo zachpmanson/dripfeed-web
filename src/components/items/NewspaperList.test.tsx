@@ -4,7 +4,6 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { NewsItem, NewsFeed } from '../../api/types'
 import { ItemList, type ItemListProps } from './ItemList'
-import { newspaperRole } from './newspaperPresentation'
 import {
   estimatedStoryHeight,
   newspaperColumnWidth,
@@ -816,8 +815,25 @@ const placement = (id: number) => {
 it('keeps actual story nodes, columns and roles through lead and chunk-boundary deletions and rollback', async () => {
   const original = pool.slice(0, 120)
   height = 30_000
-  await render({ items: original })
+  await render({ items: original, selectedId: 108 })
+  await render({ selectedId: null })
+  await scroll(0)
   const before = new Map(ids().map((id) => [id, placement(id)]))
+  for (let id = 101; id <= 108; id++) expect(before.has(id)).toBe(true)
+  expect(Array.from({ length: 9 }, (_, rank) => before.get(rank + 1)?.role)).toEqual([
+    'newspaper-lead',
+    'newspaper-brief',
+    'newspaper-image',
+    'newspaper-brief',
+    'newspaper-feature',
+    'newspaper-image',
+    'newspaper-brief',
+    'newspaper-standard',
+    'newspaper-feature',
+  ])
+  for (const [id, { role }] of before) {
+    if (id > 9) expect(role).toBe(before.get(2 + ((id - 2) % 8))?.role)
+  }
   const survivingNode = host.querySelector('[data-story-id="53"]')
   const removed = new Set([1, 2, 49, 50, 51, 52, 74, 75])
   await render({ items: original.filter((story) => !removed.has(story.id)) })
@@ -871,7 +887,7 @@ it('drops empty chunks after bulk clears and still targets reader-return by owne
   await render({ active: false, selectedId: 151 })
   await render({ active: true, selectedId: null })
   expect(document.activeElement?.getAttribute('data-story-id')).toBe('151')
-  expect(placement(151).role).toBe(`newspaper-${newspaperRole(150)}`)
+  expect(placement(151).role).toBe('newspaper-brief')
   expect(host.querySelectorAll('.newspaper-story').length).toBeLessThanOrEqual(250)
 })
 

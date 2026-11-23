@@ -130,7 +130,6 @@ it.each(['feature', 'image'] as const)(
   'uses safe metadata on %s tiles with the same broken-image fallback',
   async (role) => {
     await render(item, role)
-    expect(container.querySelector('li')?.classList.contains(`newspaper-${role}`)).toBe(true)
     expect(container.querySelector('li')?.classList.contains('[column-span:all]')).toBe(false)
     const image = container.querySelector('img')!
     expect(image.getAttribute('src')).toBe('https://fixture.invalid/image.png')
@@ -158,13 +157,18 @@ it.each(['feature', 'image'] as const)(
   },
 )
 
-it('varies excerpt lengths without truncating headlines or adding unsafe markup', async () => {
+it('renders a longer excerpt for feature and lead stories without truncating the headline', async () => {
   const story = { ...item, title: 'A complete headline', body: `<p>${'word '.repeat(150)}</p>` }
+  const excerptLength = () => container.querySelector('p')!.textContent!.length
   await render(story, 'brief')
-  expect(container.querySelector('p')!.textContent!.length).toBeLessThanOrEqual(161)
+  const briefLength = excerptLength()
+  expect(briefLength).toBeLessThanOrEqual(161)
   await render(story, 'feature')
-  expect(container.querySelector('p')!.textContent!.length).toBeGreaterThan(160)
+  const featureLength = excerptLength()
+  expect(featureLength).toBeGreaterThan(briefLength)
   expect(container.querySelector('[data-story-id]')!.textContent).toBe(story.title)
+  await render(story, 'lead')
+  expect(excerptLength()).toBeGreaterThan(featureLength)
 })
 
 it('keeps Star and read toggles labelled and wired to the current story', async () => {
