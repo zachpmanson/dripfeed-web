@@ -97,11 +97,11 @@ describe('legacy feature callers', () => {
   it.each([settings.baseUrl, 'https://reader.example/nextcloud'])(
     'keeps full sync nonfatal for unsupported legacy hydration at %s',
     async (baseUrl) => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
       const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input) => {
         const path = new URL(String(input)).pathname
         if (path.endsWith('/api/v1-3/feeds')) {
-          return new Response(JSON.stringify({ feeds: [feed] }))
+          return new Response(JSON.stringify({ feeds: [{ ...feed, title: 'Updated feed' }] }))
         }
         if (path.endsWith('/api/v1-3/folders')) {
           return new Response('{"folders":[]}')
@@ -117,8 +117,10 @@ describe('legacy feature callers', () => {
 
       expect(await isInitialized()).toBe(true)
       expect(getStatus().stage).toBe('done')
-      expect(warn).toHaveBeenCalledWith('feed settings read failed', expect.any(Error))
-      expect(warn.mock.calls[0][1].message).toContain('unsupported')
+      expect(await dbGetFeed(feed.id)).toMatchObject({
+        title: 'Updated feed',
+        fullTextEnabled: false,
+      })
       expect(fetchMock).toHaveBeenCalledTimes(4)
       for (const [url] of fetchMock.mock.calls) {
         expect(String(url)).toMatch(`${baseUrl}/apps/news/api/v1-3/`)

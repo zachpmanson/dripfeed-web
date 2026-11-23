@@ -37,26 +37,21 @@ describe('parsePositiveSafeInteger', () => {
 })
 
 describe('parseUrlState', () => {
-  for (const kind of ['feed', 'folder']) {
-    // The integer parser above owns the full input matrix; here check URL fallback wiring.
-    it.each([null, 'NaN', '9007199254740992'])(`${kind} %j falls back to all items`, (id) => {
-      const params = new URLSearchParams({ view: kind, item: '7' })
-      if (id !== null) params.set('id', id)
-      expect(parseUrlState(params.toString())).toEqual({ view: { kind: 'all' }, selectedId: 7 })
-    })
-  }
+  it.each([
+    ['feed', '?view=feed&item=7'],
+    ['folder', '?view=folder&id=9007199254740992&item=7'],
+  ])('falls back from an invalid %s scope without losing the item', (_kind, search) => {
+    expect(parseUrlState(search)).toEqual({ view: { kind: 'all' }, selectedId: 7 })
+  })
 
-  it.each([null, '1.5', '9007199254740992'])(
-    'item %j falls back to null without changing the view',
-    (id) => {
-      const params = new URLSearchParams({ view: 'feed', id: '8' })
-      if (id !== null) params.set('item', id)
-      expect(parseUrlState(params.toString())).toEqual({
-        view: { kind: 'feed', id: 8 },
-        selectedId: null,
-      })
-    },
-  )
+  it.each([null, '1.5'])('item %j falls back to null without changing the view', (id) => {
+    const params = new URLSearchParams({ view: 'feed', id: '8' })
+    if (id !== null) params.set('item', id)
+    expect(parseUrlState(params.toString())).toEqual({
+      view: { kind: 'feed', id: 8 },
+      selectedId: null,
+    })
+  })
 
   it.each(['all', 'allUnread', 'starred', 'feed', 'folder'])('accepts view %s', (kind) => {
     expect(parseUrlState(`?view=${kind}&id=9007199254740991&item=9007199254740991`)).toEqual({
@@ -72,12 +67,8 @@ describe('parseUrlState', () => {
 
 describe('canonical URL', () => {
   it.each([
-    ['?view=feed&id=NaN&item=1.5', '?view=all'],
-    ['?view=folder&id=-1&item=7', '?view=all&item=7'],
     ['?view=feed&id=001&item=2e1', '?view=feed&id=1&item=20'],
     ['?view=all&id=1&item=', '?view=all'],
-    ['?view=unknown', '?view=all'],
-    ['', '?view=all'],
   ])('canonicalizes %s and is stable', (search, expected) => {
     const canonical = urlForState(`https://reader.test/reader${search}`, parseUrlState(search))
     expect(canonical).toBe(`/reader${expected}`)

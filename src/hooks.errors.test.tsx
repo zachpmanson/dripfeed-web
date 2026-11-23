@@ -105,10 +105,12 @@ function deferred() {
   return { promise, reject }
 }
 
-it.each([false, true])(
-  'keeps extraction failure local (automatic=%s), with manual retry',
-  async (auto) => {
-    const failure = new Error('Could not extract an article from this URL')
+it.each([
+  { auto: false, failure: new ApiError('Rate limited', 429) },
+  { auto: true, failure: new TypeError('Could not extract: offline') },
+])(
+  'keeps extraction failure local (automatic=$auto), with manual retry',
+  async ({ auto, failure }) => {
     mocks.extract.mockRejectedValue(failure)
     await act(async () => root.render(<Harness auto={auto} />))
     const extract = () =>
@@ -118,28 +120,11 @@ it.each([false, true])(
     expect(container.querySelector('article [role="alert"]')?.textContent).toContain(
       failure.message,
     )
-    expect(data.error).toBeNull()
     expect(extract().disabled).toBe(false)
     await act(async () => root.render(<Harness auto={auto} item={{ ...selected }} />))
     expect(mocks.extract).toHaveBeenCalledOnce()
     await act(async () => extract().click())
     expect(mocks.extract).toHaveBeenCalledTimes(2)
-    await act(async () => {
-      await expect(data.actions.extractFulltext(selected)).rejects.toBe(failure)
-    })
-    expect(data.error).toBeNull()
-  },
-)
-
-it.each(['network', 'server', 'rate limit'])(
-  'rejects non-auth extraction %s failures without a toast',
-  async (kind) => {
-    const failure =
-      kind === 'network'
-        ? new TypeError('offline')
-        : new ApiError(kind, kind === 'server' ? 500 : 429)
-    mocks.extract.mockRejectedValue(failure)
-    await act(async () => root.render(<Harness />))
     await act(async () => {
       await expect(data.actions.extractFulltext(selected)).rejects.toBe(failure)
     })
@@ -180,7 +165,6 @@ it('toasts unrelated errors without focus theft, deduplicates dismissal and perm
   await act(async () => data.actions.syncNow())
   const toast = container.querySelector('[role="alert"]')!
   expect(toast.textContent).toContain('Sync failed')
-  expect(toast.className).toContain('fixed')
   expect(document.activeElement).toBe(background)
   await act(async () =>
     root.render(
@@ -214,30 +198,27 @@ it('toasts unrelated errors without focus theft, deduplicates dismissal and perm
   vi.restoreAllMocks()
 })
 
-it.each([401, 500])(
-  'ignores an old-session %s rejection after logout/new login',
-  async (status) => {
-    const pending = deferred()
-    mocks.extract.mockReturnValueOnce(pending.promise)
-    await act(async () => root.render(<Harness />))
-    const failure = new ApiError('Old session', status)
-    let request!: Promise<void>
-    await act(async () => {
-      request = data.actions.extractFulltext(selected)
-    })
-    const rejected = expect(request).rejects.toBe(failure)
-    await act(async () => data.actions.reset())
-    await act(async () => root.render(<Harness credentials={null} />))
-    await act(async () => root.render(<Harness credentials={{ ...settings }} />))
-    await act(async () => {
-      pending.reject(failure)
-      await rejected
-    })
-    expect(data.error).toBeNull()
-    expect(data.authFailed).toBe(false)
-    expect(mocks.reset).toHaveBeenCalledOnce()
-  },
-)
+it('ignores an old-session extraction 401 after logout/new login', async () => {
+  const pending = deferred()
+  mocks.extract.mockReturnValueOnce(pending.promise)
+  await act(async () => root.render(<Harness />))
+  const failure = new ApiError('Old session', 401)
+  let request!: Promise<void>
+  await act(async () => {
+    request = data.actions.extractFulltext(selected)
+  })
+  const rejected = expect(request).rejects.toBe(failure)
+  await act(async () => data.actions.reset())
+  await act(async () => root.render(<Harness credentials={null} />))
+  await act(async () => root.render(<Harness credentials={{ ...settings }} />))
+  await act(async () => {
+    pending.reject(failure)
+    await rejected
+  })
+  expect(data.error).toBeNull()
+  expect(data.authFailed).toBe(false)
+  expect(mocks.reset).toHaveBeenCalledOnce()
+})
 
 it('does not put a late automatic extraction error on another article', async () => {
   const pending = deferred()

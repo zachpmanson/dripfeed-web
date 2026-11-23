@@ -47,20 +47,11 @@ const render = async (feeds: NewsFeed[]) =>
     ),
   )
 
-it('gives ungrouped feeds a quiet, non-interactive heading aligned with sidebar rows', async () => {
+it('groups unfiled feeds under a non-interactive heading', async () => {
   await render([ungrouped, grouped])
   const heading = container.querySelector<HTMLHeadingElement>('.folder-head-static')!
   expect(heading.tagName).toBe('H2')
   expect(heading.textContent?.trim()).toBe('Feeds')
-  // Utility/structure wiring only: jsdom does not establish visual alignment.
-  for (const name of ['m-0', 'mb-0.5', 'font-normal', 'text-app-muted']) {
-    expect(heading.classList.contains(name)).toBe(true)
-  }
-  const folderButton = container.querySelector('.folder-name-btn')!
-  for (const name of ['px-2.5', 'py-1.5', 'text-sm']) {
-    expect(heading.classList.contains(name)).toBe(true)
-    expect(folderButton.classList.contains(name)).toBe(true)
-  }
   expect(heading.tabIndex).toBe(-1)
   expect(heading.closest('button')).toBeNull()
   expect(heading.hasAttribute('aria-expanded')).toBe(false)

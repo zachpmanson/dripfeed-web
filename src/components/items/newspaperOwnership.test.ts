@@ -27,6 +27,10 @@ const placements = (current: NewsItem[], ownership: NewspaperOwnership) => {
 it('retains column and role across lead/boundary/bulk removals, read/star updates and fresh arrivals', () => {
   let ownership = newspaperOwnership(items, 3)
   const before = placements(items, ownership)
+  const roles = ['brief', 'image', 'brief', 'feature', 'image', 'brief', 'standard', 'feature']
+  expect(before.get(1)?.role).toBe('lead')
+  for (const item of items.slice(1))
+    expect(before.get(item.id)?.role).toBe(roles[(item.id - 2) % roles.length])
   // Remove the lead, both sides of chunk boundaries and all of a middle chunk.
   const remaining = items.filter(
     (item) => ![1, 2, 49, 50, 51, 100, 101].includes(item.id) && (item.id < 51 || item.id > 100),
@@ -34,7 +38,7 @@ it('retains column and role across lead/boundary/bulk removals, read/star update
   const updated = remaining.map((item) => ({ ...item, unread: false, starred: true }))
   const fresh = { id: 999 } as NewsItem
   // Even a newer item arriving at the head cannot displace existing owners.
-  const current = [fresh, ...updated].reverse()
+  const current = [fresh, ...updated.reverse()]
   ownership = newspaperOwnership(current, 3, ownership)
   const after = placements(current, ownership)
   remaining.forEach((item) => expect(after.get(item.id)).toEqual(before.get(item.id)))
@@ -42,6 +46,7 @@ it('retains column and role across lead/boundary/bulk removals, read/star update
   expect([...after.values()].some((value) => value.role === 'lead')).toBe(false)
   const stacks = ownedNewspaperStacks(ownedNewspaperItems(current, ownership), ownership)
   expect(stacks.columns.flat()).toHaveLength(current.length)
+  expect(stacks.columns[1].at(-1)?.id).toBe(fresh.id)
   // Rollback revives the same slot, not a newly appended card or promoted lead.
   ownership = newspaperOwnership([...current, items[0], items[49]], 3, ownership)
   const restored = placements([...current, items[0], items[49]], ownership)

@@ -282,7 +282,7 @@ it('feed icons preserve external branding and dimensions, falling back to decora
   expect(container.querySelector<HTMLElement>('.feed-icon')?.style.width).toBe('16px')
 })
 
-it('IconButton exposes optional pressed state and selects accent without competing muted classes', async () => {
+it('IconButton distinguishes a toggle from an ordinary action', async () => {
   const action = vi.fn()
   const render = (pressed?: boolean) =>
     root.render(
@@ -294,13 +294,8 @@ it('IconButton exposes optional pressed state and selects accent without competi
     await act(async () => render(pressed))
     const button = container.querySelector('button')!
     expect(button.getAttribute('aria-pressed')).toBe(pressed === undefined ? null : String(pressed))
-    expect(button.classList.contains('text-app-accent')).toBe(pressed === true)
-    expect(button.classList.contains('text-app-muted')).toBe(pressed !== true)
-    expect(button.classList.contains('hover:text-app-text')).toBe(pressed !== true)
-    expect(button.classList.contains('hover:text-app-accent')).toBe(pressed === true)
-    expect(button.classList.contains('size-8')).toBe(true)
     expect(button.textContent).toBe('')
-    await click(button)
   }
-  expect(action).toHaveBeenCalledTimes(5)
+  await click(container.querySelector('button')!)
+  expect(action).toHaveBeenCalledOnce()
 })

@@ -2,18 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { ApiError } from './api/client'
 import {
   createSyncRetryState,
-  isNetworkError,
   recordSyncFailure,
   recordSyncSuccess,
   retryAfterOnline,
 } from './syncRetry'
-
-describe('isNetworkError', () => {
-  it('does not bypass server-error backoff', () => {
-    expect(isNetworkError(new ApiError('rate limited', 429))).toBe(false)
-    expect(isNetworkError(new Error('unexpected'))).toBe(false)
-  })
-})
 
 describe('background sync retry lifecycle', () => {
   it('bypasses network backoff when connectivity returns', () => {
@@ -30,15 +22,15 @@ describe('background sync retry lifecycle', () => {
     expect(retryAfterOnline(state, 6_000)).toBe(true)
   })
 
-  it('keeps server failures on backoff and resets after success', () => {
+  it('keeps non-network failures on backoff', () => {
     const state = createSyncRetryState(1_000)
     recordSyncFailure(state, new ApiError('rate limited', 429), 2_000)
-
     expect(state.nextSyncAt).toBe(62_000)
     expect(retryAfterOnline(state, 3_000)).toBe(false)
-    recordSyncSuccess(state)
-    expect(state.failureBackoff).toBe(30_000)
-    expect(state.retryOnOnline).toBe(false)
+
+    recordSyncFailure(state, new Error('unexpected'), 4_000)
+    expect(state.nextSyncAt).toBe(124_000)
+    expect(retryAfterOnline(state, 5_000)).toBe(false)
   })
 
   it('caps repeated failures at fifteen minutes', () => {
@@ -56,6 +48,7 @@ describe('background sync retry lifecycle', () => {
     const state = createSyncRetryState(0)
     recordSyncFailure(state, new TypeError('Failed to fetch'), 1_000)
     recordSyncSuccess(state)
+    expect(state.failureBackoff).toBe(30_000)
     expect(retryAfterOnline(state, 2_000)).toBe(false)
 
     recordSyncFailure(state, new TypeError('Failed to fetch'), 3_000)

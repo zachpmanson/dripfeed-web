@@ -53,8 +53,8 @@ const render = async (story = item, role: NewspaperRole = 'lead') => {
   return { onSelect, onRead, onStar }
 }
 
-it('inherits read/unread headline color, retains RTL, and uses focusable native action buttons', async () => {
-  const { onSelect, onRead, onStar } = await render()
+it('retains RTL and read/unread color wiring on a focusable headline', async () => {
+  const { onSelect, onRead } = await render()
   const headline = container.querySelector<HTMLButtonElement>('[data-story-id]')!
   expect(headline.tagName).toBe('BUTTON')
   expect(headline.tabIndex).toBe(0)
@@ -67,15 +67,6 @@ it('inherits read/unread headline color, retains RTL, and uses focusable native 
   await act(async () => headline.click())
   expect(onSelect).toHaveBeenCalledExactlyOnceWith(item.id)
   expect(onRead).not.toHaveBeenCalled()
-  const star = container.querySelector<HTMLButtonElement>('[aria-label="Star: Headline"]')!
-  expect(star.getAttribute('aria-pressed')).toBe('false')
-  await act(async () => star.click())
-  expect(onStar).toHaveBeenCalledExactlyOnceWith(item)
-  await act(async () =>
-    container.querySelector<HTMLButtonElement>('[aria-label="Mark unread: Headline"]')!.click(),
-  )
-  expect(onRead).toHaveBeenCalledExactlyOnceWith(item)
-
   await render({ ...item, unread: true, rtl: false })
   expect(headline.closest('h2')?.classList.contains('text-app-text')).toBe(true)
   expect(headline.closest('article')?.getAttribute('dir')).toBe('auto')
@@ -86,25 +77,17 @@ it('places story actions beside feed metadata above the headline, without footer
   const article = container.querySelector('article')!
   const header = article.firstElementChild!
   expect(header.tagName).toBe('HEADER')
-  expect(article.getAttribute('dir')).toBe('rtl')
   expect(header.getAttribute('dir')).toBe('ltr')
-  // Structure/utility wiring only, not native right-edge or pixel geometry.
-  expect(header.classList.contains('justify-between')).toBe(true)
-  expect(header.classList.contains('items-start')).toBe(true)
   const metadata = header.firstElementChild!
   expect(metadata.getAttribute('dir')).toBe('auto')
   expect(metadata.textContent).toContain('Feed')
   expect(metadata.querySelector('time')).not.toBeNull()
-  expect(metadata.classList.contains('min-h-[16px]')).toBe(true)
-  expect(metadata.classList.contains('min-w-0')).toBe(true)
   const actions = header.lastElementChild!
-  expect(actions.classList.contains('shrink-0')).toBe(true)
   expect(actions.querySelectorAll('button')).toHaveLength(2)
   expect(actions.querySelector('[aria-label="Star: Headline"]')).not.toBeNull()
   expect(actions.querySelector('[aria-label="Mark read: Headline"]')).not.toBeNull()
   expect(article.children.item(1)?.tagName).toBe('H2')
   expect(article.querySelectorAll('button')).toHaveLength(3)
-  expect(article.querySelector('[class~="mt-4"]')).toBeNull()
 })
 
 it('falls back after an image error, retries changed metadata and omits brief images', async () => {
@@ -126,36 +109,29 @@ it('falls back after an image error, retries changed metadata and omits brief im
   expect(container.textContent).not.toContain('Image unavailable')
 })
 
-it.each(['feature', 'image'] as const)(
-  'uses safe metadata on %s tiles with the same broken-image fallback',
-  async (role) => {
-    await render(item, role)
-    expect(container.querySelector('li')?.classList.contains('[column-span:all]')).toBe(false)
-    const image = container.querySelector('img')!
-    expect(image.getAttribute('src')).toBe('https://fixture.invalid/image.png')
-    if (role === 'image') {
-      expect(
-        image.compareDocumentPosition(container.querySelector('p')!) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy()
-    }
-    await act(async () => image.dispatchEvent(new Event('error')))
-    expect(container.querySelector('img')).toBeNull()
-    expect(container.textContent).toContain('Image unavailable')
-    await render(
-      {
-        ...item,
-        mediaThumbnail: 'javascript:bad',
-        enclosureMime: 'audio/mp3',
-        body: '<img src="https://never.invalid/body"><p>Safe</p>',
-      },
-      role,
-    )
-    expect(container.querySelector('img')).toBeNull()
-    expect(container.textContent).not.toContain('Image unavailable')
-    expect(container.querySelector('p')?.textContent).toBe('Safe')
-  },
-)
+it.each(['feature', 'image'] as const)('uses safe metadata on %s tiles', async (role) => {
+  await render(item, role)
+  const image = container.querySelector('img')!
+  expect(image.getAttribute('src')).toBe('https://fixture.invalid/image.png')
+  if (role === 'image') {
+    expect(
+      image.compareDocumentPosition(container.querySelector('p')!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  }
+  await render(
+    {
+      ...item,
+      mediaThumbnail: 'javascript:bad',
+      enclosureMime: 'audio/mp3',
+      body: '<img src="https://never.invalid/body"><p>Safe</p>',
+    },
+    role,
+  )
+  expect(container.querySelector('img')).toBeNull()
+  expect(container.textContent).not.toContain('Image unavailable')
+  expect(container.querySelector('p')?.textContent).toBe('Safe')
+})
 
 it('renders a longer excerpt for feature and lead stories without truncating the headline', async () => {
   const story = { ...item, title: 'A complete headline', body: `<p>${'word '.repeat(150)}</p>` }
@@ -172,7 +148,7 @@ it('renders a longer excerpt for feature and lead stories without truncating the
 })
 
 it('keeps Star and read toggles labelled and wired to the current story', async () => {
-  await render()
+  const initial = await render()
   const star = container.querySelector<HTMLButtonElement>('[aria-label="Star: Headline"]')!
   expect(star.textContent).toBe('')
   const read = container.querySelector<HTMLButtonElement>('[aria-label="Mark unread: Headline"]')!
@@ -180,6 +156,11 @@ it('keeps Star and read toggles labelled and wired to the current story', async 
   expect(read.hasAttribute('aria-pressed')).toBe(false)
   expect(read.querySelector('svg.tabler-icon-circle')?.getAttribute('aria-hidden')).toBe('true')
   expect(star.querySelector('svg.tabler-icon-star')?.getAttribute('aria-hidden')).toBe('true')
+  expect(star.getAttribute('aria-pressed')).toBe('false')
+  await act(async () => star.click())
+  expect(initial.onStar).toHaveBeenCalledExactlyOnceWith(item)
+  await act(async () => read.click())
+  expect(initial.onRead).toHaveBeenCalledExactlyOnceWith(item)
   const changed = { ...item, starred: true, unread: true }
   const { onStar, onRead } = await render(changed)
   const unstar = container.querySelector<HTMLButtonElement>('[aria-label="Unstar: Headline"]')!

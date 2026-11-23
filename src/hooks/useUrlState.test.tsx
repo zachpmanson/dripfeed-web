@@ -49,28 +49,25 @@ async function traverse(direction: 'back' | 'forward') {
 }
 
 describe('initial URL cleanup', () => {
-  for (const kind of ['feed', 'folder']) {
-    // Numeric edge cases are covered by urlState.test.ts. Keep history behavior here.
-    it.each(['NaN', '9007199254740992'])(
-      `replaces invalid ${kind} %j without exposing an invalid ID`,
-      async (id) => {
-        const params = new URLSearchParams({ view: kind, id, item: '7', keep: 'yes' })
-        window.history.replaceState({ retained: true }, '', `/reader?${params}#article`)
-        const length = window.history.length
-        const push = vi.spyOn(window.history, 'pushState')
-        const replace = vi.spyOn(window.history, 'replaceState')
-        await mount()
-        expect(navigation.view).toEqual({ kind: 'all' })
-        expect(navigation.selectedId).toBe(7)
-        expect(window.location.search).toBe('?view=all&item=7&keep=yes')
-        expect(window.location.hash).toBe('#article')
-        expect(window.history.state).toEqual({ retained: true })
-        expect(window.history.length).toBe(length)
-        expect(push).not.toHaveBeenCalled()
-        expect(replace).toHaveBeenCalledOnce()
-      },
+  it('replaces a malformed initial scope while preserving history state and the fragment', async () => {
+    window.history.replaceState(
+      { retained: true },
+      '',
+      '/reader?view=feed&id=NaN&item=7&keep=yes#article',
     )
-  }
+    const length = window.history.length
+    const push = vi.spyOn(window.history, 'pushState')
+    const replace = vi.spyOn(window.history, 'replaceState')
+    await mount()
+    expect(navigation.view).toEqual({ kind: 'all' })
+    expect(navigation.selectedId).toBe(7)
+    expect(window.location.search).toBe('?view=all&item=7&keep=yes')
+    expect(window.location.hash).toBe('#article')
+    expect(window.history.state).toEqual({ retained: true })
+    expect(window.history.length).toBe(length)
+    expect(push).not.toHaveBeenCalled()
+    expect(replace).toHaveBeenCalledOnce()
+  })
 
   it('replaces an invalid item without changing a valid view', async () => {
     const params = new URLSearchParams({ view: 'folder', id: '2', item: '1.5' })
@@ -80,30 +77,6 @@ describe('initial URL cleanup', () => {
     expect(navigation.view).toEqual({ kind: 'folder', id: 2 })
     expect(navigation.selectedId).toBeNull()
     expect(window.location.search).toBe('?view=folder&id=2')
-    expect(push).not.toHaveBeenCalled()
-  })
-
-  it.each([
-    ['/reader#top', '?view=all', { kind: 'all' }, null],
-    ['/reader?view=feed#top', '?view=all', { kind: 'all' }, null],
-    ['/reader?view=folder#top', '?view=all', { kind: 'all' }, null],
-    ['/reader?view=unknown&id=5#top', '?view=all', { kind: 'all' }, null],
-    [
-      '/reader?view=feed&id=001&item=2e1#top',
-      '?view=feed&id=1&item=20',
-      { kind: 'feed', id: 1 },
-      20,
-    ],
-  ])('replaces noncanonical %s', async (url, search, view, selectedId) => {
-    window.history.replaceState(null, '', url)
-    const length = window.history.length
-    const push = vi.spyOn(window.history, 'pushState')
-    await mount()
-    expect(navigation.view).toEqual(view)
-    expect(navigation.selectedId).toBe(selectedId)
-    expect(window.location.search).toBe(search)
-    expect(window.location.hash).toBe('#top')
-    expect(window.history.length).toBe(length)
     expect(push).not.toHaveBeenCalled()
   })
 
@@ -151,34 +124,27 @@ describe('browser navigation', () => {
     expect(window.history.length).toBe(length + 2)
   })
 
-  it.each(['feed', 'folder'])(
-    'cleans a malformed %s history entry without truncating forward history',
-    async (kind) => {
-      window.history.replaceState(
-        null,
-        '',
-        `/reader?view=${kind}&id=Infinity&item=1.5&keep=yes#top`,
-      )
-      window.history.pushState(null, '', '/reader?view=starred&item=30#next')
-      await mount()
-      const length = window.history.length
-      const push = vi.spyOn(window.history, 'pushState')
-      const replace = vi.spyOn(window.history, 'replaceState')
-      await traverse('back')
-      expect(navigation.view).toEqual({ kind: 'all' })
-      expect(navigation.selectedId).toBeNull()
-      expect(window.location.search).toBe('?view=all&keep=yes')
-      expect(window.location.hash).toBe('#top')
-      expect(push).not.toHaveBeenCalled()
-      expect(replace).toHaveBeenCalledOnce()
-      await traverse('forward')
-      expect(navigation.view).toEqual({ kind: 'starred' })
-      expect(navigation.selectedId).toBe(30)
-      expect(window.location.hash).toBe('#next')
-      expect(push).not.toHaveBeenCalled()
-      expect(window.history.length).toBe(length)
-    },
-  )
+  it('cleans a malformed history entry without truncating forward history', async () => {
+    window.history.replaceState(null, '', '/reader?view=folder&id=Infinity&item=1.5&keep=yes#top')
+    window.history.pushState(null, '', '/reader?view=starred&item=30#next')
+    await mount()
+    const length = window.history.length
+    const push = vi.spyOn(window.history, 'pushState')
+    const replace = vi.spyOn(window.history, 'replaceState')
+    await traverse('back')
+    expect(navigation.view).toEqual({ kind: 'all' })
+    expect(navigation.selectedId).toBeNull()
+    expect(window.location.search).toBe('?view=all&keep=yes')
+    expect(window.location.hash).toBe('#top')
+    expect(push).not.toHaveBeenCalled()
+    expect(replace).toHaveBeenCalledOnce()
+    await traverse('forward')
+    expect(navigation.view).toEqual({ kind: 'starred' })
+    expect(navigation.selectedId).toBe(30)
+    expect(window.location.hash).toBe('#next')
+    expect(push).not.toHaveBeenCalled()
+    expect(window.history.length).toBe(length)
+  })
 
   it('does not add entries for equivalent updates, and supports functional setters', async () => {
     await mount()

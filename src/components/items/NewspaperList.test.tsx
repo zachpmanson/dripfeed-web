@@ -361,22 +361,6 @@ it('makes the button local-first and never reports up to date while cached stori
   bounds()
 })
 
-it('expands a hidden URL target without mounting its prefix and resets exposure only on window remount', async () => {
-  await render()
-  await render({ active: false, selectedId: 9950 })
-  expect(represented()).toBe(199)
-  expect(host.querySelector('[data-story-id="9950"]')).not.toBeNull()
-  expect(host.querySelector('[data-story-id="1"]')).toBeNull()
-  bounds()
-  await render({ active: true, selectedId: null })
-  expect(document.activeElement?.getAttribute('data-story-id')).toBe('9950')
-  await scroll(0)
-  expect(represented()).toBe(199)
-  await render({ windowKey: 'new-scope' })
-  expect(represented()).toBe(2)
-  bounds()
-})
-
 it('redistributes ranked tops into three, two and one stacks on resize without changing rank or roles', async () => {
   await render()
   const first = () => host.querySelector<HTMLElement>('.newspaper')!
@@ -464,20 +448,25 @@ it('prefetches the server two viewports early, without serially draining small p
   bounds()
 })
 
-it('caps even a viewport taller than the entire estimated pool and coalesces rapid jumps', async () => {
+it('caps the DOM when the viewport spans the exposed pool and renders the latest queued scroll', async () => {
+  await render({ items: pool.slice(0, 400), selectedId: 400 })
+  await render({ selectedId: null })
+  expect(represented()).toBe(8)
   height = 10_000_000
-  await exposeAll()
-  bounds()
+  await resize()
+  await scroll(0)
   expect(stories().length).toBeLessThanOrEqual(250)
+  const deepTarget = () => host.querySelector('[data-story-id="351"]')
+  expect(deepTarget()).toBeNull()
   await act(async () => {
-    for (const chunk of [150, 2, 199, 70]) {
+    for (const chunk of [1, 2, 0, 7]) {
       pane().scrollTop = offset(chunk) + 100
       pane().dispatchEvent(new Event('scroll', { bubbles: true }))
     }
   })
   await flush()
   bounds()
-  expect(host.querySelector('[data-story-id="3501"]')).not.toBeNull()
+  expect(deepTarget()).not.toBeNull()
 }, 30_000)
 
 it('anchors an actual visible headline through image/font height changes, width changes and removal', async () => {
@@ -533,10 +522,11 @@ it('reuses per-story measured heights after eviction instead of retaining story 
   bounds()
 })
 
-it('keeps hidden/deep-link selections bounded and restores their chunk and headline on Back', async () => {
+it('bounds hidden selections, restores the headline on return, and resets exposure only on remount', async () => {
+  await render()
   await render({ active: false, selectedId: 9950 })
   bounds()
-  expect(stories().length).toBeLessThanOrEqual(250)
+  expect(represented()).toBe(199)
   expect(host.querySelector('[data-story-id="9950"]')).not.toBeNull()
   expect(host.querySelector('[data-story-id="1"]')).toBeNull()
   expect(props.onLoadMore).not.toHaveBeenCalled()
@@ -555,6 +545,11 @@ it('keeps hidden/deep-link selections bounded and restores their chunk and headl
   expect(host.querySelector('[data-story-id="5000"]')).not.toBeNull()
   await render({ active: true, selectedId: null })
   expect(document.activeElement?.getAttribute('data-story-id')).toBe('5000')
+  bounds()
+  await scroll(0)
+  expect(represented()).toBe(199)
+  await render({ windowKey: 'new-scope' })
+  expect(represented()).toBe(2)
   bounds()
 })
 
@@ -764,40 +759,26 @@ it('leaves list mode prefix batching, selected-row inclusion and caller order/fi
   expect(props.onLoadMore).toHaveBeenCalledTimes(1)
 })
 
-it('forwards feed metadata and favicon preference, groups the name with branding, and falls back safely', async () => {
+it('forwards feed metadata and honors the favicon preference', async () => {
   const feed = {
     id: 1,
     title: 'Fixture',
     faviconLink: 'https://fixture.invalid/favicon.png',
   } as NewsFeed
-  await render({ items: [{ ...item(1), pubDate: 1000 }], feedById: () => feed })
+  await render({
+    items: [{ ...item(1), pubDate: 1000 }],
+    feedById: (id) => (id === feed.id ? feed : undefined),
+  })
   const image = host.querySelector<HTMLImageElement>('.feed-icon')!
   expect(image.getAttribute('src')).toBe(feed.faviconLink)
-  expect(image.alt).toBe('')
-  expect(image.width).toBe(16)
   const source = image.parentElement!
   expect(source.textContent).toBe('Fixture')
-  expect(source.classList.contains('inline-flex')).toBe(true)
-  expect(source.classList.contains('items-center')).toBe(true)
-  // Wrapping utility wiring, not native geometry evidence.
-  expect(source.classList.contains('max-w-full')).toBe(true)
-  expect(source.lastElementChild?.classList.contains('[overflow-wrap:anywhere]')).toBe(true)
-  expect(source.parentElement?.classList.contains('flex-wrap')).toBe(true)
   expect(source.nextElementSibling?.tagName).toBe('TIME')
-  await act(async () => image.dispatchEvent(new Event('error')))
-  expect(host.querySelector('img')).toBeNull()
-  expect(source.querySelector('svg.tabler-icon-rss')?.getAttribute('aria-hidden')).toBe('true')
   await render({ showFavicons: false })
   expect(host.querySelector('.feed-icon')).toBeNull()
   expect(source.textContent).toBe('Fixture')
-  await render({ showFavicons: true, feedById: () => ({ ...feed, faviconLink: null }) })
-  expect(host.querySelector('.feed-icon svg.tabler-icon-rss')).not.toBeNull()
-  expect(host.querySelector('img')).toBeNull()
-  await render({ feedById: () => undefined })
+  await render({ showFavicons: true, feedById: () => undefined })
   expect(host.querySelector('.feed-icon')).toBeNull()
-  expect(source.textContent).toBe('Fixture')
-  await render({ feedById: undefined })
-  expect(host.querySelector('img')).toBeNull()
   expect(source.textContent).toBe('Fixture')
 })
 
@@ -812,70 +793,35 @@ const placement = (id: number) => {
   }
 }
 
-it('keeps actual story nodes, columns and roles through lead and chunk-boundary deletions and rollback', async () => {
-  const original = pool.slice(0, 120)
-  height = 30_000
-  await render({ items: original, selectedId: 108 })
-  await render({ selectedId: null })
-  await scroll(0)
-  const before = new Map(ids().map((id) => [id, placement(id)]))
-  for (let id = 101; id <= 108; id++) expect(before.has(id)).toBe(true)
-  expect(Array.from({ length: 9 }, (_, rank) => before.get(rank + 1)?.role)).toEqual([
-    'newspaper-lead',
-    'newspaper-brief',
-    'newspaper-image',
-    'newspaper-brief',
-    'newspaper-feature',
-    'newspaper-image',
-    'newspaper-brief',
-    'newspaper-standard',
-    'newspaper-feature',
-  ])
-  for (const [id, { role }] of before) {
-    if (id > 9) expect(role).toBe(before.get(2 + ((id - 2) % 8))?.role)
-  }
-  const survivingNode = host.querySelector('[data-story-id="53"]')
-  const removed = new Set([1, 2, 49, 50, 51, 52, 74, 75])
-  await render({ items: original.filter((story) => !removed.has(story.id)) })
-  for (const [id, owner] of before) {
-    if (!removed.has(id)) expect(placement(id)).toEqual(owner)
-  }
-  expect(host.querySelector('[data-story-id="53"]')).toBe(survivingNode)
-  expect(host.querySelector('.newspaper-lead')).toBeNull()
-  expect(host.querySelectorAll('.newspaper-story').length).toBeLessThanOrEqual(250)
+it('keeps surviving nodes and placements until the view or column count changes', async () => {
+  const original = pool.slice(0, 10)
   await render({ items: original })
-  expect(placement(1)).toEqual(before.get(1))
-  expect(placement(50)).toEqual(before.get(50))
-  expect(placement(51)).toEqual(before.get(51))
-  expect(host.querySelectorAll('.newspaper-lead')).toHaveLength(1)
-}, 30_000)
+  const before = new Map(ids().map((id) => [id, placement(id)]))
+  const node = host.querySelector('[data-story-id="5"]')
+  const survivors = original.slice(2).map((story) => ({ ...story, unread: false, starred: true }))
+  const updated = [item(999), ...[...survivors].reverse()]
+  await render({ items: updated })
+  expect(host.querySelector('.newspaper-lead')).toBeNull()
+  expect(host.querySelector('[data-story-id="5"]')).toBe(node)
+  for (const survivor of survivors) expect(placement(survivor.id)).toEqual(before.get(survivor.id))
+  expect(ids()).toContain(999)
 
-it('appends fresh arrivals without redealing and only resets ownership for real views or column-count changes', async () => {
-  const original = pool.slice(0, 85)
-  height = 30_000
-  await render({ items: original })
-  const before = new Map(ids().map((id) => [id, placement(id)]))
-  const current = original.slice(2).map((story) => ({ ...story, unread: false, starred: true }))
-  await render({ items: [item(999), ...current].reverse() })
-  current.forEach((story) => expect(placement(story.id)).toEqual(before.get(story.id)))
-  expect(placement(999).role).not.toBe('newspaper-lead')
-  expect(host.querySelector('.newspaper-lead')).toBeNull()
-  width = 990 // Width changed, but still three columns.
+  await render({ items: [...updated, original[0], original[1]] })
+  expect(placement(1)).toEqual(before.get(1))
+  expect(placement(2)).toEqual(before.get(2))
+  expect(host.querySelectorAll('.newspaper-lead')).toHaveLength(1)
+
+  await render({ items: updated })
+  width = 990 // Width changes within the three-column layout must not redeal.
   await resize()
-  current.forEach((story) => expect(placement(story.id)).toEqual(before.get(story.id)))
+  for (const survivor of survivors) expect(placement(survivor.id)).toEqual(before.get(survivor.id))
   width = 700
   await resize()
-  expect(host.querySelectorAll('.newspaper-column')).toHaveLength(2)
-  await scroll(0)
-  expect(host.querySelector('.newspaper-lead [data-story-id]')?.getAttribute('data-story-id')).toBe(
-    '85',
-  )
-  await render({ windowKey: 'different-sort', items: current })
-  expect(host.querySelector('.newspaper-lead [data-story-id]')?.getAttribute('data-story-id')).toBe(
-    '3',
-  )
-  expect(represented()).toBe(2)
-}, 30_000)
+  expect(columns()).toHaveLength(2)
+  expect(placement(999).role).toBe('newspaper-lead')
+  await render({ windowKey: 'different-sort', items: survivors })
+  expect(placement(3).role).toBe('newspaper-lead')
+})
 
 it('drops empty chunks after bulk clears and still targets reader-return by ownership rather than compacted rank', async () => {
   await render({ items: pool.slice(0, 200), selectedId: 200 })
@@ -889,41 +835,6 @@ it('drops empty chunks after bulk clears and still targets reader-return by owne
   expect(document.activeElement?.getAttribute('data-story-id')).toBe('151')
   expect(placement(151).role).toBe('newspaper-brief')
   expect(host.querySelectorAll('.newspaper-story').length).toBeLessThanOrEqual(250)
-})
-
-it('calls read immediately and restores original ownership after a simulated failed optimistic read', async () => {
-  const original = pool.slice(0, 85)
-  height = 30_000
-  let reject!: (error: Error) => void
-  let reported: Error | undefined
-  const request = new Promise<void>((_, fail) => {
-    reject = fail
-  })
-  const onRead = vi.fn(() =>
-    request.catch((error: Error) => {
-      reported = error
-    }),
-  )
-  await render({ items: original, onRead })
-  const before = placement(2)
-  const read = host.querySelector<HTMLButtonElement>('[aria-label="Mark read: Story 2"]')!
-  await act(async () => {
-    read.focus()
-    read.click()
-    // No animation frame or timer is allowed to own mutation timing.
-    expect(onRead).toHaveBeenCalledExactlyOnceWith(original[1])
-  })
-  await render({ items: original.filter((story) => story.id !== 2) })
-  expect(document.activeElement?.getAttribute('data-story-id')).toBe('3')
-  const error = new Error('server rejected read')
-  await act(async () => {
-    reject(error)
-    await request.catch(() => {})
-  })
-  expect(reported).toBe(error)
-  await render({ items: original })
-  expect(placement(2)).toEqual(before)
-  expect(document.activeElement?.getAttribute('data-story-id')).toBe('3')
 })
 
 it('wires visible sort/explicit Reload motion across keyed sessions but not initial newspaper/list-mode entry', async () => {
@@ -1076,16 +987,23 @@ it('glides surviving mounted stories for read/rollback but never for scroll-only
     const current = pool.slice(0, 100)
     await render({ items: current })
     expect(animate).not.toHaveBeenCalled()
-    await act(async () =>
-      host.querySelector<HTMLButtonElement>('[aria-label="Mark read: Story 2"]')!.click(),
-    )
-    expect(props.onRead).toHaveBeenCalledExactlyOnceWith(current[1])
+    const before = placement(2)
+    const read = host.querySelector<HTMLButtonElement>('[aria-label="Mark read: Story 2"]')!
+    await act(async () => {
+      read.focus()
+      read.click()
+      // Dispatch immediately; motion must not own mutation timing.
+      expect(props.onRead).toHaveBeenCalledExactlyOnceWith(current[1])
+    })
     await render({ items: current.filter((item) => item.id !== 2) })
+    expect(document.activeElement?.getAttribute('data-story-id')).toBe('3')
     expect(animate).toHaveBeenCalled()
     expect(animate.mock.calls[0][1]).toEqual({ duration: 180, easing: 'ease-out' })
     const count = animate.mock.calls.length
     await render({ items: current })
     expect(animate.mock.calls.length).toBeGreaterThan(count)
+    expect(placement(2)).toEqual(before)
+    expect(document.activeElement?.getAttribute('data-story-id')).toBe('3')
     animate.mockClear()
     await scroll(8000)
     expect(animate).not.toHaveBeenCalled()

@@ -30,35 +30,13 @@ const item: NewsItem = {
   sharedByDisplayName: null,
 }
 
-it.each([true, false])('uses title colour without an unread dot (unread=%s)', (unread) => {
-  const html = renderToStaticMarkup(
-    <ItemRow
-      item={{ ...item, unread }}
-      selected={false}
-      feedTitle={() => 'Example feed'}
-      showFavicons={false}
-      singleClickRead={false}
-      onSelect={vi.fn()}
-      onRead={vi.fn()}
-      rarityMode={false}
-    />,
-  )
-
-  expect(html).not.toContain('unread-dot')
-  const title = html.match(/<div class="item-title([^"]*)">([^<]*)<\/div>/)!
-  expect(title).not.toBeNull()
-  expect(title[2]).toBe('Article title')
-  expect(title[1].includes('text-app-muted')).toBe(!unread)
-})
-
-it.each([true, false])(
-  'uses a decorative Tabler filled star only for starred items (%s)',
-  (starred) => {
-    const html = renderToStaticMarkup(
+it('renders read and star state without an unread dot', () => {
+  const render = (unread: boolean, starred: boolean) =>
+    renderToStaticMarkup(
       <ItemRow
-        item={{ ...item, starred }}
+        item={{ ...item, unread, starred }}
         selected={false}
-        feedTitle={() => 'Feed'}
+        feedTitle={() => 'Example feed'}
         showFavicons={false}
         singleClickRead={false}
         onSelect={vi.fn()}
@@ -66,8 +44,20 @@ it.each([true, false])(
         rarityMode={false}
       />,
     )
-    expect(html.includes('tabler-icon-star-filled')).toBe(starred)
-    expect(html.includes('aria-label="starred"')).toBe(starred)
-    if (starred) expect(html).toMatch(/<svg[^>]*aria-hidden="true"/)
-  },
-)
+  const unread = render(true, false)
+  const read = render(false, true)
+  const unreadStarred = render(true, true)
+  const titleClasses = (html: string) =>
+    html.match(/<div class="item-title([^"]*)">Article title<\/div>/)?.[1]
+  expect(titleClasses(unread)).toBeDefined()
+  expect(titleClasses(unread)).not.toContain('text-app-muted')
+  expect(titleClasses(read)).toContain('text-app-muted')
+  expect(titleClasses(unreadStarred)).toBe(titleClasses(unread))
+  expect(unreadStarred).toContain('aria-label="starred"')
+  expect(unread).not.toContain('unread-dot')
+  expect(read).not.toContain('unread-dot')
+  expect(unread).not.toContain('tabler-icon-star-filled')
+  expect(unread).not.toContain('aria-label="starred"')
+  expect(read).toMatch(/<span aria-label="starred"><svg[^>]*aria-hidden="true"[^>]*>/)
+  expect(read).toContain('tabler-icon-star-filled')
+})

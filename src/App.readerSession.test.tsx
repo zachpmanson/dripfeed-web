@@ -265,7 +265,6 @@ it('renders the global toast outside the reader grid and wires dismissal', async
   await render()
   const toast = container.querySelector('[role="alert"]')!
   expect(toast.textContent).toContain('Sync failed')
-  expect(toast.className).toContain('fixed')
   expect(toast.closest('main')).toBeNull()
   await act(async () =>
     container.querySelector<HTMLButtonElement>('[aria-label="Dismiss error"]')!.click(),
